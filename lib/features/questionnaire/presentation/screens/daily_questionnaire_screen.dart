@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/services/questionnaire_service.dart';
 import '../../domain/entities/daily_survey.dart';
+import '../../../prediction/data/services/prediction_api_service.dart';
+import '../../../prediction/domain/entities/prediction_result.dart';
 
 class DailyQuestionnaireScreen extends StatefulWidget {
   final DailySurvey? initialSurvey;
@@ -14,6 +16,7 @@ class DailyQuestionnaireScreen extends StatefulWidget {
 
 class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   final _service = QuestionnaireService();
+  final _predictionService = PredictionApiService();
   bool loading = false;
   String? error;
 
@@ -95,9 +98,23 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       );
 
       await _service.saveDailySurvey(survey);
-      if (mounted) context.go('/home');
+      
+      // 3. Lancer l'analyse IA (Risque J+3, etc.)
+      final prediction = await _predictionService.predict({
+        'stress': stress,
+        'sleep': sleepDuration,
+        'hydration': hydration,
+        'food': food,
+      });
+
+      // Sauvegarder la prédiction pour l'historique
+      await _predictionService.saveResult(prediction, user.uid);
+
+      if (mounted) {
+        context.go('/prediction', extra: prediction);
+      }
     } catch (e) {
-      setState(() { error = e.toString(); });
+      setState(() { error = 'Erreur lors de l\'analyse : $e'; });
     } finally {
       setState(() { loading = false; });
     }

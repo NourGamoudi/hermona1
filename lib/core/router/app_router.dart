@@ -22,6 +22,7 @@ import '../../features/questionnaire/presentation/screens/profile_questionnaire_
 import '../../features/questionnaire/presentation/screens/daily_questionnaire_screen.dart';
 import '../../features/questionnaire/presentation/screens/weekly_questionnaire_screen.dart';
 import '../../features/questionnaire/domain/entities/user_profile.dart';
+import '../../features/prediction/domain/entities/prediction_result.dart';
 import '../widgets/main_scaffold.dart';
 
 final _rootKey  = GlobalKey<NavigatorState>();
@@ -58,7 +59,12 @@ final appRouter = GoRouter(
       routes: [
         GoRoute(path: '/home',       builder: (_, __) => const HomeScreen()),
         GoRoute(path: '/chat',       builder: (_, __) => const ChatScreen()),
-        GoRoute(path: '/prediction', builder: (_, __) => const PredictionScreen()),
+        GoRoute(
+          path: '/prediction', 
+          builder: (_, state) => PredictionScreen(
+            initialResult: state.extra as PredictionResult?,
+          ),
+        ),
         GoRoute(path: '/profile',    builder: (_, __) => const ProfileScreen()),
       ],
     ),

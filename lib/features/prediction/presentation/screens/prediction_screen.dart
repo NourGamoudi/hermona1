@@ -11,7 +11,8 @@ import '../../data/services/prediction_api_service.dart';
 import '../../domain/entities/prediction_result.dart';
 
 class PredictionScreen extends StatefulWidget {
-  const PredictionScreen({super.key});
+  final PredictionResult? initialResult;
+  const PredictionScreen({super.key, this.initialResult});
   @override
   State<PredictionScreen> createState() => _PredictionScreenState();
 }
@@ -24,7 +25,11 @@ class _PredictionScreenState extends State<PredictionScreen> {
   @override
   void initState() {
     super.initState();
-    _fetchLastPrediction();
+    if (widget.initialResult != null) {
+      _result = widget.initialResult;
+    } else {
+      _fetchLastPrediction();
+    }
   }
 
   Future<void> _fetchLastPrediction() async {
