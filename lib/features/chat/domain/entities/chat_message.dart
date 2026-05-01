@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import '../../../questionnaire/domain/entities/user_profile.dart';
 import '../../../prediction/domain/entities/prediction_result.dart';
@@ -42,6 +43,8 @@ class ChatMessage extends Equatable {
   List<Object?> get props => [id];
 }
 
+
+
 // ─────────────────────────────────────────────────────────────────────────────
 abstract class ChatRepository {
   /// Envoie l'historique + le message de l'utilisateur au backend et retourne
@@ -51,9 +54,8 @@ abstract class ChatRepository {
     required String userMessage,
     UserProfile? profile,
     PredictionResult? prediction,
+    CancelToken? cancelToken,
   });
-
-
   Future<List<ChatMessage>> loadHistory(String userId);
   Future<void> saveMessage(ChatMessage msg, String userId);
   Future<void> clearHistory(String userId);

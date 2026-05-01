@@ -21,6 +21,7 @@ class ChatApiService implements ChatRepository {
     required String userMessage,
     UserProfile? profile,
     PredictionResult? prediction,
+    CancelToken? cancelToken,
   }) async {
     try {
       // Préparer le payload attendu par le backend FastAPI
@@ -53,9 +54,16 @@ class ChatApiService implements ChatRepository {
       // Forcer l'URL de base pour éviter tout cache persistant de localhost
       _dio.options.baseUrl = 'http://10.202.31.129:8000';
       
-      final response = await _dio.post('/chat', data: payload);
+      final response = await _dio.post(
+        '/chat', 
+        data: payload,
+        cancelToken: cancelToken,
+      );
       return response.data['response'] ?? "Désolée, je n'ai pas pu répondre.";
     } catch (e) {
+      if (e is DioException && e.type == DioExceptionType.cancel) {
+        throw Exception("Annulé par l'utilisateur");
+      }
       throw Exception('Erreur de connexion au serveur : $e');
     }
   }

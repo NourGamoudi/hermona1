@@ -11,6 +11,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
+import 'package:dio/dio.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -38,7 +39,11 @@ class _ChatScreenState extends State<ChatScreen> {
   final List<ChatMessage> _msgs = [];
   bool _loading = false;
   bool _typing = false;
+  CancelToken? _cancelToken;
   bool _isTranscribing = false;
+  String? _lastSpokenText;
+  bool _isPaused = false;
+  int _currentSpeakPosition = 0;
 
   // Voice & TTS
   final _audioRecorder = AudioRecorder();
@@ -110,6 +115,9 @@ class _ChatScreenState extends State<ChatScreen> {
         debugPrint('TTS error: $message');
         if (mounted) setState(() => _isSpeaking = false);
       });
+      _tts.setProgressHandler((text, start, end, word) {
+        _currentSpeakPosition = start;
+      });
       if (mounted) setState(() => _ttsReady = true);
       debugPrint('TTS: Ready');
     } catch (e) {
@@ -126,13 +134,43 @@ class _ChatScreenState extends State<ChatScreen> {
     if (mounted) {
       setState(() {
         _isSpeaking = false;
+        _isPaused = false;
       });
     }
   }
 
+  Future<void> _pauseSpeaking() async {
+    if (!_ttsReady) return;
+    try {
+      await _tts.stop();
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _isSpeaking = false;
+        _isPaused = true;
+      });
+    }
+  }
+
+  Future<void> _resumeSpeaking() async {
+    if (!_ttsReady || _lastSpokenText == null) return;
+    setState(() {
+      _isPaused = false;
+    });
+    // Si on a une position valide, on reprend depuis cette position
+    if (_currentSpeakPosition > 0 && _currentSpeakPosition < _lastSpokenText!.length) {
+      await _tts.speak(_lastSpokenText!.substring(_currentSpeakPosition));
+    } else {
+      await _tts.speak(_lastSpokenText!);
+    }
+  }
+
   Future<void> _handleSpeak(String text) async {
+    _lastSpokenText = text;
+    _currentSpeakPosition = 0;
+    _isPaused = false;
     debugPrint(
-        'TTS: _handleSpeak called with text: "${text.substring(0, min(50, text.length))}..."');
+        'TTS: _handleSpeak called with text: "${text.length > 50 ? text.substring(0, 50) : text}..."');
     if (!_ttsReady) {
       debugPrint('TTS: Not ready yet');
       return;
@@ -149,12 +187,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _toggleAutoSpeak() async {
-    if (_autoSpeak) {
-      await _stopSpeaking();
-    }
+    final newMode = !_autoSpeak;
     if (mounted) {
-      setState(() => _autoSpeak = !_autoSpeak);
+      setState(() => _autoSpeak = newMode);
     }
+    try {
+      await _tts.setVolume(newMode ? 1.0 : 0.0);
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -359,12 +398,15 @@ class _ChatScreenState extends State<ChatScreen> {
       }
     }
 
+    _cancelToken = CancelToken();
+
     try {
       final reply = await _chatSvc.getResponse(
         history: _msgs,
         userMessage: text,
         profile: _profile,
         prediction: _prediction,
+        cancelToken: _cancelToken,
       );
 
       final botMsg = ChatMessage(
@@ -397,6 +439,15 @@ class _ChatScreenState extends State<ChatScreen> {
         debugPrint('TTS: Auto speak disabled and not voice input');
       }
     } catch (e) {
+      if (e.toString().contains("Annulé par l'utilisateur")) {
+        setState(() {
+          _loading = false;
+          _typing = false;
+        });
+        debugPrint('Chat request cancelled by user');
+        return;
+      }
+      
       setState(() {
         _loading = false;
         _typing = false;
@@ -465,29 +516,45 @@ class _ChatScreenState extends State<ChatScreen> {
           ],
         ),
         actions: [
+          // Toggle Auto-Speak
           IconButton(
-            icon: Icon(_autoSpeak ? Iconsax.volume_high : Iconsax.volume_cross,
-                color: _autoSpeak
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.onSurface.withOpacity(0.6)),
+            tooltip: _autoSpeak ? 'Désactiver la lecture auto' : 'Activer la lecture auto',
+            icon: Icon(
+              _autoSpeak ? Iconsax.volume_high : Iconsax.volume_cross,
+              color: _autoSpeak
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface.withOpacity(0.4),
+            ),
             onPressed: _toggleAutoSpeak,
           ),
-          IconButton(
-            icon: Icon(
-              _isSpeaking
-                  ? Icons.pause_circle_filled
-                  : Icons.pause_circle_outline,
-              color: _isSpeaking
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.onSurface.withOpacity(0.6),
+          // Pause / Play / Replay buttons
+          if (_isSpeaking)
+            IconButton(
+              tooltip: 'Mettre en pause',
+              icon: Icon(
+                Icons.pause_circle_filled_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              onPressed: _pauseSpeaking,
+            )
+          else if (_isPaused)
+            IconButton(
+              tooltip: 'Reprendre la lecture',
+              icon: Icon(
+                Icons.play_circle_filled_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              onPressed: _resumeSpeaking,
             ),
-            onPressed: _isSpeaking ? _stopSpeaking : null,
-          ),
-          // Test button - remove after debugging
-          IconButton(
-            icon: const Icon(Icons.play_arrow, color: Colors.green),
-            onPressed: () => _handleSpeak("Test de synthèse vocale"),
-          ),
+          if (_lastSpokenText != null && !_isSpeaking)
+            IconButton(
+              tooltip: 'Recommencer depuis le début',
+              icon: Icon(
+                Icons.replay_circle_filled_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              onPressed: () => _handleSpeak(_lastSpokenText!),
+            ),
           const SizedBox(width: 8),
         ],
       ),
@@ -633,21 +700,35 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
           const SizedBox(width: 10),
           GestureDetector(
-            onTap: () => _send(_textCtrl.text),
+            onTap: _loading
+                ? () {
+                    _cancelToken?.cancel("Annulé par l'utilisateur");
+                  }
+                : () => _send(_textCtrl.text),
             child: Container(
               width: 50,
               height: 50,
               decoration: BoxDecoration(
-                gradient: _textCtrl.text.trim().isNotEmpty
-                    ? LinearGradient(
-                        colors: [theme.colorScheme.primary, theme.colorScheme.secondary])
-                    : LinearGradient(
-                        colors: [theme.colorScheme.surface, theme.colorScheme.surface]),
+                gradient: _loading
+                    ? LinearGradient(colors: [theme.colorScheme.error, theme.colorScheme.error.withOpacity(0.8)])
+                    : _textCtrl.text.trim().isNotEmpty
+                        ? LinearGradient(colors: [theme.colorScheme.primary, theme.colorScheme.secondary])
+                        : LinearGradient(colors: [theme.colorScheme.surface, theme.colorScheme.surface]),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: _textCtrl.text.trim().isNotEmpty ? Colors.transparent : theme.dividerColor),
+                border: Border.all(
+                  color: _loading
+                      ? theme.colorScheme.error
+                      : _textCtrl.text.trim().isNotEmpty
+                          ? Colors.transparent
+                          : theme.dividerColor,
+                ),
               ),
-              child:
-                  Icon(Icons.arrow_upward_rounded, color: _textCtrl.text.trim().isNotEmpty ? Colors.white : theme.colorScheme.onSurface.withOpacity(0.4)),
+              child: Icon(
+                _loading ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+                color: _loading || _textCtrl.text.trim().isNotEmpty
+                    ? Colors.white
+                    : theme.colorScheme.onSurface.withOpacity(0.4),
+              ),
             ),
           ),
         ],

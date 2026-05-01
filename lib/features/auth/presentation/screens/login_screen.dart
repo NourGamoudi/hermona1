@@ -41,7 +41,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await _auth.signInWithGoogle();
       if (mounted) context.go('/home');
     } catch (e) {
-      _snack('Connexion Google échouée');
+      debugPrint("❌ Erreur Google: $e");
+      _snack('Connexion Google échouée: ${e.toString()}');
     } finally {
       if (mounted) setState(() => _googleLoading = false);
     }
