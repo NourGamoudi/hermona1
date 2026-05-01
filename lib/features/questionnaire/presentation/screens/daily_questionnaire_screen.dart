@@ -69,17 +69,14 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
         }
       }
 
-      // Calcul heuristique du score (0-100)
-      int score = 70; // Base
-      if (sleepDuration > 7) score += 10;
-      if (hydration > 6) score += 10;
-      if (spfUsed) score += 10;
-      if (stress > 7) score -= 15;
-      if (food.contains('sucre')) score -= 10;
-      if (food.contains('laitages')) score -= 10;
-      if (food.contains('fast-food')) score -= 15;
-      if (food.contains('fruits')) score += 5;
-      if (food.contains('équilibrée')) score += 10;
+      // Calcul auto backend : hygiene_score heuristique (0–100)
+      // sommeil < 7h → -15 | eau < 6 → -10 | stress > 7 → -20 | sucre/laitiers → -15
+      int score = 100;
+      if (sleepDuration < 7) score -= 15;
+      if (hydration < 6) score -= 10;
+      if (stress > 7) score -= 20;
+      if (food.contains('sucre') || food.contains('laitages')) score -= 15;
+      if (food.contains('fast-food')) score -= 10; // Extra penalty
       score = score.clamp(0, 100);
 
       final survey = DailySurvey(
@@ -98,7 +95,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       );
 
       await _service.saveDailySurvey(survey);
-      if (mounted) context.pop();
+      if (mounted) context.go('/home');
     } catch (e) {
       setState(() { error = e.toString(); });
     } finally {

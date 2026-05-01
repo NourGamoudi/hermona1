@@ -1,18 +1,28 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
+import 'firebase_options.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
+
+  if (kIsWeb) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
+  } else {
+    await Firebase.initializeApp();
+  }
+
+  await initializeDateFormatting('fr', null);
 
   // Restore saved primary colour
   final prefs = await SharedPreferences.getInstance();
-  final saved  = prefs.getInt(AppConstants.keyPrimaryColor);
+  final saved = prefs.getInt(AppConstants.keyPrimaryColor);
   if (saved != null) AppTheme.setPrimary(Color(saved));
 
   runApp(AcneIAApp(
@@ -47,12 +57,12 @@ class _AcneIAAppState extends State<AcneIAApp> {
   Widget build(BuildContext context) {
     print('build: AcneIAApp');
     return MaterialApp.router(
-      title            : 'AcnéIA',
+      title: 'HERMONA',
       debugShowCheckedModeBanner: false,
-      theme            : AppTheme.light(),
-      darkTheme        : AppTheme.dark(),
-      themeMode        : _mode,
-      routerConfig     : appRouter,
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: _mode,
+      routerConfig: appRouter,
     );
   }
 }

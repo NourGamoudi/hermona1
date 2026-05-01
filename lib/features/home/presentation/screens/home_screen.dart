@@ -5,12 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:image_picker/image_picker.dart';
+import 'package:percent_indicator/percent_indicator.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
-import '../../../detection/data/services/detection_api_service.dart';
+import '../../../prediction/domain/entities/prediction_result.dart';
+import '../../../questionnaire/domain/entities/daily_survey.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,10 +20,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final _picker     = ImagePicker();
-  final _detection  = DetectionApiService();
-  final List<File> _images = [];
-  bool _analyzing = false;
   String? _firstName;
 
   @override
@@ -36,309 +33,339 @@ class _HomeScreenState extends State<HomeScreen> {
     if (uid == null) return;
     FirebaseFirestore.instance
         .collection(AppConstants.colUsers).doc(uid).get()
-        .then((d) { if (d.exists && mounted) setState(() => _firstName = d.data()?['firstName'] as String?); });
-  }
-
-  Future<void> _pick(ImageSource src) async {
-    try {
-      if (src == ImageSource.gallery) {
-        final files = await _picker.pickMultiImage(imageQuality: 85);
-        if (files.isNotEmpty) setState(() => _images.addAll(files.map((f) => File(f.path))));
-      } else {
-        final f = await _picker.pickImage(source: src, imageQuality: 85);
-        if (f != null) setState(() => _images.add(File(f.path)));
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _analyze() async {
-    if (_images.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Ajoutez au moins une photo')));
-      return;
-    }
-    setState(() => _analyzing = true);
-    try {
-      final uid  = FirebaseAuth.instance.currentUser!.uid;
-      final result = await _detection.analyzeImages(_images);
-      await _detection.saveResult(result, uid);
-      if (mounted) context.push('/detection/result', extra: result.toJson());
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error));
-    } finally {
-      if (mounted) setState(() => _analyzing = false);
-    }
+        .then((d) { 
+          if (d.exists && mounted) {
+            setState(() => _firstName = d.data()?['firstName'] as String?);
+          }
+        });
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+
     return Scaffold(
       body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: RefreshIndicator(
+          onRefresh: () async => _loadUser(),
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            children: [
+              // Header
+              _buildHeader(context),
+              const SizedBox(height: 32),
+              
+              // Dashboard Metrics
+              _buildDashboardMetrics(uid),
+              const SizedBox(height: 32),
+
+              // Quick Actions
+              SectionTitle(title: 'Actions Rapides', action: 'Tout voir', onAction: () {}),
+              const SizedBox(height: 16),
+              _buildQuickActions(context),
+              
+              const SizedBox(height: 32),
+              
+              // Daily Follow-up
+              _buildDailyFollowUp(context),
+              
+              const SizedBox(height: 80), // Space for bottom nav
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Bonjour, ${_firstName ?? '...'} ✨',
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Comment se sent ta peau aujourd\'hui ?',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          icon: const Icon(Iconsax.notification),
+          onPressed: () {},
+        ),
+        const SizedBox(width: 8),
+        GestureDetector(
+          onTap: () => context.go('/profile'),
+          child: CircleAvatar(
+            backgroundColor: AppTheme.primary.withOpacity(0.1),
+            child: const Text('🌸'),
+          ),
+        ),
+      ],
+    ).animate().fadeIn().slideX(begin: -0.1);
+  }
+
+  Widget _buildDashboardMetrics(String? uid) {
+    if (uid == null) return const SizedBox();
+
+    return Column(
+      children: [
+        // Top Row: Risk & Hygiene
+        Row(
           children: [
-            // Header
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bonjour ${_firstName ?? ''} 👋',
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Prête à prendre soin de ta peau ?',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-                      ),
-                    ],
-                  ),
-                ),
-                CircleAvatar(
-                  backgroundColor: AppTheme.primary.withOpacity(0.1),
-                  child: const Text('🌸', style: TextStyle(fontSize: 20)),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Iconsax.logout),
-                  color: AppColors.error,
-                  onPressed: () async {
-                    await FirebaseAuth.instance.signOut();
-                    if (context.mounted) context.go('/welcome');
-                  },
-                ),
-              ],
-            ).animate().fadeIn().slideY(begin: -0.2),
-            
-            const SizedBox(height: 32),
-            
-            // Questionnaires Dashboard
-            SectionTitle(title: 'Suivi & Bilans', action: '', onAction: () {}),
-            const SizedBox(height: 16),
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              clipBehavior: Clip.none,
+            // Risk Card
+            Expanded(
+              flex: 3,
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection(AppConstants.colPredictions)
+                    .where('userId', isEqualTo: uid)
+                    .orderBy('predictedAt', descending: true)
+                    .limit(1)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  PredictionResult? result;
+                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                    result = PredictionResult.fromJson(snapshot.data!.docs.first.data() as Map<String, dynamic>);
+                  }
+
+                  return _MetricCard(
+                    title: 'Risque Acné',
+                    value: result != null ? '${(result.riskScore * 100).toInt()}%' : '--',
+                    subtitle: result?.riskLevel.name.toUpperCase() ?? 'En attente',
+                    icon: Iconsax.status_up,
+                    color: _getRiskColor(result?.riskLevel),
+                    onTap: () => context.go('/prediction'),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Hygiene Score Card
+            Expanded(
+              flex: 2,
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('daily_surveys')
+                    .where('userId', isEqualTo: uid)
+                    .orderBy('date', descending: true)
+                    .limit(1)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  int? score;
+                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                    score = snapshot.data!.docs.first['lifestyleScore'] as int?;
+                  }
+
+                  return _MetricCard(
+                    title: 'Hygiène',
+                    value: score != null ? '$score' : '--',
+                    subtitle: '/100',
+                    icon: Iconsax.mask,
+                    color: AppColors.info,
+                    onTap: () => context.push('/daily-survey'),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        // Cycle Phase Card
+        StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance.collection(AppConstants.colUsers).doc(uid).snapshots(),
+          builder: (context, snapshot) {
+            String phase = 'Inconnue';
+            int day = 0;
+            if (snapshot.hasData && snapshot.data!.exists) {
+              final data = snapshot.data!.data() as Map<String, dynamic>;
+              if (data['lastPeriodsDate'] != null) {
+                final lastDate = (data['lastPeriodsDate'] as Timestamp).toDate();
+                day = DateTime.now().difference(lastDate).inDays + 1;
+                if (day <= 5) phase = 'Menstruelle';
+                else if (day <= 13) phase = 'Folliculaire';
+                else if (day <= 15) phase = 'Ovulatoire';
+                else phase = 'Lutéale';
+              }
+            }
+
+            return AppCard(
+              onTap: () => context.push('/onboarding'),
               child: Row(
                 children: [
-                  _buildSurveyCard(
-                    context, 
-                    title: 'Mon Profil', 
-                    subtitle: 'Onboarding', 
-                    icon: Iconsax.user, 
-                    color: AppTheme.primary, 
-                    onTap: () => context.push('/onboarding')
+                  CircularPercentIndicator(
+                    radius: 30.0,
+                    lineWidth: 6.0,
+                    percent: (day % 28) / 28,
+                    center: Text('$day'),
+                    progressColor: AppColors.secondary,
+                    backgroundColor: AppColors.secondary.withOpacity(0.1),
+                    circularStrokeCap: CircularStrokeCap.round,
                   ),
                   const SizedBox(width: 16),
-                  _buildSurveyCard(
-                    context, 
-                    title: 'Bilan', 
-                    subtitle: 'Quotidien', 
-                    icon: Iconsax.calendar_1, 
-                    color: AppColors.secondary, 
-                    onTap: () => context.push('/daily-survey')
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Phase $phase', style: Theme.of(context).textTheme.headlineMedium),
+                        Text('Jour $day du cycle', style: Theme.of(context).textTheme.bodySmall),
+                      ],
+                    ),
                   ),
-                  const SizedBox(width: 16),
-                  _buildSurveyCard(
-                    context, 
-                    title: 'Bilan', 
-                    subtitle: 'Hebdomadaire', 
-                    icon: Iconsax.health, 
-                    color: AppColors.accent, 
-                    onTap: () => context.push('/weekly-survey')
-                  ),
+                  Icon(Iconsax.moon, color: AppColors.secondary.withOpacity(0.5)),
                 ],
               ),
-            ).animate().fadeIn(delay: 200.ms).slideX(begin: 0.2),
-
-            const SizedBox(height: 32),
-
-            // AI Analysis Section
-            SectionTitle(title: 'Analyse de peau IA', action: '', onAction: () {}),
-            const SizedBox(height: 16),
-            _buildLastAnalysis(),
-            const SizedBox(height: 16),
-            _buildUploadZone(),
-            if (_images.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildPreviews(),
-              const SizedBox(height: 16),
-              GradientButton(
-                text: _analyzing ? 'Analyse en cours...' : 'Analyser les photos',
-                onPressed: _analyzing ? null : _analyze,
-              ).animate().fadeIn().slideY(begin: 0.1),
-            ],
-
-            const SizedBox(height: 32),
-            _buildShortcuts(),
-            const SizedBox(height: 32),
-          ],
+            );
+          },
         ),
-      ),
+      ],
+    ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1);
+  }
+
+  Widget _buildQuickActions(BuildContext context) {
+    return GridView.count(
+      crossAxisCount: 2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 1.5,
+      children: [
+        _ActionItem(
+          title: 'Assistant IA',
+          icon: Iconsax.message_notif,
+          color: AppTheme.primary,
+          onTap: () => context.go('/chat'),
+        ),
+        _ActionItem(
+          title: 'Analyse Photo',
+          icon: Iconsax.camera,
+          color: AppColors.accent,
+          onTap: () => context.push('/weekly-survey'),
+        ),
+        _ActionItem(
+          title: 'Forum Femmes',
+          icon: Iconsax.people,
+          color: AppColors.secondary,
+          onTap: () => context.push('/forum'),
+        ),
+        _ActionItem(
+          title: 'Historique',
+          icon: Iconsax.chart,
+          color: AppColors.info,
+          onTap: () => context.push('/history'),
+        ),
+      ],
     );
   }
 
-  Widget _buildSurveyCard(BuildContext context, {required String title, required String subtitle, required IconData icon, required Color color, required VoidCallback onTap}) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 120,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.2)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, color: color, size: 28),
-            const SizedBox(height: 16),
-            Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 14)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: TextStyle(color: color.withOpacity(0.8), fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLastAnalysis() {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections)
-          .where('userId', isEqualTo: uid)
-          .orderBy('analyzedAt', descending: true).limit(1).snapshots(),
-      builder: (ctx, snap) {
-        if (!snap.hasData || snap.data!.docs.isEmpty) {
-          return AppCard(child: Row(children: [
-            Container(padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-              child: Icon(Iconsax.camera, color: AppTheme.primary)),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Première analyse', style: Theme.of(ctx).textTheme.labelLarge),
-              Text('Commencez votre parcours beauté !', style: Theme.of(ctx).textTheme.bodySmall),
-            ])),
-          ])).animate().fadeIn(delay: 100.ms);
-        }
-        final data  = snap.data!.docs.first.data() as Map<String, dynamic>;
-        final score = data['severityScore'] as int;
-        final level = data['severityLevel'] as String;
-        final color = level == 'normal' ? AppColors.severityNormal
-                    : level == 'moderate' ? AppColors.severityModerate
-                    : AppColors.severitySevere;
-        final label = level == 'normal' ? 'Normal' : level == 'moderate' ? 'Modéré' : 'Sévère';
-        return AppCard(
-          onTap: () => context.push('/detection/result', extra: data),
-          child: Row(children: [
-            Container(width: 54, height: 54,
-              decoration: BoxDecoration(color: color.withOpacity(0.15), shape: BoxShape.circle,
-                  border: Border.all(color: color.withOpacity(0.5), width: 2)),
-              child: Center(child: Text('$score', style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold)))),
-            const SizedBox(width: 14),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Dernière analyse', style: Theme.of(ctx).textTheme.bodySmall),
-              const SizedBox(height: 4),
-              SeverityBadge(label: label, color: color),
-            ])),
-            Icon(Iconsax.arrow_right_3, size: 16, color: Theme.of(ctx).colorScheme.onSurface.withOpacity(0.4)),
-          ]),
-        ).animate().fadeIn(delay: 100.ms);
-      },
-    );
-  }
-
-  Widget _buildUploadZone() {
-    return Row(children: [
-      Expanded(child: GestureDetector(
-        onTap: () => _pick(ImageSource.camera),
-        child: Container(height: 96,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppTheme.primary.withOpacity(0.4), width: 1.5),
-            borderRadius: BorderRadius.circular(20),
-            color: AppTheme.primary.withOpacity(0.04)),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Iconsax.camera, color: AppTheme.primary, size: 28),
-            const SizedBox(height: 8),
-            Text('Prendre photo', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
-        ),
-      ).animate().fadeIn(delay: 360.ms).slideX(begin: -0.08)),
-      const SizedBox(width: 12),
-      Expanded(child: GestureDetector(
-        onTap: () => _pick(ImageSource.gallery),
-        child: Container(height: 96,
-          decoration: BoxDecoration(
-            border: Border.all(color: AppColors.secondary.withOpacity(0.4), width: 1.5),
-            borderRadius: BorderRadius.circular(20),
-            color: AppColors.secondary.withOpacity(0.04)),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Iconsax.gallery, color: AppColors.secondary, size: 28),
-            const SizedBox(height: 8),
-            Text('Importer galerie', style: TextStyle(color: AppColors.secondary, fontSize: 12, fontWeight: FontWeight.w600)),
-          ]),
-        ),
-      ).animate().fadeIn(delay: 440.ms).slideX(begin: 0.08)),
-    ]);
-  }
-
-  Widget _buildPreviews() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Text('${_images.length} photo(s)', style: Theme.of(context).textTheme.bodySmall),
-        TextButton(
-          onPressed: () => setState(() => _images.clear()),
-          child: Text('Effacer tout', style: TextStyle(color: AppColors.error, fontSize: 12))),
-      ]),
-      SizedBox(height: 88, child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: _images.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => Stack(children: [
-          ClipRRect(borderRadius: BorderRadius.circular(14),
-            child: Image.file(_images[i], width: 88, height: 88, fit: BoxFit.cover)),
-          Positioned(top: 4, right: 4, child: GestureDetector(
-            onTap: () => setState(() => _images.removeAt(i)),
-            child: Container(padding: const EdgeInsets.all(3),
-              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-              child: const Icon(Icons.close, color: Colors.white, size: 12)),
-          )),
-        ]),
-      )),
-    ]).animate().fadeIn().slideY(begin: 0.08);
-  }
-
-  Widget _buildShortcuts() {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      SectionTitle(title: 'Accès rapide', action: 'Historique', onAction: () => context.push('/history')),
-      const SizedBox(height: 12),
-      GridView.count(
-        crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12,
-        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: 1.6,
+  Widget _buildDailyFollowUp(BuildContext context) {
+    return AppCard(
+      color: AppTheme.primary.withOpacity(0.05),
+      onTap: () => context.push('/daily-survey'),
+      child: Row(
         children: [
-          _sc(Iconsax.message,  'Assistant IA',  AppTheme.primary,    () => context.go('/chat')),
-          _sc(Iconsax.chart_2,  'Prédictions',   AppColors.secondary, () => context.go('/prediction')),
-          _sc(Iconsax.people,   'Forum',          AppColors.accent,    () => context.push('/forum')),
-          _sc(Iconsax.clock,    'Historique',     AppColors.info,      () => context.push('/history')),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), shape: BoxShape.circle),
+            child: Icon(Iconsax.edit, color: AppTheme.primary),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Bilan du jour', style: Theme.of(context).textTheme.labelLarge),
+                const Text('Mets à jour ton stress, sommeil et alimentation.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+              ],
+            ),
+          ),
+          const Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey),
         ],
       ),
-    ]).animate().fadeIn(delay: 400.ms);
+    );
   }
 
-  Widget _sc(IconData icon, String label, Color color, VoidCallback onTap) =>
-    GestureDetector(
+  Color _getRiskColor(RiskLevel? level) {
+    switch (level) {
+      case RiskLevel.low: return AppColors.success;
+      case RiskLevel.medium: return AppColors.warning;
+      case RiskLevel.high: return AppColors.error;
+      default: return Colors.grey;
+    }
+  }
+}
+
+class _MetricCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _MetricCard({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.2), width: 1)),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Icon(icon, color: color, size: 24),
-          Text(label, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13)),
-        ]),
+          const SizedBox(height: 16),
+          Text(value, style: Theme.of(context).textTheme.displayMedium?.copyWith(color: color, height: 1)),
+          const SizedBox(height: 4),
+          Text(title, style: Theme.of(context).textTheme.labelLarge),
+          Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+        ],
       ),
     );
+  }
+}
+
+class _ActionItem extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionItem({
+    required this.title,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      onTap: onTap,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Icon(icon, color: color, size: 28),
+          Text(title, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13)),
+        ],
+      ),
+    );
+  }
 }

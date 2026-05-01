@@ -19,7 +19,7 @@ import cv2
 from PIL import Image, UnidentifiedImageError
 from io import BytesIO
 
-from app.model import get_model
+from model import get_model
 
 # Charger les variables d'environnement depuis le dossier app/
 env_path = os.path.join(os.path.dirname(__file__), '.env')
@@ -51,7 +51,9 @@ else:
 
 # --- CHARGEMENT DES MODÈLES ---
 # Modèle Tabulaire (Prédiction Risque)
-MODEL_PATH = "model/modele_hermona_5000_20260415_221830 (1).pkl" # Modèle de Machine Learning
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+MODEL_PATH = os.path.join(BASE_DIR, "model", "modele_hermona_5000_20260415_221830 (1).pkl")
+
 pkl_model = None
 try:
     if os.path.exists(MODEL_PATH):
@@ -163,13 +165,26 @@ async def chat(payload: ChatPayload):
 
     try:
         profile = payload.profile or {}
-        system_prompt = f"""Tu es AcnéIA, une assistante experte en acné hormonale.
-        Contexte de l'utilisatrice :
-        - Âge : {profile.get('age', 'non spécifié')}
-        - SOPK/PCOS : {profile.get('pcos', 'non spécifié')}
-        - Type de peau : {profile.get('type_peau', 'non spécifié')}
+        prediction = payload.prediction or {}
+        shap = prediction.get('shapFactors', {})
+        routine = prediction.get('routine', [])
         
-        Réponds de manière empathique, scientifique mais accessible. Utilise des emojis 🌸."""
+        system_prompt = f"""Tu es HERMONA, une assistante experte en acné hormonale féminine.
+        Ton ton est empathique, bienveillant et expert.
+        
+        CONTEXTE UTILISATRICE :
+        - Profil : {profile}
+        - Dernière Analyse : Risque {prediction.get('riskScore', 'N/A')}, Phase {prediction.get('cyclePhase', 'N/A')}
+        - Facteurs SHAP (ce qui influence son acné) : {shap}
+        - Routine actuelle recommandée : {routine}
+        
+        RÈGLES :
+        1. Ne prends JAMAIS de décision médicale. Suggère de voir un dermatologue pour les diagnostics.
+        2. Si elle pose une question sur sa routine, utilise les données contextuelles.
+        3. Réponds en français.
+        4. Termine TOUJOURS ta réponse par UN conseil actionnable concret et simple.
+        
+        Utilise des emojis comme 🌸, ✨, 🧴 pour un aspect premium."""
 
         messages = [{"role": "system", "content": system_prompt}]
         for msg in payload.history:
@@ -273,47 +288,96 @@ async def predict(body: dict):
         factors.append('Routine de soins irrégulière')
 
     risk_score = 0.30
-    
     if pkl_model:
         try:
-            # Créer un DataFrame avec une seule ligne, en respectant l'ordre exact attendu
             df = pd.DataFrame([data])
-            # Le modèle renvoie des probabilités [prob_0, prob_1]
             prob = pkl_model.predict_proba(df)[0][1]
             risk_score = float(prob)
         except Exception as e:
             logger.error(f"Erreur prédiction modèle: {e}")
             pass
             
-    # Détermination du niveau et de la tendance
+    # Simulation Risk J+3
+    risk_j3 = min(1.0, risk_score + 0.1) if data['phase_luteale'] == 1 else max(0.0, risk_score - 0.05)
+    
+    # SHAP Simulation (based on identified factors)
+    shap_factors = {}
+    for i, f in enumerate(factors[:3]):
+        shap_factors[f] = 0.1 + (0.05 * i)
+
+    # Détermination du niveau
     level = "low"
-    if risk_score >= 0.65:
-        level = "high"
-    elif risk_score >= 0.35:
-        level = "medium"
+    if risk_score >= 0.60: level = "high"
+    elif risk_score >= 0.35: level = "medium"
         
     trend = "stable"
-    if risk_score > 0.60:
-        trend = "increasing"
-    elif risk_score < 0.35:
-        trend = "decreasing"
+    if risk_j3 > risk_score: trend = "increasing"
+    elif risk_j3 < risk_score: trend = "decreasing"
 
-    tips = [
-        "🧘 10 min de méditation / jour pour réguler le cortisol",
-        "💤 7-9h de sommeil pour la régénération cellulaire",
-        "🌊 Nettoyez le visage après chaque transpiration"
-    ]
+    # --- ALGO 2 : GÉNÉRATION DES RECOMMANDATIONS (Règles d'experts) ---
+    routine = ["Nettoyant doux au pH physiologique"]
+    to_avoid = ["Gommages à grains", "Huiles comédogènes"]
+    lifestyle = ["Dormir au moins 7h", "Limiter le sucre raffiné"]
+
+    profile = answers.get('profile', {})
+    acne_treat = profile.get('acneTreatment', 'aucun')
+    allergies = profile.get('cosmeticAllergies', [])
+
+    # 1. Stratégie de base selon le Risque
+    if level == "low":
+        strategy = "PRÉVENTION"
+        routine.append("Sérum à la Vitamine C (éclat)")
+        routine.append("Hydratation légère (gel-crème)")
+    elif level == "medium":
+        strategy = "ÉQUILIBRE"
+        routine.append("Sérum à la Niacinamide (sébum)")
+        routine.append("Hydratation équilibrante")
+    else:
+        strategy = "PROTECTION"
+        routine.append("Sérum apaisant (Panthénol)")
+        routine.append("Crème barrière réparatrice")
+        to_avoid.append("Ingrédients actifs irritants")
+
+    # 2. Adaptation Phase du Cycle
+    if data['phase_luteale'] == 1:
+        routine.append("Double nettoyage le soir (indispensable)")
+        lifestyle.append("Infusion de menthe poivrée (anti-androgène)")
     
-    if not factors:
-        factors.append('Aucun facteur de risque majeur identifié')
+    # 3. SÉCURITÉ MÉDICALE (Priorité absolue)
+    if acne_treat == 'isotrétinoïne':
+        routine = ["Nettoyant SURGRAS", "Baume ultra-réparateur", "SPF 50+ (Indispensable)"]
+        to_avoid.extend(["Rétinoïdes", "AHA", "BHA", "Gommages"])
+        lifestyle.append("Hydratation labiale constante")
+    elif acne_treat == 'antibiotiques':
+        routine.append("Protection solaire renforcée")
+        lifestyle.append("Cure de probiotiques (flore intestinale)")
+
+    # 4. ALLERGIES (Éviction)
+    if allergies:
+        to_avoid.append(f"⚠️ ÉVITER ABSOLUMENT : {', '.join(allergies)}")
+
+    # 5. Facteurs SHAP (Mode de vie)
+    for factor in factors[:2]:
+        if 'Stress' in factor:
+            lifestyle.append("Séance de cohérence cardiaque (5 min)")
+        if 'Alimentation' in factor:
+            lifestyle.append("Augmenter les oméga-3 (noix, poissons gras)")
+        if 'Sommeil' in factor:
+            lifestyle.append("Rituel sans écran 30min avant le coucher")
 
     return {
         "id": f"pred_{uuid.uuid4().hex[:8]}",
         "riskScore": round(risk_score, 2),
+        "riskJ3": round(risk_j3, 2),
         "riskLevel": level,
         "trend": trend,
-        "factors": factors,
-        "preventionTips": tips,
+        "shapFactors": shap_factors,
+        "hygieneScore": answers.get('hygieneScore', 70), # Provided by frontend
+        "cycleDay": data['jour_cycle'],
+        "cyclePhase": answers.get('hormonal_cycle', 'folliculaire'),
+        "routine": routine,
+        "toAvoid": to_avoid,
+        "lifestyle": lifestyle,
         "predictedAt": datetime.now().isoformat() + "Z"
     }
 

@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../data/services/questionnaire_service.dart';
 import '../../domain/entities/weekly_survey.dart';
 
@@ -58,13 +60,28 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
     }
   }
 
-  Future<void> _pickImage(String key) async {
-    final xFile = await _picker.pickImage(source: ImageSource.gallery);
+  Future<void> _pickImage(String key, ImageSource source) async {
+    final xFile = await _picker.pickImage(source: source, imageQuality: 80);
     if (xFile != null) {
       setState(() {
         photos[key] = xFile.path;
       });
     }
+  }
+
+  void _showPhotoSourceDialog(String key) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(leading: Icon(Iconsax.camera), title: const Text('Prendre une photo'), onTap: () { Navigator.pop(ctx); _pickImage(key, ImageSource.camera); }),
+            ListTile(leading: Icon(Iconsax.gallery), title: const Text('Choisir dans la galerie'), onTap: () { Navigator.pop(ctx); _pickImage(key, ImageSource.gallery); }),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _save() async {
@@ -110,7 +127,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         if (reminderSent) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('💡 Rappel bienveillant : Essayez de suivre votre routine pour de meilleurs résultats.')));
         }
-        context.pop();
+        context.go('/daily-survey');
       }
     } catch (e) {
       setState(() { error = e.toString(); });
@@ -138,16 +155,11 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
                   Text('📋 Questionnaire Hebdomadaire', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 24),
                   
-                  Text('📸 Photos visage', style: Theme.of(context).textTheme.titleLarge),
-                  const Text('Comparaison avec la semaine précédente.', style: TextStyle(color: Colors.grey)),
+                  Text('📸 Photo de face', style: Theme.of(context).textTheme.titleLarge),
+                  const Text('Analyse de sévérité et comparaison hebdomadaire.', style: TextStyle(color: Colors.grey)),
                   const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildPhotoBox('Face', 'face'),
-                      _buildPhotoBox('Profil Gauche', 'profil_gauche'),
-                      _buildPhotoBox('Profil Droit', 'profil_droit'),
-                    ],
+                  Center(
+                    child: _buildPhotoBox('Photo de face', 'face', width: 200, height: 260),
                   ),
                   const SizedBox(height: 24),
 
@@ -224,27 +236,29 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
     );
   }
 
-  Widget _buildPhotoBox(String title, String key) {
+  Widget _buildPhotoBox(String title, String key, {double width = 80, double height = 80}) {
     final path = photos[key];
     return GestureDetector(
-      onTap: () => _pickImage(key),
+      onTap: () => _showPhotoSourceDialog(key),
       child: Column(
         children: [
           Container(
-            width: 80, height: 80,
+            width: width, height: height,
             decoration: BoxDecoration(
               color: Colors.grey[200],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey[400]!),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.grey[300]!, width: 2),
             ),
             child: path != null 
                 ? ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.file(File(path), fit: BoxFit.cover))
-                : const Icon(Icons.add_a_photo, color: Colors.grey),
+                    borderRadius: BorderRadius.circular(18),
+                    child: kIsWeb 
+                      ? Image.network(path, fit: BoxFit.cover)
+                      : Image.file(File(path), fit: BoxFit.cover))
+                : const Icon(Icons.add_a_photo, color: Colors.grey, size: 32),
           ),
           const SizedBox(height: 8),
-          Text(title, style: const TextStyle(fontSize: 12)),
+          Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         ],
       ),
     );

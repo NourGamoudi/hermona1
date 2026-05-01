@@ -50,7 +50,7 @@ class WelcomeScreen extends StatelessWidget {
                 const SizedBox(height: 48),
                 
                 Text(
-                  'Bienvenue sur\nAcnéIA',
+                  'Bienvenue sur\nHERMONA',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.displayLarge?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -58,11 +58,22 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.2, duration: 800.ms, curve: Curves.easeOut),
                 
+                const SizedBox(height: 16),
+                
+                Text(
+                  'Ton assistant IA dédié à l\'acné hormonale',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.primary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ).animate().fadeIn(delay: 1000.ms),
+                
                 const SizedBox(height: 24),
                 
                 // Description
                 Text(
-                  'AcnéIA vous accompagne dans votre parcours beauté. Analysez votre peau et recevez des recommandations personnalisées !',
+                  'Comprenez votre cycle, analysez votre peau et recevez des recommandations expertes pour une routine sereine.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     height: 1.5,
@@ -86,7 +97,7 @@ class WelcomeScreen extends StatelessWidget {
                       style: OutlinedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(50), // Plus arrondi pour le look premium
                         ),
                         side: BorderSide(color: AppTheme.primary, width: 2),
                       ),
@@ -100,8 +111,25 @@ class WelcomeScreen extends StatelessWidget {
                       ),
                     ),
                   ],
-                ).animate().fadeIn(delay: 3000.ms, duration: 800.ms).slideY(begin: 0.2, duration: 800.ms, curve: Curves.easeOut),
-                const SizedBox(height: 16),
+                ).animate().fadeIn(delay: 2000.ms, duration: 800.ms).slideY(begin: 0.2),
+                
+                const SizedBox(height: 32),
+                
+                // Liens discrets
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    TextButton(
+                      onPressed: () {},
+                      child: Text('Mentions légales', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                    ),
+                    Text(' • ', style: TextStyle(color: Colors.grey[400])),
+                    TextButton(
+                      onPressed: () {},
+                      child: Text('Politique de confidentialité', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                    ),
+                  ],
+                ).animate().fadeIn(delay: 2500.ms),
               ],
             ),
           ),

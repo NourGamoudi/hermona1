@@ -11,6 +11,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../../../main.dart';
+import '../../../questionnaire/domain/entities/user_profile.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -68,6 +69,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         SliverPadding(padding: const EdgeInsets.all(20), sliver: SliverList(delegate: SliverChildListDelegate([
           _stats(),
           const SizedBox(height: 22),
+          _section('Mon Profil', [
+            _Item(Iconsax.user, 'Mes informations', 'Âge: ${_user?['age'] ?? '?'}, IMC: ${_user?['imc'] ?? '?'}', () {
+              if (_user != null) {
+                final p = UserProfile.fromJson(_user!, FirebaseAuth.instance.currentUser!.uid);
+                context.push('/onboarding', extra: p);
+              }
+            }),
+            _Item(Iconsax.magic_star, 'Type de peau', '${_user?['skinType'] ?? 'Inconnu'}', null),
+            _Item(Iconsax.health, 'Traitement acné', '${_user?['acneTreatment'] ?? 'Aucun'}', null),
+          ]),
+          const SizedBox(height: 14),
           _section('Historique', [
             _Item(Iconsax.scan,    'Mes analyses',          'Résultats de détection',        () => context.push('/history')),
             _Item(Iconsax.star,    'Mes recommandations',   'Routines et conseils',          () => context.push('/history')),

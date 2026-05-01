@@ -39,7 +39,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         email: _emailCtrl.text.trim(), password: _passCtrl.text,
         firstName: _firstCtrl.text.trim(), lastName: _lastCtrl.text.trim(),
       );
-      if (mounted) context.go('/home');
+      if (mounted) context.go('/onboarding');
     } catch (e) {
       _snack(e.toString().replaceAll('Exception: ', ''));
     } finally {

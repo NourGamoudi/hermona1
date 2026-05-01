@@ -21,6 +21,7 @@ import '../../features/messaging/presentation/screens/chat_private_screen.dart';
 import '../../features/questionnaire/presentation/screens/profile_questionnaire_screen.dart';
 import '../../features/questionnaire/presentation/screens/daily_questionnaire_screen.dart';
 import '../../features/questionnaire/presentation/screens/weekly_questionnaire_screen.dart';
+import '../../features/questionnaire/domain/entities/user_profile.dart';
 import '../widgets/main_scaffold.dart';
 
 final _rootKey  = GlobalKey<NavigatorState>();
@@ -36,7 +37,11 @@ final appRouter = GoRouter(
                    state.matchedLocation.startsWith('/register') ||
                    state.matchedLocation.startsWith('/terms');
     if (!authed && !isAuth) return '/welcome';
-    if (authed  &&  isAuth) return '/home';
+    
+    // Si déjà connecté et sur une page d'auth, on laisse passer vers home 
+    // SAUF si on est dans le flux d'onboarding/questionnaire
+    if (authed && isAuth) return '/home';
+    
     return null;
   },
   routes: [
@@ -89,7 +94,12 @@ final appRouter = GoRouter(
         conversationId: state.pathParameters['convId']!,
       ),
     ),
-    GoRoute(path: '/onboarding',    builder: (_, __) => const ProfileQuestionnaireScreen()),
+    GoRoute(
+      path: '/onboarding', 
+      builder: (_, state) => ProfileQuestionnaireScreen(
+        initialProfile: state.extra as UserProfile?,
+      ),
+    ),
     GoRoute(path: '/daily-survey',  builder: (_, __) => const DailyQuestionnaireScreen()),
     GoRoute(path: '/weekly-survey', builder: (_, __) => const WeeklyQuestionnaireScreen()),
   ],

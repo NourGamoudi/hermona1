@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/prediction_result.dart';
@@ -28,20 +29,38 @@ class PredictionApiService implements PredictionRepository {
   // ─────────────────────────────────────────────────────────────────────────
   @override
   Future<PredictionResult> predict(Map<String, dynamic> answers) async {
-
-    // ════════════════════════════════════════════════════════════════════════
-    // [API RÉELLE] – POST /predict
-    // ════════════════════════════════════════════════════════════════════════
     try {
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('Non connecté');
+
+      // 1. Fetch Latest Context
+      final profileSnap = await _db.collection('users').doc(uid).get();
+      final dailySnap = await _db.collection('daily_surveys')
+          .where('userId', isEqualTo: uid)
+          .orderBy('date', descending: true)
+          .limit(1).get();
+
+      final profile = profileSnap.data() ?? {};
+      final daily = dailySnap.docs.isNotEmpty ? dailySnap.docs.first.data() : {};
+
+      // 2. Prepare Payload
+      final payload = {
+        'answers': {
+          ...answers,
+          'hygieneScore': daily['lifestyleScore'] ?? 70,
+          'hormonal_cycle': daily['cyclePhase'] ?? 'folliculaire',
+          'profile': profile,
+        }
+      };
+
       final response = await _dio.post<Map<String, dynamic>>(
         '/predict',
-        data: {'answers': answers},
+        data: payload,
       );
       return PredictionResult.fromJson(response.data!);
     } catch (e) {
       throw Exception('Erreur de prédiction: $e');
     }
-    // ════════════════════════════════════════════════════════════════════════
   }
 
   // ─────────────────────────────────────────────────────────────────────────

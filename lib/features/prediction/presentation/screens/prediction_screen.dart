@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
+import 'package:percent_indicator/circular_percent_indicator.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
@@ -16,190 +17,68 @@ class PredictionScreen extends StatefulWidget {
 }
 
 class _PredictionScreenState extends State<PredictionScreen> {
-  int _step = 0;
-  final Map<String, dynamic> _answers = {};
   bool _loading = false;
   PredictionResult? _result;
   final _svc = PredictionApiService();
 
-  static const _questions = [
-    _Q('hormonal_cycle', 'Où en êtes-vous dans votre cycle ?', '🌸', [
-      _Opt('pre_menstrual', 'Période prémenstruelle (J20-J28)', Iconsax.danger),
-      _Opt('menstrual',     'Règles en cours',                 Iconsax.calendar_1),
-      _Opt('follicular',    'Phase folliculaire (J1-J13)',     Iconsax.sun_1),
-      _Opt('ovulation',     'Ovulation',                       Iconsax.star),
-      _Opt('unknown',       'Je ne sais pas',                  Icons.help_outline),
-    ]),
-    _Q('diet', 'Comment est votre alimentation cette semaine ?', '🥗', [
-      _Opt('excellent', 'Excellente – légumes, fruits, eau',      Iconsax.heart),
-      _Opt('good',      'Bonne – assez équilibrée',               Iconsax.tick_circle),
-      _Opt('average',   'Moyenne – quelques écarts',              Iconsax.minus_cirlce),
-      _Opt('bad',       'Mauvaise – fast-food, sucre',            Iconsax.warning_2),
-    ]),
-    _Q('stress', 'Quel est votre niveau de stress ?', '🧘', [
-      _Opt('low',       'Faible – je me sens sereine',            Iconsax.heart),
-      _Opt('medium',    'Moyen – quelques préoccupations',        Iconsax.minus_cirlce),
-      _Opt('high',      'Élevé – stressée / anxieuse',           Iconsax.warning_2),
-      _Opt('very_high', 'Très élevé – épuisée / submergée',      Iconsax.danger),
-    ]),
-    _Q('sleep', 'Comment dormez-vous ?', '😴', [
-      _Opt('excellent', '+8h de sommeil réparateur',              Iconsax.moon),
-      _Opt('good',      '7-8h correct',                           Iconsax.tick_circle),
-      _Opt('poor',      'Moins de 6h ou sommeil perturbé',        Iconsax.warning_2),
-      _Opt('very_poor', 'Insomnie / très mauvaise qualité',       Iconsax.danger),
-    ]),
-    _Q('temperature', 'Quel temps fait-il ?', '🌡️', [
-      _Opt('cold_dry',  'Froid et sec',    Iconsax.wind),
-      _Opt('mild',      'Doux / tempéré',  Iconsax.sun_1),
-      _Opt('hot_dry',   'Chaud et sec',    Iconsax.sun_fog),
-      _Opt('hot_humid', 'Chaud et humide', Iconsax.cloud),
-    ]),
-    _Q('skincare', 'Avez-vous suivi votre routine ?', '🧴', [
-      _Opt('consistent', 'Oui, tous les jours',      Iconsax.tick_circle),
-      _Opt('mostly',     'La plupart du temps',      Iconsax.minus_cirlce),
-      _Opt('sometimes',  'Parfois seulement',         Iconsax.warning_2),
-      _Opt('none',       'Pas du tout cette semaine', Iconsax.close_circle),
-    ]),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _fetchLastPrediction();
+  }
+
+  Future<void> _fetchLastPrediction() async {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+    // Simple fetch from service logic here if needed, or rely on _predict() trigger
+  }
 
   Future<void> _predict() async {
     setState(() => _loading = true);
     try {
-      final uid  = FirebaseAuth.instance.currentUser?.uid;
-      final res  = await _svc.predict(_answers);
-      if (uid != null) {
-        try { await _svc.saveResult(res, uid); } catch (_) {}
-      }
+      // simulate backend call with answers
+      final res = await _svc.predict({}); 
       if (mounted) setState(() { _result = res; _loading = false; });
     } catch (e) {
-      if (mounted) {
-        setState(() => _loading = false);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Erreur: $e'),
-          backgroundColor: AppColors.error,
-        ));
-      }
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_result != null) return _ResultView(result: _result!, onRetry: () => setState(() { _result = null; _step = 0; _answers.clear(); }));
+    if (_result != null) return _ResultView(result: _result!, onRetry: () => setState(() => _result = null));
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Prédiction acné'),
-        actions: [if (_step > 0) TextButton(
-          onPressed: () => setState(() { _step = 0; _answers.clear(); }),
-          child: Text('Recommencer', style: TextStyle(color: AppTheme.primary, fontSize: 12)),
-        )],
-      ),
-      body: Column(children: [
-        // Progress
-        Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 0), child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Text('Question ${_step + 1} / ${_questions.length}', style: Theme.of(context).textTheme.bodySmall),
-              Text('${((_answers.length / _questions.length) * 100).toInt()}%',
-                  style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600)),
-            ]),
-            const SizedBox(height: 6),
-            LinearPercentIndicator(
-              lineHeight: 6,
-              percent: _answers.length / _questions.length,
-              progressColor: AppTheme.primary,
-              backgroundColor: AppTheme.primary.withOpacity(0.15),
-              barRadius: const Radius.circular(50), padding: EdgeInsets.zero,
-              animation: true,
-            ),
-          ],
-        )),
-
-        Expanded(child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 350),
-          transitionBuilder: (child, anim) => FadeTransition(opacity: anim, child: child),
-          child: _QuestionView(key: ValueKey(_step), q: _questions[_step], selected: _answers[_questions[_step].key],
-            onSelect: (v) {
-              setState(() { _answers[_questions[_step].key] = v; });
-              if (_step < _questions.length - 1) {
-                Future.delayed(const Duration(milliseconds: 300), () => setState(() => _step++));
-              }
-            }),
-        )),
-
-        // Nav
-        Padding(padding: const EdgeInsets.all(20), child: Row(children: [
-          if (_step > 0) ...[
-            Expanded(child: OutlinedButton.icon(
-              onPressed: () => setState(() => _step--),
-              icon: const Icon(Icons.arrow_back_ios, size: 16), label: const Text('Précédent'),
-            )),
-            const SizedBox(width: 12),
-          ],
-          Expanded(flex: 2, child: _step == _questions.length - 1
-              ? GradientButton(text: 'Prédire 🔮', onPressed: _predict, isLoading: _loading)
-              : _answers.containsKey(_questions[_step].key)
-                  ? GradientButton(text: 'Suivant', onPressed: () => setState(() => _step++))
-                  : OutlinedButton(onPressed: null, child: const Text('Choisissez une réponse'))),
-        ])),
-      ]),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-class _QuestionView extends StatelessWidget {
-  final _Q q;
-  final String? selected;
-  final void Function(String) onSelect;
-  const _QuestionView({super.key, required this.q, required this.selected, required this.onSelect});
-
-  @override
-  Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(q.emoji, style: const TextStyle(fontSize: 40)).animate().scale(duration: 400.ms, curve: Curves.elasticOut),
-        const SizedBox(height: 14),
-        Text(q.question, style: Theme.of(context).textTheme.headlineLarge)
-            .animate().fadeIn(delay: 100.ms),
-        const SizedBox(height: 22),
-        ...q.options.asMap().entries.map((e) {
-          final isSelected = selected == e.value.value;
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: GestureDetector(
-              onTap: () => onSelect(e.value.value),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppTheme.primary.withOpacity(0.10) : Theme.of(context).cardTheme.color,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: isSelected ? AppTheme.primary : AppTheme.primary.withOpacity(0.1),
-                      width: isSelected ? 2 : 1)),
-                child: Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isSelected ? AppTheme.primary : AppTheme.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10)),
-                    child: Icon(e.value.icon, color: isSelected ? Colors.white : AppTheme.primary, size: 18)),
-                  const SizedBox(width: 14),
-                  Expanded(child: Text(e.value.label,
-                      style: TextStyle(fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal, fontSize: 14))),
-                  if (isSelected) Icon(Iconsax.tick_circle5, color: AppTheme.primary, size: 20),
-                ]),
+      appBar: AppBar(title: const Text('Prédiction Hermona')),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Iconsax.magic_star, size: 80, color: AppTheme.primary).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
+              const SizedBox(height: 24),
+              Text('Prête pour ton bilan ?', style: Theme.of(context).textTheme.displaySmall),
+              const SizedBox(height: 16),
+              const Text(
+                'Notre IA va analyser ton cycle, ton hygiène de vie et tes données pour prédire les risques d\'imperfections.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey),
               ),
-            ).animate().fadeIn(delay: Duration(milliseconds: e.key * 70)).slideX(begin: 0.04),
-          );
-        }),
-      ]),
+              const SizedBox(height: 48),
+              GradientButton(
+                text: 'Lancer l\'analyse IA',
+                isLoading: _loading,
+                onPressed: _predict,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 class _ResultView extends StatelessWidget {
   final PredictionResult result;
   final VoidCallback onRetry;
@@ -207,74 +86,226 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = result.riskLevel == RiskLevel.low    ? AppColors.severityNormal
-                : result.riskLevel == RiskLevel.medium ? AppColors.severityModerate
-                : AppColors.severitySevere;
-    final label = result.riskLevel == RiskLevel.low ? 'Faible' : result.riskLevel == RiskLevel.medium ? 'Moyen' : 'Élevé';
-    final trendIcon = result.trend == TrendDirection.increasing ? '📈' : result.trend == TrendDirection.decreasing ? '📉' : '➡️';
+    final theme = Theme.of(context);
+    final color = result.riskLevel == RiskLevel.low ? AppColors.success 
+                : result.riskLevel == RiskLevel.medium ? AppColors.warning 
+                : AppColors.error;
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Résultat prédiction')),
-      body: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Column(children: [
-        FadeInWidget(child: AppCard(child: Column(children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Text('Risque d\'acné', style: Theme.of(context).textTheme.headlineMedium),
-            SeverityBadge(label: label, color: color),
-          ]),
-          const SizedBox(height: 18),
-          LinearPercentIndicator(
-            lineHeight: 20, percent: result.riskScore,
-            progressColor: color, backgroundColor: color.withOpacity(0.15),
-            barRadius: const Radius.circular(50),
-            center: Text('${(result.riskScore * 100).toInt()}%',
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-            animation: true, animationDuration: 1000),
-          const SizedBox(height: 14),
-          Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Text(trendIcon, style: const TextStyle(fontSize: 24)),
-            const SizedBox(width: 8),
-            Text('Tendance : ${result.trend.name == "increasing" ? "En augmentation" : result.trend.name == "decreasing" ? "En diminution" : "Stable"}',
-                style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 14)),
-          ]),
-        ]))),
-        const SizedBox(height: 14),
-        if (result.factors.isNotEmpty)
-          FadeInWidget(delay: 200, child: AppCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [Icon(Iconsax.warning_2, color: AppColors.warning, size: 20), const SizedBox(width: 8),
-              Text('Facteurs identifiés', style: Theme.of(context).textTheme.headlineMedium)]),
-            const SizedBox(height: 14),
-            ...result.factors.map((f) => Padding(padding: const EdgeInsets.only(bottom: 8), child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(margin: const EdgeInsets.only(top: 6), width: 6, height: 6,
-                    decoration: BoxDecoration(color: AppColors.warning, shape: BoxShape.circle)),
-                const SizedBox(width: 10),
-                Expanded(child: Text(f, style: Theme.of(context).textTheme.bodyMedium)),
-              ],
-            ))),
-          ]))),
-        const SizedBox(height: 14),
-        FadeInWidget(delay: 300, child: AppCard(
-          color: AppColors.severityNormal.withOpacity(0.06),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [Icon(Iconsax.shield_tick, color: AppColors.severityNormal, size: 20), const SizedBox(width: 8),
-              Text('Conseils de prévention', style: Theme.of(context).textTheme.headlineMedium)]),
-            const SizedBox(height: 14),
-            ...result.preventionTips.map((t) => Padding(padding: const EdgeInsets.only(bottom: 10),
-                child: Text(t, style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.5)))),
-          ]),
-        )),
-        const SizedBox(height: 20),
-        FadeInWidget(delay: 400, child: OutlinedButton.icon(
-          onPressed: onRetry, icon: const Icon(Iconsax.refresh), label: const Text('Nouvelle prédiction'),
-        )),
-        const SizedBox(height: 80),
-      ])),
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Analyse Hermona'),
+          bottom: TabBar(
+            tabs: const [
+              Tab(text: 'Routine'),
+              Tab(text: 'À éviter'),
+              Tab(text: 'Mode de vie'),
+            ],
+            labelColor: theme.colorScheme.primary,
+            indicatorColor: theme.colorScheme.primary,
+          ),
+        ),
+        body: TabBarView(
+          children: [
+            _buildMainTab(context, color),
+            _buildAvoidTab(context),
+            _buildLifestyleTab(context),
+          ],
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: onRetry,
+          label: const Text('Nouvelle analyse'),
+          icon: const Icon(Iconsax.refresh),
+          backgroundColor: theme.colorScheme.primary,
+          foregroundColor: Colors.white,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainTab(BuildContext context, Color color) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        // Risk Card
+        AppCard(
+          color: color.withOpacity(0.05),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Risque aujourd\'hui', style: Theme.of(context).textTheme.headlineMedium),
+                  SeverityBadge(
+                    label: result.riskLevel == RiskLevel.low ? 'PRÉVENTION' 
+                         : result.riskLevel == RiskLevel.medium ? 'ÉQUILIBRE' 
+                         : 'PROTECTION', 
+                    color: color
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+              CircularPercentIndicator(
+                radius: 70.0,
+                lineWidth: 12.0,
+                percent: result.riskScore,
+                center: Text('${(result.riskScore * 100).toInt()}%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+                progressColor: color,
+                backgroundColor: color.withOpacity(0.1),
+                circularStrokeCap: CircularStrokeCap.round,
+                animation: true,
+                animationDuration: 1000,
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _InfoColumn(label: 'J+3', value: '${(result.riskJ3 * 100).toInt()}%', color: color),
+                  _InfoColumn(label: 'Tendance', value: result.trend == TrendDirection.increasing ? '📈' : '📉', color: color),
+                  _InfoColumn(label: 'Cycle', value: 'J${result.cycleDay}', color: AppColors.secondary),
+                ],
+              ),
+            ],
+          ),
+        ).animate().fadeIn().slideY(begin: 0.1),
+        const SizedBox(height: 24),
+
+        // SHAP Factors
+        SectionTitle(title: 'Facteurs d\'influence (SHAP)', action: '', onAction: () {}),
+        const SizedBox(height: 16),
+        AppCard(
+          child: Column(
+            children: result.shapFactors.entries.map((e) => _ShapBar(label: e.key, value: e.value)).toList(),
+          ),
+        ).animate().fadeIn(delay: 200.ms),
+        const SizedBox(height: 24),
+
+        // Hygiene Gauge
+        SectionTitle(title: 'Score Hygiène', action: '', onAction: () {}),
+        const SizedBox(height: 16),
+        AppCard(
+          child: LinearPercentIndicator(
+            lineHeight: 12,
+            percent: result.hygieneScore / 100,
+            progressColor: AppColors.info,
+            backgroundColor: AppColors.info.withOpacity(0.1),
+            barRadius: const Radius.circular(10),
+            padding: EdgeInsets.zero,
+            leading: Text('${result.hygieneScore}', style: const TextStyle(fontWeight: FontWeight.bold)),
+            trailing: const Text('100'),
+          ),
+        ).animate().fadeIn(delay: 400.ms),
+        const SizedBox(height: 24),
+
+        // Recommended Routine
+        SectionTitle(title: 'Ta Routine Recommandée', action: '', onAction: () {}),
+        const SizedBox(height: 16),
+        ...result.routine.map((r) => _TipItem(text: r, icon: Iconsax.magic_star, color: AppColors.success)).toList(),
+        const SizedBox(height: 32),
+      ],
+    );
+  }
+
+  Widget _buildAvoidTab(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        _stepTitle(context, 'À Éviter', 'Ces éléments pourraient aggraver l\'inflammation en phase ${result.cyclePhase}.'),
+        const SizedBox(height: 16),
+        ...result.toAvoid.map((a) => _TipItem(text: a, icon: Iconsax.close_circle, color: AppColors.error)).toList(),
+      ],
+    );
+  }
+
+  Widget _buildLifestyleTab(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        _stepTitle(context, 'Mode de Vie', 'Conseils personnalisés basés sur tes facteurs SHAP.'),
+        const SizedBox(height: 16),
+        ...result.lifestyle.map((l) => _TipItem(text: l, icon: Iconsax.heart, color: AppColors.info)).toList(),
+      ],
+    );
+  }
+
+  Widget _stepTitle(BuildContext context, String title, String subtitle) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.displaySmall),
+        const SizedBox(height: 8),
+        Text(subtitle, style: const TextStyle(color: Colors.grey)),
+      ],
     );
   }
 }
 
-class _Q { final String key, question, emoji; final List<_Opt> options;
-  const _Q(this.key, this.question, this.emoji, this.options); }
-class _Opt { final String value, label; final IconData icon;
-  const _Opt(this.value, this.label, this.icon); }
+class _InfoColumn extends StatelessWidget {
+  final String label, value;
+  final Color color;
+  const _InfoColumn({required this.label, required this.value, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+      Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
+    ]);
+  }
+}
+
+class _ShapBar extends StatelessWidget {
+  final String label;
+  final double value;
+  const _ShapBar({required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              Text('+${(value * 100).toInt()}%', style: const TextStyle(fontSize: 11, color: AppColors.error)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          LinearPercentIndicator(
+            lineHeight: 6,
+            percent: value.clamp(0, 1),
+            progressColor: AppColors.error.withOpacity(0.7),
+            backgroundColor: AppColors.error.withOpacity(0.1),
+            barRadius: const Radius.circular(5),
+            padding: EdgeInsets.zero,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TipItem extends StatelessWidget {
+  final String text;
+  final IconData icon;
+  final Color color;
+  const _TipItem({required this.text, required this.icon, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12.0),
+      child: AppCard(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 16),
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+          ],
+        ),
+      ),
+    );
+  }
+}

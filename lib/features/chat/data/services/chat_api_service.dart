@@ -51,8 +51,6 @@ class ChatApiService implements ChatRepository {
             .toList(),
       };
 
-      // Forcer l'URL de base pour éviter tout cache persistant de localhost
-      _dio.options.baseUrl = 'http://10.202.31.129:8000';
       
       final response = await _dio.post(
         '/chat', 
@@ -120,8 +118,6 @@ class ChatApiService implements ChatRepository {
         'file': await MultipartFile.fromFile(path, filename: 'audio.m4a'),
       });
       
-      // Forcer l'URL de base pour éviter tout cache persistant
-      _dio.options.baseUrl = 'http://10.202.31.129:8000';
       
       final response = await _dio.post('/transcribe', data: formData);
       return response.data['text'] ?? '';

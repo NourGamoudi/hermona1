@@ -14,7 +14,8 @@ class UserProfile {
   final List<String> cosmeticAllergies;
   final String hormonalTreatment;
   final String acneTreatment;
-  final List<String> skincareRoutine;
+  final List<String> routineMatin;
+  final List<String> routineSoir;
   final DateTime lastPeriodsDate;
   final List<int> lastCyclesDuration;
   final Map<String, String> initialPhotos;
@@ -33,7 +34,8 @@ class UserProfile {
     required this.cosmeticAllergies,
     required this.hormonalTreatment,
     required this.acneTreatment,
-    required this.skincareRoutine,
+    required this.routineMatin,
+    required this.routineSoir,
     required this.lastPeriodsDate,
     required this.lastCyclesDuration,
     required this.initialPhotos,
@@ -54,14 +56,15 @@ class UserProfile {
       cosmeticAllergies: List<String>.from(json['cosmeticAllergies'] ?? []),
       hormonalTreatment: json['hormonalTreatment'] ?? '',
       acneTreatment: json['acneTreatment'] ?? '',
-      skincareRoutine: List<String>.from(json['skincareRoutine'] ?? []),
+      routineMatin: List<String>.from(json['routineMatin'] ?? []),
+      routineSoir: List<String>.from(json['routineSoir'] ?? []),
       lastPeriodsDate: json['lastPeriodsDate'] is Timestamp
-      ? (json['lastPeriodsDate'] as Timestamp).toDate()
-      : DateTime.now(),
+          ? (json['lastPeriodsDate'] as Timestamp).toDate()
+          : DateTime.now(),
       lastCyclesDuration: List<int>.from(json['lastCyclesDuration'] ?? []),
       initialPhotos: json['initialPhotos'] != null
-    ? Map<String, String>.from(json['initialPhotos'])
-    : <String, String>{},
+          ? Map<String, String>.from(json['initialPhotos'])
+          : <String, String>{},
     );
   }
 
@@ -79,7 +82,8 @@ class UserProfile {
       'cosmeticAllergies': cosmeticAllergies,
       'hormonalTreatment': hormonalTreatment,
       'acneTreatment': acneTreatment,
-      'skincareRoutine': skincareRoutine,
+      'routineMatin': routineMatin,
+      'routineSoir': routineSoir,
       'lastPeriodsDate': Timestamp.fromDate(lastPeriodsDate),
       'lastCyclesDuration': lastCyclesDuration,
       'initialPhotos': initialPhotos,
