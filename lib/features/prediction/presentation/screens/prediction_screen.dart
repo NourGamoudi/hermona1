@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:go_router/go_router.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 
@@ -39,19 +41,57 @@ class _PredictionScreenState extends State<PredictionScreen> {
   }
 
   Future<void> _predict() async {
-    setState(() => _loading = true);
+    setState(() { _loading = true; _result = null; });
     try {
-      // simulate backend call with answers
-      final res = await _svc.predict({}); 
+      final uid = FirebaseAuth.instance.currentUser?.uid;
+      if (uid == null) throw Exception('Utilisateur non connecté');
+
+      // 1. Récupérer les bilans de l'utilisateur
+      final dailySnap = await FirebaseFirestore.instance
+          .collection('daily_surveys')
+          .where('userId', isEqualTo: uid)
+          .get();
+
+      Map<String, dynamic> answers = {};
+      if (dailySnap.docs.isNotEmpty) {
+        // Trier manuellement par date pour éviter l'erreur d'index
+        final docs = dailySnap.docs.toList();
+        docs.sort((a, b) {
+          DateTime dateA = a['date'] is Timestamp ? (a['date'] as Timestamp).toDate() : DateTime.tryParse(a['date'].toString()) ?? DateTime(2000);
+          DateTime dateB = b['date'] is Timestamp ? (b['date'] as Timestamp).toDate() : DateTime.tryParse(b['date'].toString()) ?? DateTime(2000);
+          return dateB.compareTo(dateA);
+        });
+        
+        final d = docs.first.data();
+        answers = {
+          'stress': d['stress'] > 7 ? 'high' : d['stress'] > 4 ? 'medium' : 'low',
+          'sleep': d['sleepDuration'] < 6 ? 'poor' : 'good',
+          'diet': (d['food'] as List).contains('sucre') ? 'bad' : 'good',
+          'hormonal_cycle': d['cyclePhase'],
+          'hygieneScore': d['lifestyleScore'],
+        };
+      }
+
+      // 2. Lancer l'analyse
+      final res = await _svc.predict(answers); 
+      
+      // 3. Sauvegarder
+      await _svc.saveResult(res, uid);
+
       if (mounted) setState(() { _result = res; _loading = false; });
     } catch (e) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur IA : $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_result != null) return _ResultView(result: _result!, onRetry: () => setState(() => _result = null));
+    if (_result != null) return _ResultView(result: _result!, onRetry: () => context.push('/weekly-survey'));
 
     return Scaffold(
       appBar: AppBar(title: const Text('Prédiction Hermona')),

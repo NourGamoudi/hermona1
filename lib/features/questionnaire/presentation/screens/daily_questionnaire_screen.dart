@@ -101,13 +101,14 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       
       // 3. Lancer l'analyse IA (Risque J+3, etc.)
       final prediction = await _predictionService.predict({
-        'stress': stress,
-        'sleep': sleepDuration,
-        'hydration': hydration,
-        'food': food,
+        'stress': stress > 7 ? 'high' : stress > 4 ? 'medium' : 'low',
+        'sleep': sleepDuration < 6 ? 'poor' : 'good',
+        'diet': (food.contains('sucre') || food.contains('laitages')) ? 'bad' : 'good',
+        'hormonal_cycle': cyclePhase,
+        'hygieneScore': score,
       });
 
-      // Sauvegarder la prédiction pour l'historique
+      // 4. Sauvegarder la prédiction pour l'historique
       await _predictionService.saveResult(prediction, user.uid);
 
       if (mounted) {

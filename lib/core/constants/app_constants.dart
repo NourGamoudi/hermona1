@@ -1,11 +1,8 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// AppConstants – toutes les constantes de l'application
-// ─────────────────────────────────────────────────────────────────────────────
+import 'package:flutter/foundation.dart' show kIsWeb;
+
 class AppConstants {
   // ── Backend Python ──────────────────────────────────────────────────────────
-  /// URL de base de votre API Python.
-  /// Changez cette valeur quand votre backend est déployé.
-  static const String apiBaseUrl = 'http://10.0.2.2:8000'; // 10.0.2.2 is localhost for Android Emulator
+  static const String apiBaseUrl = kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
 
   // ── Appwrite ────────────────────────────────────────────────────────────────
   static const String appwriteEndpoint  = 'https://cloud.appwrite.io/v1';

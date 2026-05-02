@@ -51,16 +51,19 @@ else:
 
 # --- CHARGEMENT DES MODÈLES ---
 # Modèle Tabulaire (Prédiction Risque)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# On remonte de 'app/' vers le dossier parent 'backend/' pour trouver 'model/'
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(CURRENT_DIR) # C'est le dossier 'backend/'
 MODEL_PATH = os.path.join(BASE_DIR, "model", "modele_hermona_5000_20260415_221830 (1).pkl")
 
 pkl_model = None
 try:
+    logger.info(f"🔍 Tentative de chargement du modèle à : {MODEL_PATH}")
     if os.path.exists(MODEL_PATH):
         pkl_model = joblib.load(MODEL_PATH)
-        logger.info(f"✅ Modèle tabulaire chargé : {MODEL_PATH}")
+        logger.info(f"✅ Modèle tabulaire chargé avec succès.")
     else:
-        logger.warning(f"⚠️ Fichier modèle {MODEL_PATH} introuvable.")
+        logger.warning(f"⚠️ Fichier modèle introuvable à l'adresse indiquée.")
 except Exception as e:
     logger.error(f"❌ Erreur chargement modèle tabulaire : {e}")
 
@@ -287,24 +290,65 @@ async def predict(body: dict):
         data['lavage_parfois'] = 1
         factors.append('Routine de soins irrégulière')
 
+    # --- ALGO 1 : CALCUL DU RISQUE IA ---
     risk_score = 0.30
+    shap_factors = {}
+    explicability_method = "none"
+    
     if pkl_model:
         try:
             df = pd.DataFrame([data])
             prob = pkl_model.predict_proba(df)[0][1]
             risk_score = float(prob)
+            
+            # TENTATIVE DE VRAI SHAP (Local)
+            try:
+                import shap
+                # On utilise un explicateur adapté (TreeExplainer pour les arbres, ou KernelExplainer)
+                explainer = shap.Explainer(pkl_model)
+                shap_values = explainer(df)
+                
+                # Extraction des contributions pour cette ligne précise (df.iloc[0])
+                # shap_values[0] contient les contributions pour chaque feature
+                vals = shap_values.values[0]
+                if isinstance(vals[0], (list, np.ndarray)): # Cas multiclasse
+                    vals = vals[:, 1] # On prend la classe positive
+                
+                feat_contrib = sorted(zip(df.columns, vals), key=lambda x: abs(x[1]), reverse=True)
+                for name, val in feat_contrib[:3]:
+                    pretty_name = name.replace('_', ' ').capitalize()
+                    shap_factors[pretty_name] = float(abs(val))
+                explicability_method = "SHAP (Local)"
+                logger.info("✅ Explicabilité SHAP calculée avec succès.")
+            
+            except Exception as shap_err:
+                logger.warning(f"⚠️ SHAP réel non disponible ({shap_err}). Repli sur Feature Importance.")
+                # FALLBACK : Importance Globale (Inspirée de SHAP mais pas locale)
+                if hasattr(pkl_model, 'feature_importances_'):
+                    importances = pkl_model.feature_importances_
+                    feat_imp = sorted(zip(df.columns, importances), key=lambda x: x[1], reverse=True)
+                    for name, imp in feat_imp[:3]:
+                        pretty_name = name.replace('_', ' ').capitalize()
+                        shap_factors[pretty_name] = float(imp)
+                    explicability_method = "Feature Importance (Global)"
+            
+            if not shap_factors:
+                # Si rien ne marche, on utilise les facteurs identifiés par les règles
+                for i, f in enumerate(factors[:3]):
+                    shap_factors[f] = 0.1 + (0.05 * i)
+                explicability_method = "Rule-based (Simulated)"
+                    
         except Exception as e:
             logger.error(f"Erreur prédiction modèle: {e}")
             pass
-            
-    # Simulation Risk J+3
-    risk_j3 = min(1.0, risk_score + 0.1) if data['phase_luteale'] == 1 else max(0.0, risk_score - 0.05)
-    
-    # SHAP Simulation (based on identified factors)
-    shap_factors = {}
-    for i, f in enumerate(factors[:3]):
-        shap_factors[f] = 0.1 + (0.05 * i)
+    else:
+        for i, f in enumerate(factors[:3]):
+            shap_factors[f] = 0.1 + (0.05 * i)
+        explicability_method = "None (Mock)"
 
+    # Simulation Risk J+3
+    risk_j3 = min(1.0, risk_score + 0.1) if data.get('phase_luteale') == 1 else max(0.0, risk_score - 0.05)
+    
     # Détermination du niveau
     level = "low"
     if risk_score >= 0.60: level = "high"

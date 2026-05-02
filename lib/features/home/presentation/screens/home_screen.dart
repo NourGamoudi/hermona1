@@ -128,13 +128,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 stream: FirebaseFirestore.instance
                     .collection(AppConstants.colPredictions)
                     .where('userId', isEqualTo: uid)
-                    .orderBy('predictedAt', descending: true)
-                    .limit(1)
                     .snapshots(),
                 builder: (context, snapshot) {
                   PredictionResult? result;
                   if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    result = PredictionResult.fromJson(snapshot.data!.docs.first.data() as Map<String, dynamic>);
+                    final docs = snapshot.data!.docs.toList();
+                    docs.sort((a, b) {
+                      DateTime dateA = a['predictedAt'] is Timestamp ? (a['predictedAt'] as Timestamp).toDate() : DateTime.tryParse(a['predictedAt'].toString()) ?? DateTime(2000);
+                      DateTime dateB = b['predictedAt'] is Timestamp ? (b['predictedAt'] as Timestamp).toDate() : DateTime.tryParse(b['predictedAt'].toString()) ?? DateTime(2000);
+                      return dateB.compareTo(dateA);
+                    });
+                    result = PredictionResult.fromJson(docs.first.data() as Map<String, dynamic>);
                   }
 
                   return _MetricCard(
@@ -156,13 +160,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 stream: FirebaseFirestore.instance
                     .collection('daily_surveys')
                     .where('userId', isEqualTo: uid)
-                    .orderBy('date', descending: true)
-                    .limit(1)
                     .snapshots(),
                 builder: (context, snapshot) {
                   int? score;
                   if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    score = snapshot.data!.docs.first['lifestyleScore'] as int?;
+                    final docs = snapshot.data!.docs.toList();
+                    docs.sort((a, b) {
+                      DateTime dateA = a['date'] is Timestamp ? (a['date'] as Timestamp).toDate() : DateTime.tryParse(a['date'].toString()) ?? DateTime(2000);
+                      DateTime dateB = b['date'] is Timestamp ? (b['date'] as Timestamp).toDate() : DateTime.tryParse(b['date'].toString()) ?? DateTime(2000);
+                      return dateB.compareTo(dateA);
+                    });
+                    score = docs.first['lifestyleScore'] as int?;
                   }
 
                   return _MetricCard(

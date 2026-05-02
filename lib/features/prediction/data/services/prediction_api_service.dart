@@ -22,7 +22,11 @@ class PredictionApiService implements PredictionRepository {
 
   final Dio _dio;
   PredictionApiService()
-      : _dio = Dio(BaseOptions(baseUrl: AppConstants.apiBaseUrl));
+      : _dio = Dio(BaseOptions(
+          baseUrl: AppConstants.apiBaseUrl,
+          connectTimeout: const Duration(seconds: 30),
+          receiveTimeout: const Duration(seconds: 30),
+        ));
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
@@ -37,11 +41,20 @@ class PredictionApiService implements PredictionRepository {
       final profileSnap = await _db.collection('users').doc(uid).get();
       final dailySnap = await _db.collection('daily_surveys')
           .where('userId', isEqualTo: uid)
-          .orderBy('date', descending: true)
-          .limit(1).get();
+          .get();
 
       final profile = profileSnap.data() ?? {};
-      final daily = dailySnap.docs.isNotEmpty ? dailySnap.docs.first.data() : {};
+      Map<String, dynamic> daily = {};
+      
+      if (dailySnap.docs.isNotEmpty) {
+        final docs = dailySnap.docs.toList();
+        docs.sort((a, b) {
+          DateTime dateA = a['date'] is Timestamp ? (a['date'] as Timestamp).toDate() : DateTime.tryParse(a['date'].toString()) ?? DateTime(2000);
+          DateTime dateB = b['date'] is Timestamp ? (b['date'] as Timestamp).toDate() : DateTime.tryParse(b['date'].toString()) ?? DateTime(2000);
+          return dateB.compareTo(dateA);
+        });
+        daily = docs.first.data();
+      }
 
       // 2. Prepare Payload
       final payload = {
