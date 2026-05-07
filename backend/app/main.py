@@ -6,7 +6,7 @@ import base64
 from typing import List, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
@@ -39,6 +39,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# --- SECURITY ---
+HERMONA_API_KEY = os.getenv("HERMONA_API_KEY", "hermona_secret_2026")
+
+async def verify_api_key(request: Request):
+    api_key = request.headers.get("X-API-Key")
+    if api_key != HERMONA_API_KEY:
+        raise HTTPException(status_code=403, detail="Unauthorized: Invalid API Key")
 
 # --- CONFIGURATION IA GROQ ---
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -162,7 +170,7 @@ async def health():
     }
 
 @app.post("/chat")
-async def chat(payload: ChatPayload):
+async def chat(payload: ChatPayload, _ = Depends(verify_api_key)):
     if not client:
         return {"response": "Désolée, le service de chat est en mode démo car la clé API est manquante. 🌸"}
 
@@ -208,7 +216,7 @@ async def chat(payload: ChatPayload):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)):
+async def transcribe(file: UploadFile = File(...), _ = Depends(verify_api_key)):
     if not client:
         raise HTTPException(status_code=400, detail="Groq non configuré.")
     
@@ -232,7 +240,7 @@ async def transcribe(file: UploadFile = File(...)):
         return {"text": "", "error": str(e)}
 
 @app.post("/predict")
-async def predict(body: dict):
+async def predict(body: dict, _ = Depends(verify_api_key)):
     answers = body.get('answers', {})
     
     # Valeurs par défaut basiques (moyennes) pour les 40 colonnes attendues
@@ -426,7 +434,7 @@ async def predict(body: dict):
     }
 
 @app.post("/detect")
-async def detect(files: List[UploadFile] = File(...)):
+async def detect(files: List[UploadFile] = File(...), _ = Depends(verify_api_key)):
     counts = {'Blackhead': 0, 'Whitehead': 0, 'Papule': 0, 'Pustule': 0, 'Nodule': 0}
     total_detections = 0
     imageUrls = []
@@ -494,7 +502,7 @@ async def detect(files: List[UploadFile] = File(...)):
         "severityScore": int(score),
         "severityLevel": level,
         "classifications": classifications,
-        "analyzedAt": datetime.datetime.now().isoformat() + "Z",
+        "analyzedAt": datetime.now().isoformat() + "Z",
         "imageUrls": imageUrls
     }
 

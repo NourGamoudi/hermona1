@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.acneia.acneia"
+    namespace = "com.hermona.app"
 
     compileSdk = 36
 
@@ -16,6 +16,7 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -23,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.acneia.acneia"
+        applicationId = "com.hermona.app"
 
         minSdk = 24
         targetSdk = flutter.targetSdkVersion
@@ -36,6 +37,10 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+dependencies {
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }
 
 flutter {

@@ -1,48 +1,100 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
 
 class AppConstants {
-  // ── Backend Python ──────────────────────────────────────────────────────────
-  static const String apiBaseUrl = kIsWeb ? 'http://localhost:8000' : 'http://10.0.2.2:8000';
+  // ——————————————————————————————————————————————————————————————————————————————————————
+  static final String apiBaseUrl = kReleaseMode 
+      ? 'https://hermona-api.onrender.com' // PROD
+      : (kIsWeb ? 'http://localhost:8000' : 'http://192.168.100.232:8000'); // DEV (Local IP for Real Device)
+  static const String apiKey     = 'hermona_secret_2026';
 
-  // ── Appwrite ────────────────────────────────────────────────────────────────
+
+
+  // â”€â”€ Appwrite â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   static const String appwriteEndpoint  = 'https://cloud.appwrite.io/v1';
+
   static const String appwriteProjectId = 'YOUR_APPWRITE_PROJECT_ID';
+
   static const String appwriteBucketId  = 'YOUR_BUCKET_ID';
 
-  // ── Firestore Collections ───────────────────────────────────────────────────
-  static const String colUsers           = 'users';
-  static const String colDetections      = 'detections';
-  static const String colRecommendations = 'recommendations';
-  static const String colPredictions     = 'predictions';
-  static const String colChatHistory     = 'chat_history';
-  static const String colForumPosts      = 'forum_posts';
-  static const String colForumReplies    = 'forum_replies';
-  static const String colConversations   = 'conversations';
-  static const String colMessages        = 'messages';
-  static const String colLikes           = 'likes';
-  static const String colReports         = 'reports';
 
-  // ── SharedPreferences Keys ──────────────────────────────────────────────────
+
+  // â”€â”€ Firestore Collections â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+  static const String colUsers           = 'users';
+
+  static const String colDetections      = 'detections';
+
+  static const String colRecommendations = 'recommendations';
+
+  static const String colPredictions     = 'predictions';
+
+  static const String colChatHistory     = 'chat_history';
+
+  static const String colForumPosts      = 'forum_posts';
+
+  static const String colForumReplies    = 'forum_replies';
+
+  static const String colConversations   = 'conversations';
+
+  static const String colMessages        = 'messages';
+
+  static const String colLikes           = 'likes';
+
+  static const String colReports         = 'reports';
+  static const String colNotifications   = 'notifications';
+  static const String colPublicProfiles = 'public_profiles';
+
+
+
+  // ——————————————————————————————————————————————————————————————————————————————————————
+
   static const String keyThemeMode     = 'theme_mode';
+
   static const String keyPrimaryColor  = 'primary_color';
+
   static const String keyWelcomeShown  = 'welcome_shown';
 
-  // ── Forum Categories ────────────────────────────────────────────────────────
+
+
+  // â”€â”€ Forum Categories â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   static const List<String> forumCategories = [
+
     'Général', 'Routine beauté', 'Alimentation',
+
     'Hormones', 'Traitements', 'Témoignages', 'Questions',
+
   ];
 
-  // ── Photo tips ──────────────────────────────────────────────────────────────
+
+
+  // â”€â”€ Photo tips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
   static const String photoTipsGood =
-      '✅ Lumière naturelle douce\n'
-      '✅ Visage propre, sans maquillage\n'
-      '✅ Photo nette, distance 20-30 cm\n'
-      '✅ Fond neutre';
+
+      'âœ… Lumière naturelle douce\n'
+
+      'âœ… Visage propre, sans maquillage\n'
+
+      'âœ… Photo nette, distance 20-30 cm\n'
+
+      'âœ… Fond neutre';
+
+
 
   static const String photoTipsBad =
-      '❌ Pas de filtres ni retouches\n'
-      '❌ Pas de flash direct\n'
-      '❌ Pas de lunettes\n'
-      '❌ Éviter le mauvais éclairage';
+
+      'âŒ Pas de filtres ni retouches\n'
+
+      'âŒ Pas de flash direct\n'
+
+      'âŒ Pas de lunettes\n'
+
+      'âŒ Éviter le mauvais éclairage';
+
 }
+
+
+

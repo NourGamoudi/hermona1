@@ -1,17 +1,17 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../data/services/questionnaire_service.dart';
 import '../../domain/entities/user_profile.dart';
+import '../../../../core/localization/app_localizations.dart';
 
 class ProfileQuestionnaireScreen extends StatefulWidget {
   final UserProfile? initialProfile;
@@ -24,18 +24,17 @@ class ProfileQuestionnaireScreen extends StatefulWidget {
 class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen> {
   final _pageController = PageController();
   final _service = QuestionnaireService();
-  final _picker = ImagePicker();
 
   int _currentStep = 0;
   bool loading = false;
-  String? error;
 
   // Data
   final TextEditingController _firstNameCtrl = TextEditingController();
   final TextEditingController _ageCtrl = TextEditingController(text: '25');
   final TextEditingController _imcCtrl = TextEditingController(text: '22.0');
+  final TextEditingController _pseudoCtrl = TextEditingController();
   
-  String sopk = 'inconnu'; // spec: oui/non/inconnu
+  String sopk = 'inconnu';
   bool acneFamilyHistory = false;
   bool smoker = false;
   String alcohol = 'jamais';
@@ -47,29 +46,27 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   List<String> routineSoir = [];
   DateTime lastPeriodsDate = DateTime.now();
   List<int> lastCycles = [28, 28, 28];
-  XFile? facePhoto;
 
   final List<String> alcoholOptions = ['jamais', 'occasionnel', 'régulier'];
   final List<String> skinTypeOptions = ['grasse', 'mixte', 'sèche', 'sensible', 'normale', 'acnéique'];
   final List<String> allergiesOptions = ['aucune', 'parfums', 'conservateurs', 'alcool cosmétique', 'nickel', 'filtres solaires', 'rétinol', 'AHA-BHA'];
   final List<String> hormonalOptions = ['pilule', 'implant', 'stérilet', 'aucun'];
   final List<String> acneTreatOptions = ['antibiotiques', 'isotrétinoïne', 'crème topique', 'aucun'];
-  final List<String> routineMatinOptions = ['Aucun produit', 'Nettoyant doux', 'Tonique', 'Sérum Vitamine C', 'Crème hydratante', 'SPF (Indispensable)'];
-  final List<String> routineSoirOptions = ['Aucun produit', 'Démaquillant/Huile', 'Nettoyant', 'Actif (Rétinol/AHA)', 'Sérum hydratant', 'Crème de nuit'];
+  final List<String> routineMatinOptions = ['Aucun produit', 'Nettoyant doux', 'Tonique', 'Sérum Vitamine C', 'Crème hydratante', 'SPF'];
+  final List<String> routineSoirOptions = ['Aucun produit', 'Démaquillant', 'Nettoyant', 'Actif (Rétinol)', 'Sérum hydratant', 'Crème de nuit'];
 
   @override
   void initState() {
     super.initState();
-    if (widget.initialProfile != null) {
-      _populate(widget.initialProfile!);
-    }
+    if (widget.initialProfile != null) _populate(widget.initialProfile!);
   }
 
   void _populate(UserProfile p) {
     _firstNameCtrl.text = p.firstName;
+    _pseudoCtrl.text = p.pseudonym ?? '';
     _ageCtrl.text = p.age.toString();
     _imcCtrl.text = p.imc.toString();
-    sopk = p.sopk ? 'oui' : 'non'; // Simplified mapping
+    sopk = p.sopk ? 'oui' : 'non';
     acneFamilyHistory = p.acneFamilyHistory;
     smoker = p.smoker;
     alcohol = p.alcohol;
@@ -83,63 +80,9 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
     lastCycles = List.from(p.lastCyclesDuration);
   }
 
-  Future<void> _pickFace(ImageSource source) async {
-    final xFile = await _picker.pickImage(source: source, imageQuality: 80);
-    if (xFile != null) setState(() => facePhoto = xFile);
-  }
-
-  void _snack(String m) => ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-    content: Text(m), backgroundColor: Colors.red, behavior: SnackBarBehavior.floating,
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-  ));
-
-  bool _validateCurrentStep() {
-    switch (_currentStep) {
-      case 0:
-        if (_firstNameCtrl.text.trim().isEmpty) { _snack('Veuillez entrer votre prénom'); return false; }
-        if (_ageCtrl.text.trim().isEmpty) { _snack('Veuillez entrer votre âge'); return false; }
-        if (_imcCtrl.text.trim().isEmpty) { _snack('Veuillez entrer votre IMC'); return false; }
-        return true;
-      case 1:
-        if (skinType.isEmpty) { _snack('Veuillez choisir votre type de peau'); return false; }
-        if (cosmeticAllergies.isEmpty) { _snack('Veuillez choisir vos allergies ou "aucune"'); return false; }
-        return true;
-      case 2:
-        return true; 
-      case 3:
-        if (routineMatin.isEmpty) { _snack('Veuillez choisir votre routine matin ou "Aucun produit"'); return false; }
-        if (routineSoir.isEmpty) { _snack('Veuillez choisir votre routine soir ou "Aucun produit"'); return false; }
-        return true;
-      case 4:
-        for(var c in lastCycles) if (c <= 0) { _snack('Veuillez remplir les durées de cycles'); return false; }
-        return true;
-      case 5:
-        if (facePhoto == null) { _snack('La photo est obligatoire pour l\'analyse'); return false; }
-        return true;
-      default: return true;
-    }
-  }
-
-  void _showPhotoSourceDialog() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Wrap(
-          children: [
-            ListTile(leading: Icon(Iconsax.camera), title: const Text('Prendre une photo'), onTap: () { Navigator.pop(ctx); _pickFace(ImageSource.camera); }),
-            ListTile(leading: Icon(Iconsax.gallery), title: const Text('Choisir dans la galerie'), onTap: () { Navigator.pop(ctx); _pickFace(ImageSource.gallery); }),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _next() {
-    if (!_validateCurrentStep()) return;
-    
-    if (_currentStep < 5) {
-      _pageController.nextPage(duration: 400.ms, curve: Curves.easeInOut);
+    if (_currentStep < 4) {
+      _pageController.nextPage(duration: 500.ms, curve: Curves.easeOutQuart);
       setState(() => _currentStep++);
     } else {
       _save();
@@ -148,18 +91,16 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
   void _prev() {
     if (_currentStep > 0) {
-      _pageController.previousPage(duration: 400.ms, curve: Curves.easeInOut);
+      _pageController.previousPage(duration: 500.ms, curve: Curves.easeOutQuart);
       setState(() => _currentStep--);
     }
   }
 
   Future<void> _save() async {
-    if (!_validateCurrentStep()) return;
-
-    setState(() { loading = true; error = null; });
+    setState(() => loading = true);
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Utilisateur non connecté');
+      if (user == null) return;
       
       final profile = UserProfile(
         id: user.uid,
@@ -179,19 +120,12 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
         routineSoir: routineSoir,
         lastPeriodsDate: lastPeriodsDate,
         lastCyclesDuration: lastCycles,
-        initialPhotos: facePhoto != null ? {'face': facePhoto!.path} : {},
+        initialPhotos: const {},
+        pseudonym: _pseudoCtrl.text.trim(),
       );
       
       await _service.saveUserProfile(profile);
-      if (mounted) {
-        if (widget.initialProfile != null) {
-          context.pop();
-        } else {
-          context.go('/weekly-survey');
-        }
-      }
-    } catch (e) {
-      setState(() => error = e.toString());
+      if (mounted) context.go('/daily-survey?onboarding=true');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -199,263 +133,217 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
+    final size = MediaQuery.of(context).size;
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Profil Hermona'),
-        leading: _currentStep > 0 ? IconButton(icon: const Icon(Iconsax.arrow_left), onPressed: _prev) : null,
+        title: const Text('Bilan Initial'),
+        leading: _currentStep > 0 ? IconButton(icon: const Icon(Iconsax.arrow_left_1), onPressed: _prev) : null,
         actions: [
           Center(child: Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Text('${_currentStep + 1}/6', style: theme.textTheme.labelLarge),
+            padding: const EdgeInsets.only(right: 20),
+            child: Text('${_currentStep + 1}/5', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.primary)),
           )),
         ],
       ),
-      body: Column(
+      body: Stack(
         children: [
-          LinearProgressIndicator(
-            value: (_currentStep + 1) / 6,
-            backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-            valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.primary),
+          // Background
+          Positioned(
+            top: -100,
+            left: -50,
+            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.05)),
           ),
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              children: [
-                _step1(),
-                _step2(),
-                _step3(),
-                _step4(),
-                _step5(),
-                _step6(),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: GradientButton(
-              text: _currentStep == 5 ? 'Terminer' : 'Suivant',
-              isLoading: loading,
-              onPressed: _next,
-            ),
+
+          Column(
+            children: [
+              const SizedBox(height: 100),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _StepIndicator(current: _currentStep),
+              ),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: [
+                    _buildStep(child: _step1(), title: 'Profil Personnel', sub: 'Commençons par faire connaissance.'),
+                    _buildStep(child: _step2(), title: 'Type de Peau', sub: 'Identifions ta base dermatologique.'),
+                    _buildStep(child: _step3(), title: 'Bilan Médical', sub: 'Tes antécédents et traitements.'),
+                    _buildStep(child: _step4(), title: 'Routine Actuelle', sub: 'Quels produits utilises-tu déjà ?'),
+                    _buildStep(child: _step5(), title: 'Cycle Menstruel', sub: 'Essentiel pour prédire les poussées.'),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
+                child: PrimaryButton(
+                  label: _currentStep == 4 ? 'TERMINER LE BILAN' : 'CONTINUER',
+                  isLoading: loading,
+                  onTap: _next,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _stepTitle(String title, String subtitle) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height: 8),
-        Text(subtitle, style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[600])),
-        const SizedBox(height: 24),
-      ],
+  Widget _buildStep({required Widget child, required String title, required String sub}) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.displaySmall).animate().fadeIn().slideX(begin: -0.1),
+          const SizedBox(height: 8),
+          Text(sub, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)).animate().fadeIn(delay: 100.ms),
+          const SizedBox(height: 32),
+          child,
+        ],
+      ),
     );
   }
 
   Widget _step1() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
       children: [
-        _stepTitle('Profil Personnel', 'Parlons un peu de toi.'),
-        AppCard(
+        GlassCard(
+          padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              TextField(controller: _firstNameCtrl, decoration: const InputDecoration(labelText: 'Prénom', prefixIcon: Icon(Iconsax.user))),
-              const SizedBox(height: 16),
-              Row(children: [
-                Expanded(child: TextField(controller: _ageCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Âge'))),
-                const SizedBox(width: 16),
-                Expanded(child: TextField(controller: _imcCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'IMC'))),
-              ]),
+              TextField(controller: _firstNameCtrl, decoration: const InputDecoration(labelText: 'Prénom', prefixIcon: Icon(Iconsax.user, size: 20))),
+              const SizedBox(height: 20),
+              TextField(controller: _pseudoCtrl, decoration: const InputDecoration(labelText: 'Pseudonyme (Forum)', prefixIcon: Icon(Iconsax.mask, size: 20))),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Expanded(child: TextField(controller: _ageCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Âge'))),
+                  const SizedBox(width: 20),
+                  Expanded(child: TextField(controller: _imcCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'IMC'))),
+                ],
+              ),
             ],
           ),
-        ),
-        const SizedBox(height: 24),
-        Text('SOPK (Syndrome des Ovaires Polykystiques)', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 8),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(value: 'oui', label: Text('Oui')),
-            ButtonSegment(value: 'non', label: Text('Non')),
-            ButtonSegment(value: 'inconnu', label: Text('Inconnu')),
-          ],
-          selected: {sopk},
-          onSelectionChanged: (v) => setState(() => sopk = v.first),
-        ),
-        const SizedBox(height: 16),
-        SwitchListTile(
-          title: const Text('Antécédents familiaux d\'acné'),
-          value: acneFamilyHistory,
-          onChanged: (v) => setState(() => acneFamilyHistory = v),
-        ),
-        SwitchListTile(
-          title: const Text('Fumeuse'),
-          value: smoker,
-          onChanged: (v) => setState(() => smoker = v),
-        ),
-        const SizedBox(height: 16),
-        Text('Consommation d\'alcool', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: alcoholOptions.map((o) => ChoiceChip(
-            label: Text(o),
-            selected: alcohol == o,
-            onSelected: (s) => setState(() => alcohol = o),
-          )).toList(),
-        ),
+        ).animate().fadeIn(delay: 200.ms),
+        const SizedBox(height: 32),
+        _buildChoiceSection('Avez-vous le SOPK ?', ['oui', 'non', 'inconnu'], sopk, (v) => setState(() => sopk = v)),
+        const SizedBox(height: 20),
+        _buildSwitch('Antécédents familiaux d\'acné', acneFamilyHistory, (v) => setState(() => acneFamilyHistory = v)),
+        _buildSwitch('Fumeuse', smoker, (v) => setState(() => smoker = v)),
       ],
     );
   }
 
   Widget _step2() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _stepTitle('Profil Cutané', 'Ton type de peau et tes sensibilités.'),
-        Text('Quel est ton type de peau ?', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: skinTypeOptions.map((o) => ChoiceChip(
-            label: Text(o),
-            selected: skinType == o,
-            onSelected: (s) => setState(() => skinType = o),
-          )).toList(),
-        ),
+        _buildWrapChoice('Quel est ton type de peau ?', skinTypeOptions, skinType, (v) => setState(() => skinType = v)),
         const SizedBox(height: 32),
-        Text('Allergies cosmétiques connues :', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: allergiesOptions.map((o) => FilterChip(
-            label: Text(o),
-            selected: cosmeticAllergies.contains(o),
-            onSelected: (s) => setState(() {
-              if (o == 'aucune') {
-                s ? cosmeticAllergies = ['aucune'] : cosmeticAllergies.remove('aucune');
-              } else {
-                cosmeticAllergies.remove('aucune');
-                s ? cosmeticAllergies.add(o) : cosmeticAllergies.remove(o);
-              }
-            }),
-          )).toList(),
-        ),
+        _buildWrapFilter('Allergies cosmétiques connues', allergiesOptions, cosmeticAllergies, (v, s) {
+          setState(() {
+            if (v == 'aucune') {
+              s ? cosmeticAllergies = ['aucune'] : cosmeticAllergies.remove('aucune');
+            } else {
+              cosmeticAllergies.remove('aucune');
+              s ? cosmeticAllergies.add(v) : cosmeticAllergies.remove(v);
+            }
+          });
+        }),
       ],
     );
   }
 
   Widget _step3() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
       children: [
-        _stepTitle('Profil Médical', 'Tes traitements en cours.'),
-        const Text('C\'est une priorité absolue pour nos recommandations.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+        _buildRadioSection('Traitement acné actuel', acneTreatOptions, acneTreatment, (v) => setState(() => acneTreatment = v)),
         const SizedBox(height: 24),
-        Text('Traitement acné actuel', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 12),
-        ...acneTreatOptions.map((o) => RadioListTile<String>(
-          title: Text(o),
-          value: o,
-          groupValue: acneTreatment,
-          onChanged: (v) => setState(() => acneTreatment = v!),
-        )),
-        const Divider(),
-        Text('Traitement hormonal actuel', style: Theme.of(context).textTheme.labelLarge),
-        const SizedBox(height: 12),
-        ...hormonalOptions.map((o) => RadioListTile<String>(
-          title: Text(o),
-          value: o,
-          groupValue: hormonalTreatment,
-          onChanged: (v) => setState(() => hormonalTreatment = v!),
-        )),
+        _buildRadioSection('Contraception / Traitement hormonal', hormonalOptions, hormonalTreatment, (v) => setState(() => hormonalTreatment = v)),
       ],
     );
   }
 
   Widget _step4() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
       children: [
-        _stepTitle('Routine Actuelle', 'Quels produits utilises-tu ?'),
-        Text('Le matin ☀️', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        ...routineMatinOptions.map((o) => CheckboxListTile(
-          title: Text(o),
-          value: routineMatin.contains(o),
-          onChanged: (v) => setState(() {
-            if (o == 'Aucun produit') {
-              v! ? routineMatin = ['Aucun produit'] : routineMatin.remove('Aucun produit');
+        _buildCheckSection('Routine Matin', routineMatinOptions, routineMatin, (v, s) {
+          setState(() {
+            if (v == 'Aucun produit') {
+              s ? routineMatin = ['Aucun produit'] : routineMatin.remove('Aucun produit');
             } else {
               routineMatin.remove('Aucun produit');
-              v! ? routineMatin.add(o) : routineMatin.remove(o);
+              s ? routineMatin.add(v) : routineMatin.remove(v);
             }
-          }),
-        )),
+          });
+        }),
         const SizedBox(height: 24),
-        Text('Le soir 🌙', style: Theme.of(context).textTheme.headlineSmall),
-        const SizedBox(height: 12),
-        ...routineSoirOptions.map((o) => CheckboxListTile(
-          title: Text(o),
-          value: routineSoir.contains(o),
-          onChanged: (v) => setState(() {
-            if (o == 'Aucun produit') {
-              v! ? routineSoir = ['Aucun produit'] : routineSoir.remove('Aucun produit');
+        _buildCheckSection('Routine Soir', routineSoirOptions, routineSoir, (v, s) {
+          setState(() {
+            if (v == 'Aucun produit') {
+              s ? routineSoir = ['Aucun produit'] : routineSoir.remove('Aucun produit');
             } else {
               routineSoir.remove('Aucun produit');
-              v! ? routineSoir.add(o) : routineSoir.remove(o);
+              s ? routineSoir.add(v) : routineSoir.remove(v);
             }
-          }),
-        )),
+          });
+        }),
       ],
     );
   }
 
   Widget _step5() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
+    return Column(
       children: [
-        _stepTitle('Cycle Menstruel', 'Pour calculer ta phase actuelle.'),
-        AppCard(
+        GlassCard(
+          padding: const EdgeInsets.all(24),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                title: const Text('Date des dernières règles'),
-                subtitle: Text(DateFormat('dd MMMM yyyy', 'fr').format(lastPeriodsDate)),
-                trailing: const Icon(Iconsax.calendar),
+              const Text('DATE DES DERNIÈRES RÈGLES', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
+              const SizedBox(height: 16),
+              GestureDetector(
                 onTap: () async {
-                  final d = await showDatePicker(
-                    context: context,
-                    initialDate: lastPeriodsDate,
-                    firstDate: DateTime.now().subtract(const Duration(days: 90)),
-                    lastDate: DateTime.now(),
-                  );
-                  if (d != null) setState(() => lastPeriodsDate = d);
+                  final picked = await showDatePicker(context: context, initialDate: lastPeriodsDate, firstDate: DateTime(2000), lastDate: DateTime.now());
+                  if (picked != null) setState(() => lastPeriodsDate = picked);
                 },
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.1))),
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
+                      const SizedBox(width: 16),
+                      Text(DateFormat('dd MMMM yyyy').format(lastPeriodsDate), style: const TextStyle(fontWeight: FontWeight.w700)),
+                      const Spacer(),
+                      const Icon(Iconsax.edit, size: 16, color: AppColors.textSecondaryDark),
+                    ],
+                  ),
+                ),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 24),
-        Text('Durée des 3 derniers cycles (jours)', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 32),
+        const Text('DURÉE DES 3 DERNIERS CYCLES (JOURS)', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
         const SizedBox(height: 16),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: List.generate(3, (i) => SizedBox(
-            width: 80,
-            child: TextField(
-              controller: TextEditingController(text: lastCycles[i].toString()),
-              keyboardType: TextInputType.number,
-              textAlign: TextAlign.center,
-              decoration: InputDecoration(hintText: 'C${i+1}'),
-              onChanged: (v) => lastCycles[i] = int.tryParse(v) ?? 28,
+            width: 90,
+            child: GlassCard(
+              padding: EdgeInsets.zero,
+              child: TextField(
+                textAlign: TextAlign.center,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(hintText: 'C${i+1}', border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 12)),
+                onChanged: (v) => lastCycles[i] = int.tryParse(v) ?? 28,
+              ),
             ),
           )),
         ),
@@ -463,50 +351,177 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
     );
   }
 
-  Widget _step6() {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          _stepTitle('Photo Initiale', 'Une photo de face pour l\'analyse CNN.'),
-          const Spacer(),
-          GestureDetector(
-            onTap: _showPhotoSourceDialog,
-            child: Container(
-              width: 240,
-              height: 320,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: theme.colorScheme.primary.withOpacity(0.2), width: 2),
-              ),
-              child: facePhoto != null
-                ? ClipRRect(
-                    borderRadius: BorderRadius.circular(28), 
-                    child: kIsWeb 
-                      ? Image.network(facePhoto!.path, fit: BoxFit.cover)
-                      : Image.file(File(facePhoto!.path), fit: BoxFit.cover)
-                  )
-                : Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Iconsax.camera, size: 64, color: theme.colorScheme.primary),
-                      const SizedBox(height: 16),
-                      Text('Prendre une photo', style: TextStyle(color: theme.colorScheme.primary, fontWeight: FontWeight.bold)),
-                    ],
+  Widget _buildChoiceSection(String title, List<String> options, String current, Function(String) onSel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
+        const SizedBox(height: 12),
+        Row(
+          children: options.map((o) {
+            final sel = current == o;
+            return Expanded(
+              child: GestureDetector(
+                onTap: () => onSel(o),
+                child: AnimatedContainer(
+                  duration: 300.ms,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
                   ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            '⚠️ Vos photos sont traitées de manière sécurisée et ne sont utilisées que pour votre suivi.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const Spacer(),
-        ],
-      ),
+                  child: Center(child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900))),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
+  }
+
+  Widget _buildWrapChoice(String title, List<String> options, String current, Function(String) onSel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: options.map((o) {
+            final sel = current == o;
+            return GestureDetector(
+              onTap: () => onSel(o),
+              child: AnimatedContainer(
+                duration: 300.ms,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
+                ),
+                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWrapFilter(String title, List<String> options, List<String> current, Function(String, bool) onSel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: options.map((o) {
+            final sel = current.contains(o);
+            return GestureDetector(
+              onTap: () => onSel(o, !sel),
+              child: AnimatedContainer(
+                duration: 300.ms,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
+                ),
+                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900)),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRadioSection(String title, List<String> options, String current, Function(String) onSel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
+        const SizedBox(height: 12),
+        GlassCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: options.map((o) => RadioListTile<String>(
+              activeColor: AppColors.primary,
+              title: Text(o.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              value: o,
+              groupValue: current,
+              onChanged: (v) => onSel(v!),
+            )).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCheckSection(String title, List<String> options, List<String> current, Function(String, bool) onSel) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1, color: AppColors.textSecondaryDark)),
+        const SizedBox(height: 12),
+        GlassCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            children: options.map((o) => CheckboxListTile(
+              activeColor: AppColors.primary,
+              title: Text(o.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              value: current.contains(o),
+              onChanged: (v) => onSel(o, v!),
+            )).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSwitch(String label, bool val, Function(bool) onCh) {
+    return SwitchListTile.adaptive(
+      activeColor: AppColors.primary,
+      contentPadding: EdgeInsets.zero,
+      title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      value: val,
+      onChanged: onCh,
+    );
+  }
+}
+
+class _StepIndicator extends StatelessWidget {
+  final int current;
+  const _StepIndicator({required this.current});
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: List.generate(5, (i) {
+        final active = i <= current;
+        return Expanded(
+          child: AnimatedContainer(
+            duration: 500.ms,
+            height: 4,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(color: active ? AppColors.primary : Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(2)),
+          ),
+        );
+      }),
+    );
+  }
+}
+
+class _Blob extends StatelessWidget {
+  final double size; final Color color;
+  const _Blob({required this.size, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
   }
 }

@@ -1,5 +1,5 @@
-name: acneia
-description: AcnéIA – Détection d'acné et recommandations personnalisées
+name: hermona
+description: Hermona AI - Skincare Intelligence
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -58,6 +58,9 @@ dependencies:
   record: ^6.0.0
   flutter_tts: ^4.2.5
   flutter_dotenv: ^6.0.1
+  flutter_local_notifications: ^17.1.2
+  timezone: ^0.9.2
+  workmanager: ^0.9.0
 
 dev_dependencies:
   flutter_test:
@@ -69,3 +72,9 @@ dependency_overrides:
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/hermona_bg.jpg
+    - assets/images/landing_bg.png
+    - assets/images/feature_ai.png
+    - assets/images/feature_routine.png

@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -15,6 +16,7 @@ import '../../domain/entities/prediction_result.dart';
 class PredictionScreen extends StatefulWidget {
   final PredictionResult? initialResult;
   const PredictionScreen({super.key, this.initialResult});
+
   @override
   State<PredictionScreen> createState() => _PredictionScreenState();
 }
@@ -29,15 +31,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
     super.initState();
     if (widget.initialResult != null) {
       _result = widget.initialResult;
-    } else {
-      _fetchLastPrediction();
     }
-  }
-
-  Future<void> _fetchLastPrediction() async {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) return;
-    // Simple fetch from service logic here if needed, or rely on _predict() trigger
   }
 
   Future<void> _predict() async {
@@ -46,7 +40,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('Utilisateur non connecté');
 
-      // 1. Récupérer les bilans de l'utilisateur
       final dailySnap = await FirebaseFirestore.instance
           .collection('daily_surveys')
           .where('userId', isEqualTo: uid)
@@ -54,7 +47,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
       Map<String, dynamic> answers = {};
       if (dailySnap.docs.isNotEmpty) {
-        // Trier manuellement par date pour éviter l'erreur d'index
         final docs = dailySnap.docs.toList();
         docs.sort((a, b) {
           DateTime dateA = a['date'] is Timestamp ? (a['date'] as Timestamp).toDate() : DateTime.tryParse(a['date'].toString()) ?? DateTime(2000);
@@ -72,10 +64,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         };
       }
 
-      // 2. Lancer l'analyse
       final res = await _svc.predict(answers); 
-      
-      // 3. Sauvegarder
       await _svc.saveResult(res, uid);
 
       if (mounted) setState(() { _result = res; _loading = false; });
@@ -83,7 +72,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
       if (mounted) {
         setState(() => _loading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur IA : $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Erreur IA : $e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -91,34 +80,46 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_result != null) return _ResultView(result: _result!, onRetry: () => context.push('/weekly-survey'));
+    if (_result != null) return _ResultView(result: _result!, onRetry: () => setState(() => _result = null));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Prédiction Hermona')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Iconsax.magic_star, size: 80, color: AppTheme.primary).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
-              const SizedBox(height: 24),
-              Text('Prête pour ton bilan ?', style: Theme.of(context).textTheme.displaySmall),
-              const SizedBox(height: 16),
-              const Text(
-                'Notre IA va analyser ton cycle, ton hygiène de vie et tes données pour prédire les risques d\'imperfections.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 48),
-              GradientButton(
-                text: 'Lancer l\'analyse IA',
-                isLoading: _loading,
-                onPressed: _predict,
-              ),
-            ],
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(title: const Text('Bilan Prédictif')),
+      body: Stack(
+        children: [
+          // Background
+          Positioned(
+            top: -100,
+            right: -50,
+            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.05)),
           ),
-        ),
+          
+          Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const _ScanIcon(),
+                  const SizedBox(height: 32),
+                  Text('Analyse Prédictive', style: Theme.of(context).textTheme.displayMedium),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Prédit tes futurs risques d\'acné basés sur ton cycle, ton hygiène et tes habitudes.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
+                  ),
+                  const SizedBox(height: 48),
+                  PrimaryButton(
+                    label: 'LANCER L\'ANALYSE IA',
+                    isLoading: _loading,
+                    onTap: _predict,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -131,7 +132,6 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final color = result.riskLevel == RiskLevel.low ? AppColors.success 
                 : result.riskLevel == RiskLevel.medium ? AppColors.warning 
                 : AppColors.error;
@@ -139,192 +139,262 @@ class _ResultView extends StatelessWidget {
     return DefaultTabController(
       length: 3,
       child: Scaffold(
+        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text('Analyse Hermona'),
-          bottom: TabBar(
-            tabs: const [
-              Tab(text: 'Routine'),
-              Tab(text: 'À éviter'),
-              Tab(text: 'Mode de vie'),
-            ],
-            labelColor: theme.colorScheme.primary,
-            indicatorColor: theme.colorScheme.primary,
+          title: const Text('Rapport Hermona'),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(60),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: Colors.white.withOpacity(0.05)),
+              ),
+              child: TabBar(
+                indicator: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.primary,
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                labelColor: Colors.white,
+                unselectedLabelColor: AppColors.textSecondaryDark,
+                labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5),
+                tabs: const [
+                  Tab(text: 'ANALYSE'),
+                  Tab(text: 'ROUTINE'),
+                  Tab(text: 'LIFESTYLE'),
+                ],
+              ),
+            ),
           ),
         ),
         body: TabBarView(
           children: [
-            _buildMainTab(context, color),
-            _buildAvoidTab(context),
-            _buildLifestyleTab(context),
+            _AnalysisTab(result: result, color: color),
+            _RoutineTab(result: result),
+            _LifestyleTab(result: result),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: onRetry,
-          label: const Text('Nouvelle analyse'),
-          icon: const Icon(Iconsax.refresh),
-          backgroundColor: theme.colorScheme.primary,
+          label: const Text('NOUVEAU SCAN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+          icon: const Icon(Iconsax.refresh, size: 20),
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         ),
       ),
     );
   }
+}
 
-  Widget _buildMainTab(BuildContext context, Color color) {
+class _AnalysisTab extends StatelessWidget {
+  final PredictionResult result;
+  final Color color;
+  const _AnalysisTab({required this.result, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(24),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
       children: [
-        // Risk Card
-        AppCard(
-          color: color.withOpacity(0.05),
+        // Main Risk Card
+        GlassCard(
+          padding: const EdgeInsets.all(28),
           child: Column(
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Risque aujourd\'hui', style: Theme.of(context).textTheme.headlineMedium),
-                  SeverityBadge(
-                    label: result.riskLevel == RiskLevel.low ? 'PRÉVENTION' 
-                         : result.riskLevel == RiskLevel.medium ? 'ÉQUILIBRE' 
-                         : 'PROTECTION', 
-                    color: color
+                  const Text('Risque Estimé', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  StatusBadge(
+                    text: result.riskLevel.name.toUpperCase(),
+                    color: color,
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               CircularPercentIndicator(
-                radius: 70.0,
-                lineWidth: 12.0,
+                radius: 80.0,
+                lineWidth: 14.0,
                 percent: result.riskScore,
-                center: Text('${(result.riskScore * 100).toInt()}%', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
+                center: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('${(result.riskScore * 100).toInt()}%', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: color)),
+                    const Text('INDICE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                  ],
+                ),
                 progressColor: color,
                 backgroundColor: color.withOpacity(0.1),
                 circularStrokeCap: CircularStrokeCap.round,
                 animation: true,
-                animationDuration: 1000,
+                animationDuration: 1200,
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 32),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _InfoColumn(label: 'J+3', value: '${(result.riskJ3 * 100).toInt()}%', color: color),
-                  _InfoColumn(label: 'Tendance', value: result.trend == TrendDirection.increasing ? '📈' : '📉', color: color),
-                  _InfoColumn(label: 'Cycle', value: 'J${result.cycleDay}', color: AppColors.secondary),
+                  _InfoBox(label: 'Tendance', value: result.trend == TrendDirection.increasing ? 'EN HAUSSE' : 'STABLE', color: color),
+                  _VerticalDivider(),
+                  _InfoBox(label: 'Phase Cycle', value: result.cyclePhase.toUpperCase(), color: AppColors.secondary),
                 ],
               ),
             ],
           ),
-        ).animate().fadeIn().slideY(begin: 0.1),
-        const SizedBox(height: 24),
+        ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95)),
+
+        const SizedBox(height: 32),
 
         // SHAP Factors
-        SectionTitle(title: 'Facteurs d\'influence (SHAP)', action: '', onAction: () {}),
-        const SizedBox(height: 16),
-        AppCard(
+        const SectionHeader(title: 'Facteurs d\'Influence'),
+        const SizedBox(height: 12),
+        GlassCard(
+          padding: const EdgeInsets.all(24),
           child: Column(
-            children: result.shapFactors.entries.map((e) => _ShapBar(label: e.key, value: e.value)).toList(),
+            children: result.shapFactors.entries.map((e) => _ShapIndicator(label: e.key, value: e.value)).toList(),
           ),
         ).animate().fadeIn(delay: 200.ms),
-        const SizedBox(height: 24),
-
-        // Hygiene Gauge
-        SectionTitle(title: 'Score Hygiène', action: '', onAction: () {}),
-        const SizedBox(height: 16),
-        AppCard(
-          child: LinearPercentIndicator(
-            lineHeight: 12,
-            percent: result.hygieneScore / 100,
-            progressColor: AppColors.info,
-            backgroundColor: AppColors.info.withOpacity(0.1),
-            barRadius: const Radius.circular(10),
-            padding: EdgeInsets.zero,
-            leading: Text('${result.hygieneScore}', style: const TextStyle(fontWeight: FontWeight.bold)),
-            trailing: const Text('100'),
-          ),
-        ).animate().fadeIn(delay: 400.ms),
-        const SizedBox(height: 24),
-
-        // Recommended Routine
-        SectionTitle(title: 'Ta Routine Recommandée', action: '', onAction: () {}),
-        const SizedBox(height: 16),
-        ...result.routine.map((r) => _TipItem(text: r, icon: Iconsax.magic_star, color: AppColors.success)).toList(),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-
-  Widget _buildAvoidTab(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        _stepTitle(context, 'À Éviter', 'Ces éléments pourraient aggraver l\'inflammation en phase ${result.cyclePhase}.'),
-        const SizedBox(height: 16),
-        ...result.toAvoid.map((a) => _TipItem(text: a, icon: Iconsax.close_circle, color: AppColors.error)).toList(),
-      ],
-    );
-  }
-
-  Widget _buildLifestyleTab(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        _stepTitle(context, 'Mode de Vie', 'Conseils personnalisés basés sur tes facteurs SHAP.'),
-        const SizedBox(height: 16),
-        ...result.lifestyle.map((l) => _TipItem(text: l, icon: Iconsax.heart, color: AppColors.info)).toList(),
-      ],
-    );
-  }
-
-  Widget _stepTitle(BuildContext context, String title, String subtitle) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.displaySmall),
-        const SizedBox(height: 8),
-        Text(subtitle, style: const TextStyle(color: Colors.grey)),
       ],
     );
   }
 }
 
-class _InfoColumn extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  const _InfoColumn({required this.label, required this.value, required this.color});
+class _RoutineTab extends StatelessWidget {
+  final PredictionResult result;
+  const _RoutineTab({required this.result});
+
   @override
   Widget build(BuildContext context) {
-    return Column(children: [
-      Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-    ]);
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
+      children: [
+        const SectionHeader(title: 'Votre Routine sur-mesure'),
+        const SizedBox(height: 12),
+        ...result.routine.asMap().entries.map((e) => PremiumFadeIn(
+          delay: e.key * 100,
+          child: _TipCard(text: e.value, icon: Iconsax.magic_star, color: AppColors.primary),
+        )),
+        const SizedBox(height: 24),
+        const SectionHeader(title: 'À Éviter'),
+        ...result.toAvoid.asMap().entries.map((e) => PremiumFadeIn(
+          delay: (e.key + 5) * 100,
+          child: _TipCard(text: e.value, icon: Iconsax.close_circle, color: AppColors.error),
+        )),
+      ],
+    );
   }
 }
 
-class _ShapBar extends StatelessWidget {
+class _LifestyleTab extends StatelessWidget {
+  final PredictionResult result;
+  const _LifestyleTab({required this.result});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
+      children: [
+        const SectionHeader(title: 'Habitudes & Hygiène'),
+        const SizedBox(height: 12),
+        ...result.lifestyle.asMap().entries.map((e) => PremiumFadeIn(
+          delay: e.key * 100,
+          child: _TipCard(text: e.value, icon: Iconsax.heart5, color: AppColors.info),
+        )),
+      ],
+    );
+  }
+}
+
+/// ─────────────────────────────────────────────────────────────────────────────
+/// COMPONENTS
+/// ─────────────────────────────────────────────────────────────────────────────
+
+class _ScanIcon extends StatelessWidget {
+  const _ScanIcon();
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Icon(Iconsax.magic_star, size: 80, color: AppColors.primary),
+          Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+              shape: BoxShape.circle,
+            ),
+          ).animate(onPlay: (c) => c.repeat()).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 2.seconds).fadeIn(duration: 1.seconds).fadeOut(delay: 1.seconds),
+        ],
+      ),
+    ).animate().scale(duration: 800.ms, curve: Curves.elasticOut);
+  }
+}
+
+class _InfoBox extends StatelessWidget {
+  final String label, value;
+  final Color color;
+  const _InfoBox({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark, letterSpacing: 1)),
+        const SizedBox(height: 4),
+        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+      ],
+    );
+  }
+}
+
+class _VerticalDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(width: 1, height: 30, color: Colors.white.withOpacity(0.1));
+  }
+}
+
+class _ShapIndicator extends StatelessWidget {
   final String label;
   final double value;
-  const _ShapBar({required this.label, required this.value});
+  const _ShapIndicator({required this.label, required this.value});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-              Text('+${(value * 100).toInt()}%', style: const TextStyle(fontSize: 11, color: AppColors.error)),
+              Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              Text('+${(value * 100).toInt()}%', style: const TextStyle(color: AppColors.error, fontWeight: FontWeight.w900, fontSize: 12)),
             ],
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 8),
           LinearPercentIndicator(
             lineHeight: 6,
             percent: value.clamp(0, 1),
-            progressColor: AppColors.error.withOpacity(0.7),
+            progressColor: AppColors.error,
             backgroundColor: AppColors.error.withOpacity(0.1),
-            barRadius: const Radius.circular(5),
+            barRadius: const Radius.circular(4),
             padding: EdgeInsets.zero,
+            animation: true,
+            animationDuration: 1000,
           ),
         ],
       ),
@@ -332,25 +402,44 @@ class _ShapBar extends StatelessWidget {
   }
 }
 
-class _TipItem extends StatelessWidget {
+class _TipCard extends StatelessWidget {
   final String text;
   final IconData icon;
   final Color color;
-  const _TipItem({required this.text, required this.icon, required this.color});
+  const _TipCard({required this.text, required this.icon, required this.color});
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: AppCard(
-        padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(bottom: 16),
+      child: GlassCard(
+        padding: const EdgeInsets.all(20),
         child: Row(
           children: [
-            Icon(icon, color: color, size: 20),
-            const SizedBox(width: 16),
-            Expanded(child: Text(text, style: const TextStyle(fontSize: 14))),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 20),
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 14, height: 1.4, fontWeight: FontWeight.w600))),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _Blob extends StatelessWidget {
+  final double size;
+  final Color color;
+  const _Blob({required this.size, required this.color});
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])),
     );
   }
 }

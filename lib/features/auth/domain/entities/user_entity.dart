@@ -7,6 +7,7 @@ class UserEntity extends Equatable {
   final String lastName;
   final String email;
   final String? photoUrl;
+  final String pseudonym;
   final DateTime createdAt;
   final bool termsAccepted;
 
@@ -16,6 +17,7 @@ class UserEntity extends Equatable {
     required this.lastName,
     required this.email,
     this.photoUrl,
+    required this.pseudonym,
     required this.createdAt,
     required this.termsAccepted,
   });
@@ -38,6 +40,7 @@ class UserEntity extends Equatable {
       lastName     : j['lastName']     as String? ?? '',
       email        : j['email']        as String? ?? '',
       photoUrl     : j['photoUrl']     as String?,
+      pseudonym    : j['pseudonym']    as String? ?? '',
       createdAt    : d,
       termsAccepted: j['termsAccepted'] as bool? ?? false,
     );
@@ -48,6 +51,7 @@ class UserEntity extends Equatable {
     'lastName'     : lastName,
     'email'        : email,
     'photoUrl'     : photoUrl,
+    'pseudonym'    : pseudonym,
     'createdAt'    : createdAt.toIso8601String(),
     'termsAccepted': termsAccepted,
   };
@@ -55,3 +59,4 @@ class UserEntity extends Equatable {
   @override
   List<Object?> get props => [id, email];
 }
+

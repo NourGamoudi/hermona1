@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'firebase_options.dart';
 import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
+import 'core/localization/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,25 +27,26 @@ void main() async {
   final saved = prefs.getInt(AppConstants.keyPrimaryColor);
   if (saved != null) AppTheme.setPrimary(Color(saved));
 
-  runApp(AcneIAApp(
+  runApp(HermonaApp(
     initialDark: prefs.getBool(AppConstants.keyThemeMode) ?? false,
   ));
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-class AcneIAApp extends StatefulWidget {
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+class HermonaApp extends StatefulWidget {
   final bool initialDark;
-  const AcneIAApp({super.key, required this.initialDark});
+  const HermonaApp({super.key, required this.initialDark});
 
-  static _AcneIAAppState? of(BuildContext context) =>
-      context.findAncestorStateOfType<_AcneIAAppState>();
+  static _HermonaAppState? of(BuildContext context) =>
+      context.findAncestorStateOfType<_HermonaAppState>();
 
   @override
-  State<AcneIAApp> createState() => _AcneIAAppState();
+  State<HermonaApp> createState() => _HermonaAppState();
 }
 
-class _AcneIAAppState extends State<AcneIAApp> {
+class _HermonaAppState extends State<HermonaApp> {
   late ThemeMode _mode;
+  Locale? _locale;
 
   @override
   void initState() {
@@ -52,17 +55,30 @@ class _AcneIAAppState extends State<AcneIAApp> {
   }
 
   void setThemeMode(ThemeMode m) => setState(() => _mode = m);
+  void setLocale(Locale l) => setState(() => _locale = l);
 
   @override
   Widget build(BuildContext context) {
-    print('build: AcneIAApp');
+    print('build: HermonaApp');
     return MaterialApp.router(
       title: 'HERMONA',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.dark(),
       themeMode: _mode,
+      locale: _locale,
       routerConfig: appRouter,
+      localizationsDelegates: const [
+        AppLocalizations.delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('fr', ''),
+        Locale('en', ''),
+      ],
     );
   }
 }
+

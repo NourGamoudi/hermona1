@@ -19,6 +19,7 @@ class UserProfile {
   final DateTime lastPeriodsDate;
   final List<int> lastCyclesDuration;
   final Map<String, String> initialPhotos;
+  final String? pseudonym;
 
   UserProfile({
     required this.id,
@@ -39,6 +40,7 @@ class UserProfile {
     required this.lastPeriodsDate,
     required this.lastCyclesDuration,
     required this.initialPhotos,
+    this.pseudonym,
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json, String id) {
@@ -65,6 +67,7 @@ class UserProfile {
       initialPhotos: json['initialPhotos'] != null
           ? Map<String, String>.from(json['initialPhotos'])
           : <String, String>{},
+      pseudonym: json['pseudonym'] as String?,
     );
   }
 
@@ -87,6 +90,8 @@ class UserProfile {
       'lastPeriodsDate': Timestamp.fromDate(lastPeriodsDate),
       'lastCyclesDuration': lastCyclesDuration,
       'initialPhotos': initialPhotos,
+      'pseudonym': pseudonym,
     };
   }
 }
+

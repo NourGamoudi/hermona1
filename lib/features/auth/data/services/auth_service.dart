@@ -6,9 +6,9 @@ import '../../domain/entities/user_entity.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/errors/app_exception.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// DATA – AuthService (Firebase Auth + Firestore)
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DATA â€“ AuthService (Firebase Auth + Firestore)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -17,19 +17,20 @@ class AuthService {
   Stream<User?> get authState => _auth.authStateChanges();
   User? get currentUser => _auth.currentUser;
 
-  // ── Récupérer les données utilisateur ──────────────────────────────────────
+  // â”€â”€ Récupérer les données utilisateur â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<UserEntity?> fetchUser(String uid) async {
     final doc = await _db.collection(AppConstants.colUsers).doc(uid).get();
     if (!doc.exists || doc.data() == null) return null;
     return UserEntity.fromJson(doc.data()!, doc.id);
   }
 
-  // ── Inscription ────────────────────────────────────────────────────────────
+  // â”€â”€ Inscription â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<UserEntity> register({
     required String email,
     required String password,
     required String firstName,
     required String lastName,
+    required String pseudonym,
   }) async {
     try {
       final cred = await _auth.createUserWithEmailAndPassword(
@@ -45,6 +46,7 @@ class AuthService {
         firstName: firstName,
         lastName: lastName,
         email: email,
+        pseudonym: pseudonym,
         createdAt: DateTime.now(),
         termsAccepted: true,
       );
@@ -53,6 +55,14 @@ class AuthService {
           .collection(AppConstants.colUsers)
           .doc(user.uid)
           .set(entity.toJson(), SetOptions(merge: true));
+
+      // Sync public profile
+      await _db.collection(AppConstants.colPublicProfiles).doc(user.uid).set({
+        'uid': user.uid,
+        'pseudonym': pseudonym,
+        'avatarIndex': 0, // Default for new users
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       return entity;
 
@@ -66,7 +76,7 @@ class AuthService {
     }
   }
 
-  // ── Connexion email/mot de passe ───────────────────────────────────────────
+  // â”€â”€ Connexion email/mot de passe â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<UserEntity> login({
     required String email,
     required String password,
@@ -79,7 +89,7 @@ class AuthService {
 
       final user = await fetchUser(cred.user!.uid);
 
-      // ❗ IMPORTANT : ne pas créer un faux user
+      // â— IMPORTANT : ne pas créer un faux user
       if (user == null) {
         throw const AuthException('Profil utilisateur introuvable');
       }
@@ -96,7 +106,7 @@ class AuthService {
     }
   }
 
-  // ── Connexion Google ───────────────────────────────────────────────────────
+  // â”€â”€ Connexion Google â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<UserEntity> signInWithGoogle() async {
     try {
       final gUser = await _google.signIn();
@@ -125,6 +135,7 @@ class AuthService {
         lastName: parts.length > 1 ? parts.last : '',
         email: user.email ?? '',
         photoUrl: user.photoURL,
+        pseudonym: user.displayName ?? 'Anonyme',
         createdAt: DateTime.now(),
         termsAccepted: true,
       );
@@ -133,6 +144,14 @@ class AuthService {
           .collection(AppConstants.colUsers)
           .doc(user.uid)
           .set(entity.toJson(), SetOptions(merge: true));
+
+      // Sync public profile
+      await _db.collection(AppConstants.colPublicProfiles).doc(user.uid).set({
+        'uid': user.uid,
+        'pseudonym': entity.pseudonym,
+        'avatarIndex': 0, // Default
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       return entity;
 
@@ -146,7 +165,7 @@ class AuthService {
     }
   }
 
-  // ── Déconnexion ────────────────────────────────────────────────────────────
+  // â”€â”€ Déconnexion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> signOut() async {
     await Future.wait([
       _auth.signOut(),
@@ -154,7 +173,7 @@ class AuthService {
     ]);
   }
 
-  // ── Mot de passe oublié ────────────────────────────────────────────────────
+  // â”€â”€ Mot de passe oublié â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<void> resetPassword(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -165,7 +184,7 @@ class AuthService {
     }
   }
 
-  // ── Mapper les codes d'erreur Firebase ────────────────────────────────────
+  // â”€â”€ Mapper les codes d'erreur Firebase â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   String _mapFirebaseError(String code) {
     const map = {
       'email-already-in-use': 'Cet email est déjà utilisé',

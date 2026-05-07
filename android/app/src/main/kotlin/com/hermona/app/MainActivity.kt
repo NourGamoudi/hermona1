@@ -1,4 +1,4 @@
-package com.acneia.acneia
+package com.hermona.app
 
 import io.flutter.embedding.android.FlutterActivity
 

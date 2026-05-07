@@ -1,137 +1,307 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:iconsax/iconsax.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
+import '../../../../core/services/language_service.dart';
+import '../../../../core/localization/app_localizations.dart';
+import '../../../../main.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final isFr = Localizations.localeOf(context).languageCode == 'fr';
+    final size = MediaQuery.of(context).size;
+    
+    // The exact vibrant pink from the screenshot
+    const brandPink = Color(0xFFE85886);
+
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppTheme.primary.withOpacity(0.1),
-              Theme.of(context).scaffoldBackgroundColor,
-            ],
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          // 1. Background image — top 55%
+          Positioned(
+            top: 0, left: 0, right: 0,
+            height: size.height * 0.55,
+            child: Image.asset(
+              'assets/images/hermona_bg.jpg',
+              fit: BoxFit.cover,
+              alignment: Alignment.topCenter,
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 24.0),
+
+          // 2. Gradient: image fades to white
+          Positioned(
+            top: size.height * 0.35,
+            left: 0, right: 0,
+            height: size.height * 0.22,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [Colors.transparent, Colors.white],
+                ),
+              ),
+            ),
+          ),
+
+          // 3. White background from 55% down
+          Positioned(
+            top: size.height * 0.55,
+            left: 0, right: 0, bottom: 0,
+            child: Container(color: Colors.white),
+          ),
+
+          // 4. Content overlay
+          SafeArea(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Spacer(),
-                
-                // Icon / Logo
-                Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppTheme.primary.withOpacity(0.2),
-                        blurRadius: 30,
-                        offset: const Offset(0, 10),
+                // Top bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                  child: Row(
+                    children: [
+                      _LogoBadge(brandColor: brandPink),
+                      const Spacer(),
+                      _LanguageToggle(
+                        isFr: isFr,
+                        brandColor: brandPink,
+                        onToggle: (code) => _updateLang(context, code),
                       ),
                     ],
                   ),
-                  child: const Text('🌸', style: TextStyle(fontSize: 64)),
-                ).animate().scale(duration: 800.ms, curve: Curves.elasticOut),
-                
-                const SizedBox(height: 48),
-                
-                Text(
-                  'Bienvenue sur\nHERMONA',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
+                ).animate().fadeIn(duration: 600.ms),
+
+                // Push title exactly to match screenshot (middle of face)
+                const Spacer(flex: 3),
+
+                // Title — "Reveal Your Skin's Glow"
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Text(
+                    isFr ? 'Révèle l\'Éclat\nde ta Peau' : 'Reveal Your\nSkin\'s Glow',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: 46,
+                      fontWeight: FontWeight.w900,
+                      color: brandPink,
+                      height: 1.05,
+                      letterSpacing: -1.0,
+                    ),
                   ),
-                ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.2, duration: 800.ms, curve: Curves.easeOut),
-                
-                const SizedBox(height: 16),
-                
-                Text(
-                  'Ton assistant IA dédié à l\'acné hormonale',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: AppTheme.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ).animate().fadeIn(delay: 1000.ms),
-                
+                ).animate().fadeIn(delay: 200.ms),
+
                 const SizedBox(height: 24),
-                
-                // Description
-                Text(
-                  'Comprenez votre cycle, analysez votre peau et recevez des recommandations expertes pour une routine sereine.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    height: 1.5,
-                    color: Colors.grey[600],
+
+                // Subtitle
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  child: Text(
+                    isFr
+                        ? 'Analyse faciale 5 zones, suivi du cycle, et routines expertes personnalisées.'
+                        : '5-zone facial analysis, cycle tracking, and personalized expert routines.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: Colors.grey[600],
+                      height: 1.6,
+                      letterSpacing: 0.2,
+                    ),
                   ),
-                ).animate().fadeIn(delay: 1500.ms, duration: 800.ms),
-                
-                const Spacer(),
-                
-                // Actions
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    GradientButton(
-                      text: 'Se connecter',
-                      onPressed: () => context.push('/login'),
-                    ),
-                    const SizedBox(height: 16),
-                    OutlinedButton(
-                      onPressed: () => context.push('/register'),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(50), // Plus arrondi pour le look premium
-                        ),
-                        side: BorderSide(color: AppTheme.primary, width: 2),
-                      ),
-                      child: Text(
-                        'Créer un compte',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ).animate().fadeIn(delay: 2000.ms, duration: 800.ms).slideY(begin: 0.2),
-                
-                const SizedBox(height: 32),
-                
-                // Liens discrets
+                ).animate().fadeIn(delay: 400.ms),
+
+                const Spacer(flex: 2),
+
+                // Buttons
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 36),
+                  child: Column(
+                    children: [
+                      _OutlinedPillButton(
+                        label: isFr ? 'Se connecter' : 'Log In',
+                        brandColor: brandPink,
+                        onTap: () => context.push('/login'),
+                      ).animate().fadeIn(delay: 600.ms),
+
+                      const SizedBox(height: 16),
+
+                      _OutlinedPillButton(
+                        label: isFr ? 'Créer un compte' : 'Create Account',
+                        brandColor: brandPink,
+                        onTap: () => context.push('/register'),
+                      ).animate().fadeIn(delay: 750.ms),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // Security text
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    TextButton(
-                      onPressed: () {},
-                      child: Text('Mentions légales', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
-                    ),
-                    Text(' • ', style: TextStyle(color: Colors.grey[400])),
-                    TextButton(
-                      onPressed: () {},
-                      child: Text('Politique de confidentialité', style: TextStyle(fontSize: 12, color: Colors.grey[400])),
+                    Icon(Iconsax.shield_tick, size: 12, color: Colors.grey[400]),
+                    const SizedBox(width: 6),
+                    Text(
+                      'SCIENCE-DRIVEN • ANONYMOUS • SECURE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey[400],
+                        letterSpacing: 1.8,
+                      ),
                     ),
                   ],
-                ).animate().fadeIn(delay: 2500.ms),
+                ).animate().fadeIn(delay: 900.ms),
+
+                const SizedBox(height: 28),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _updateLang(BuildContext context, String code) async {
+    final service = LanguageService();
+    await service.setLanguage(code);
+    if (context.mounted) {
+      HermonaApp.of(context)?.setLocale(Locale(code));
+    }
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+class _LogoBadge extends StatelessWidget {
+  final Color brandColor;
+  const _LogoBadge({required this.brandColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(50),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Iconsax.magic_star5, size: 16, color: brandColor),
+          const SizedBox(width: 8),
+          Text(
+            'HERMONA',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              letterSpacing: 2.5,
+              fontSize: 12,
+              color: brandColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+class _LanguageToggle extends StatelessWidget {
+  final bool isFr;
+  final Color brandColor;
+  final Function(String) onToggle;
+
+  const _LanguageToggle({required this.isFr, required this.brandColor, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(50),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          _btn(context, 'FR', isFr, () => onToggle('fr')),
+          _btn(context, 'EN', !isFr, () => onToggle('en')),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(BuildContext context, String label, bool active, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? brandColor : Colors.transparent,
+          borderRadius: BorderRadius.circular(50),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: active ? Colors.white : Colors.grey[600],
+            fontWeight: FontWeight.w800,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+class _OutlinedPillButton extends StatelessWidget {
+  final String label;
+  final Color brandColor;
+  final VoidCallback onTap;
+
+  const _OutlinedPillButton({required this.label, required this.brandColor, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(50),
+          border: Border.all(color: brandColor, width: 1.5),
+        ),
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: brandColor,
           ),
         ),
       ),
