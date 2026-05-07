@@ -11,35 +11,37 @@ import 'package:google_fonts/google_fonts.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppColors {
-  static const Color primary      = Color(0xFFE85886); // Luxury Pink
-  static const Color primaryDark  = Color(0xFFC7436D);
-  static const Color primaryLight = Color(0xFFFF85AA);
-  static const Color secondary    = Color(0xFF6B5AE0); // Deep Indigo
-  static const Color accent       = Color(0xFF45D9B3); // Mint Crystal
+  static const Color primary      = Color(0xFFFF69B4); // Hot Pink
+  static const Color primaryDark  = Color(0xFFE05297);
+  static const Color primaryLight = Color(0xFFFFB6C1); // Light Pink
+  static const Color secondary    = Color(0xFF9B59B6); // Amethyst
+  static const Color accent       = Color(0xFFFFD700); // Gold
 
-  static const Color bgLight      = Color(0xFFF9FAFE);
-  static const Color bgDark       = Color(0xFF0D0F14); // Deep Obsidian
+  static const Color bgLight      = Color(0xFFFFF0F3); // Soft Blush Pink
+  static const Color bgDark       = Color(0xFF0F0F0F); 
   
-  static const Color surfaceLight = Color(0xFFFFFFFF);
-  static const Color surfaceDark  = Color(0xFF161922);
+  static const Color surfaceLight = Color(0xFFFFE4E9); // Deeper Soft Pink
+  static const Color surfaceDark  = Color(0xFF1A1A1A);
   
-  static const Color textPrimaryLight   = Color(0xFF1A1C24);
-  static const Color textSecondaryLight = Color(0xFF64748B);
-  static const Color textPrimaryDark    = Color(0xFFF8FAFC);
+  static const Color textPrimaryLight   = Color(0xFF141413); // Solid Ink
+  static const Color textSecondaryLight = Color(0xFF4A4A4A); // Solid Grey
+  static const Color textMutedPink      = Color(0xFF8E6A74); // Softer, luxury muted pink
+  static const Color textPrimaryDark    = Color(0xFFFFFFFF);
   static const Color textSecondaryDark  = Color(0xFF94A3B8);
 
-  static const Color success = Color(0xFF10B981);
-  static const Color warning = Color(0xFFF59E0B);
-  static const Color error   = Color(0xFFEF4444);
-  static const Color info    = Color(0xFF3B82F6);
+  static const Color success = Color(0xFF27AE60);
+  static const Color warning = Color(0xFFF39C12);
+  static const Color error   = Color(0xFFE74C3C);
+  static const Color info    = Color(0xFF3498DB);
 
-  static const Color dividerLight = Color(0xFFE2E8F0);
+  static const Color dividerLight = Color(0xFFFFD1DC);
   static const Color dividerDark  = Color(0xFF2D3748);
-  static const Color cardDark     = Color(0xFF161922);
+  static const Color cardDark     = Color(0xFF1A1A1A);
 
-  static const Color severityNormal   = success;
-  static const Color severityModerate = warning;
-  static const Color severitySevere   = error;
+  static const Color severityNormal     = success;
+  static const Color severityModerate   = warning;
+  static const Color severitySevere     = error;
+  static const Color severityVerySevere = Color(0xFF8E44AD); // Deep Purple
 }
 
 
@@ -82,23 +84,23 @@ class AppTheme {
         onBackground: textPri,
       ),
       scaffoldBackgroundColor: bg,
-      textTheme: GoogleFonts.interTextTheme().copyWith(
-        displayLarge  : GoogleFonts.playfairDisplay(fontSize: 32, fontWeight: FontWeight.w900,  color: textPri, letterSpacing: -0.5),
-        displayMedium : GoogleFonts.playfairDisplay(fontSize: 26, fontWeight: FontWeight.w800,  color: textPri, letterSpacing: -0.5),
-        displaySmall  : GoogleFonts.playfairDisplay(fontSize: 20, fontWeight: FontWeight.w700, color: textPri),
-        headlineLarge : GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w700, color: textPri, letterSpacing: -0.2),
-        headlineMedium: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w600, color: textPri),
-        bodyLarge  : GoogleFonts.inter(fontSize: 16, color: textPri, height: 1.5),
-        bodyMedium : GoogleFonts.inter(fontSize: 14, color: textPri, height: 1.5),
-        bodySmall  : GoogleFonts.inter(fontSize: 12, color: textSec),
-        labelLarge : GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: textPri, letterSpacing: 0.1),
+      textTheme: GoogleFonts.outfitTextTheme().copyWith(
+        displayLarge  : GoogleFonts.fraunces(fontSize: 48, fontWeight: FontWeight.w400, color: textPri, letterSpacing: -1.5),
+        displayMedium : GoogleFonts.fraunces(fontSize: 36, fontWeight: FontWeight.w400, color: textPri, letterSpacing: -1.0),
+        displaySmall  : GoogleFonts.fraunces(fontSize: 28, fontWeight: FontWeight.w400, color: textPri, letterSpacing: -0.5),
+        headlineLarge : GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600, color: textPri),
+        headlineMedium: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: textPri),
+        bodyLarge  : GoogleFonts.outfit(fontSize: 16, color: textPri, height: 1.55),
+        bodyMedium : GoogleFonts.outfit(fontSize: 14, color: textPri, height: 1.55),
+        bodySmall  : GoogleFonts.outfit(fontSize: 12, color: textSec),
+        labelLarge : GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: textPri),
       ),
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent, 
         elevation: 0, 
         centerTitle: true,
-        titleTextStyle: GoogleFonts.playfairDisplay(fontSize: 18, fontWeight: FontWeight.w800, color: textPri),
-        iconTheme: IconThemeData(color: textPri, size: 20),
+        titleTextStyle: GoogleFonts.fraunces(fontSize: 18, fontWeight: FontWeight.w600, color: textPri),
+        iconTheme: IconThemeData(color: _primary, size: 24), // Use Primary color for icons to ensure they POP
       ),
       cardTheme: CardThemeData(
         color: surface, 
@@ -121,20 +123,20 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true, 
-        fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.black.withOpacity(0.03),
+        fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: divider.withOpacity(0.5), width: 1)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isDark ? divider.withOpacity(0.5) : AppColors.dividerLight, width: 1.5)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _primary, width: 2)),
         hintStyle: GoogleFonts.inter(color: textSec.withOpacity(0.6), fontSize: 14),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: isDark ? Colors.white.withOpacity(0.05) : Colors.black.withOpacity(0.05),
+        backgroundColor: isDark ? Colors.white.withOpacity(0.05) : AppColors.surfaceLight,
         selectedColor: _primary,
         labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: BorderSide.none,
+        side: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : AppColors.dividerLight),
       ),
     );
   }

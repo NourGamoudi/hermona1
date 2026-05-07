@@ -112,35 +112,29 @@ class DetectionApiService implements DetectionRepository {
 
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ——————————————————————————————————————————————————————————————————————————————
 
   @override
-
   Future<List<DetectionResult>> getHistory(String userId) async {
+    try {
+      final snap = await _db
+          .collection(AppConstants.colDetections)
+          .where('userId', isEqualTo: userId)
+          .orderBy('analyzedAt', descending: true)
+          .get();
 
-    final snap = await _db
-
-        .collection(AppConstants.colDetections)
-
-        .where('userId', isEqualTo: userId)
-
-        .orderBy('analyzedAt', descending: true)
-
-        .get();
-
-
-
-    return snap.docs
-
-        .map((d) => DetectionResult.fromJson(d.data()))
-
-        .toList();
-
+      return snap.docs
+          .map((d) => DetectionResult.fromJson(d.data()))
+          .toList();
+    } catch (e) {
+      print('Error fetching detection history: $e');
+      return [];
+    }
   }
 
 
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ——————————————————————————————————————————————————————————————————————————————
 
   @override
 

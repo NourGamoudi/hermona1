@@ -42,6 +42,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Journal Hermona'),
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_1),
+          onPressed: () => context.pop(),
+        ),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(60),
           child: Container(

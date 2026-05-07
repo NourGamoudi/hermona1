@@ -28,7 +28,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(title: const Text('Messagerie Anonyme')),
+      appBar: AppBar(
+        title: const Text('Messagerie Anonyme'),
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_1),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: Stack(
         children: [
           // Background

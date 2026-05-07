@@ -103,10 +103,14 @@ class GlassCard extends StatelessWidget {
           child: Container(
             padding: padding ?? const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: (isDark ? Colors.white : Colors.black).withOpacity(opacity),
+              color: isDark 
+                  ? AppColors.surfaceDark.withOpacity(opacity)
+                  : AppColors.surfaceLight.withOpacity(opacity + 0.25), // Stronger pink tint
               borderRadius: BorderRadius.circular(borderRadius),
               border: Border.all(
-                color: (isDark ? Colors.white : Colors.black).withOpacity(0.08),
+                color: isDark 
+                    ? Colors.white.withOpacity(0.12)
+                    : AppColors.dividerLight.withOpacity(0.8), // Visible pink border
                 width: 1.5,
               ),
             ),
@@ -176,7 +180,8 @@ class SectionHeader extends StatelessWidget {
           Text(
             title,
             style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                  fontSize: 22,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w400,
                   letterSpacing: -0.5,
                 ),
           ),

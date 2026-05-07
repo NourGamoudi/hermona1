@@ -1,240 +1,138 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
-
-// import 'package:dio/dio.dart';
-
-
-
+import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '../../domain/entities/recommendation_result.dart';
-
 import '../../domain/repositories/recommendation_repository.dart';
-
 import '../../../detection/domain/entities/detection_result.dart';
-
 import '../../../../core/constants/app_constants.dart';
 
-// import '../../../../core/errors/app_exception.dart';
-
-
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-// DATA ”“ Implémentation du RecommendationRepository
-
-//
-
-// âœ… MOCK ACTIF  ”“ simulation locale
-
-// 🧴”Œ API RÉELLE  ”“ commentée, endpoint : POST /recommend
-
-//
-
-// Pour passer à l'API réelle :
-
-//   1. Décommentez les imports Dio et ApiException
-
-//   2. Décommentez le bloc [API RÉELLE] dans getRecommendations()
-
-//   3. Supprimez le bloc [MOCK ”“ À SUPPRIMER]
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
 class RecommendationApiService implements RecommendationRepository {
-
-
-
-  // final Dio _dio;
-
-  // RecommendationApiService()
-
-  //     : _dio = Dio(BaseOptions(baseUrl: AppConstants.apiBaseUrl));
-
-
-
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-
-
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: AppConstants.apiBaseUrl,
+    headers: {'X-API-Key': AppConstants.apiKey},
+    connectTimeout: const Duration(seconds: 15), // NEW: Added Timeout
+    receiveTimeout: const Duration(seconds: 15), // NEW: Added Timeout
+    sendTimeout: const Duration(seconds: 15),    // NEW: Added Timeout
+  ));
 
   @override
-
   Future<RecommendationResult> getRecommendations({
-
     required DetectionResult detection,
-
     required String userId,
-
   }) async {
-
-
-
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-    // [API RÉELLE] ”“ POST /recommend
-
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-    // try {
-
-    //   final response = await _dio.post<Map<String, dynamic>>(
-
-    //     '/recommend',
-
-    //     data: {
-
-    //       'detection'  : detection.toJson(),
-
-    //       'userId'     : userId,
-
-    //     },
-
-    //   );
-
-    //   return RecommendationResult.fromJson(response.data!);
-
-    // } on DioException catch (e) {
-
-    //   throw ApiException(
-
-    //     e.response?.data?['detail'] ?? 'Erreur recommandation',
-
-    //     statusCode: e.response?.statusCode,
-
-    //   );
-
-    // }
-
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-
-
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-    // [MOCK ”“ À SUPPRIMER]
-
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
-    await Future.delayed(const Duration(seconds: 2));
-
-
-
-    final isSevere   = detection.severityLevel == SeverityLevel.severe;
-
-    final isModerate = detection.severityLevel == SeverityLevel.moderate;
-
-
-
-    return RecommendationResult(
-
-      id            : 'rec_${DateTime.now().millisecondsSinceEpoch}',
-
-      detectionId   : detection.id,
-
-      createdAt     : DateTime.now(),
-
-      duration      : isSevere ? '12 semaines' : isModerate ? '8 semaines' : '4 semaines',
-
-      morningRoutine: [
-
-        const RoutineStep(step: '1', product: 'Nettoyant doux pH neutre',       instruction: 'Nettoyez votre visage 30 s, rincez à l\'eau tiède', icon: '🧴§´'),
-
-        const RoutineStep(step: '2', product: 'Tonique sans alcool',            instruction: 'Appliquez sur coton, tapotez délicatement',          icon: '🧴’§'),
-
-        if (isModerate || isSevere)
-
-          const RoutineStep(step: '3', product: 'Sérum Niacinamide 10%',       instruction: '3-4 gouttes, massez en mouvements circulaires',       icon: '✨'),
-
-        RoutineStep(step: isSevere ? '4' : '3', product: 'Hydratant non-comédogène', instruction: 'Appliquez sur peau encore légèrement humide',   icon: '🌍¿'),
-
-        RoutineStep(step: isSevere ? '5' : '4', product: 'SPF 30+ minéral',         instruction: 'Indispensable même les jours nuageux',           icon: 'â˜€ï¸'),
-
-      ],
-
-      eveningRoutine: [
-
-        const RoutineStep(step: '1', product: 'Huile démaquillante',            instruction: 'Massez sur visage sec, émulsionnez avec un peu d\'eau', icon: '🌙'),
-
-        const RoutineStep(step: '2', product: 'Nettoyant Acide Salicylique 2%', instruction: '60 s de massage, insistez sur zones T',                icon: '🧴§¼'),
-
-        const RoutineStep(step: '3', product: 'Tonique AHA/BHA',               instruction: 'Exfoliation chimique douce 3Ï— / semaine max',           icon: 'âš—ï¸'),
-
-        if (isSevere)
-
-          const RoutineStep(step: '4', product: 'Rétinoïde 0.025%',            instruction: 'Fine couche, 2-3Ï— / semaine, augmenter graduellement', icon: '🧴’Š'),
-
-        RoutineStep(step: isSevere ? '5' : '4', product: 'Crème barrière nuit', instruction: 'Appliquez généreusement pour réparer la barrière cutanée', icon: '🌍›'),
-
-      ],
-
-      dietTips: [
-
-        '🥗 Privilégiez les aliments à faible indice glycémique (légumineuses, légumes)',
-
-        '🧴« Antioxydants : myrtilles, épinards, noix du Brésil',
-
-        '🧴’¦ 2 L d\'eau minimum par jour',
-
-        '🧴Ÿ Oméga-3 : saumon, sardines, graines de chia',
-
-        'âŒ Réduire sucres raffinés, sodas et ultra-transformés',
-
-        if (isSevere) '🧴¥› Tester l\'élimination des produits laitiers 4 semaines',
-
-        '🧴µ Thé vert : EGCG anti-inflammatoire puissant',
-
-        '🌍¾ Zinc : huîtres, graines de courge, légumineuses',
-
-      ],
-
-    );
-
-    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-
+    try {
+      debugPrint('DEBUG: Starting getRecommendations for user: $userId');
+      
+      final profileSnap = await _db.collection(AppConstants.colUsers).doc(userId).get();
+      final profile = profileSnap.data() ?? {};
+
+      final predSnap = await _db
+          .collection(AppConstants.colPredictions)
+          .where('userId', isEqualTo: userId)
+          .get();
+      
+      final List<QueryDocumentSnapshot> predDocs = predSnap.docs.toList();
+      predDocs.sort((a, b) {
+        final ta = a.data() as Map<String, dynamic>;
+        final tb = b.data() as Map<String, dynamic>;
+        final da = ta['predictedAt'] ?? '';
+        final db = tb['predictedAt'] ?? '';
+        return db.compareTo(da);
+      });
+      final prediction = predDocs.isNotEmpty ? predDocs.first.data() as Map<String, dynamic> : {};
+
+      final dailySnap = await _db
+          .collection('daily_surveys')
+          .where('userId', isEqualTo: userId)
+          .get();
+
+      final List<QueryDocumentSnapshot> dailyDocs = dailySnap.docs.toList();
+      dailyDocs.sort((a, b) {
+        final ta = a.data() as Map<String, dynamic>;
+        final tb = b.data() as Map<String, dynamic>;
+        final da = ta['date'] ?? '';
+        final db = tb['date'] ?? '';
+        return db.compareTo(da);
+      });
+      final daily = dailyDocs.isNotEmpty ? dailyDocs.first.data() as Map<String, dynamic> : {};
+
+      int hygieneScore = 100;
+      final double sleep = (daily['sleep_hours'] ?? 8.0).toDouble();
+      final int water = (daily['water_glasses'] ?? 8);
+      final int stress = (daily['stress_level'] ?? 5);
+      final List diet = daily['diet_tags'] ?? [];
+
+      if (sleep < 7) hygieneScore -= 15;
+      if (water < 6) hygieneScore -= 10;
+      if (stress > 7) hygieneScore -= 20;
+      if (diet.contains('sucre') || diet.contains('produits_laitiers') || diet.contains('fast_food')) hygieneScore -= 15;
+      if (hygieneScore < 0) hygieneScore = 0;
+
+      final requestData = {
+        'userId': userId,
+        'detectionId': detection.id,
+        'severity': (detection.severityScore).toDouble(),
+        'zones': detection.zoneCounts?.keys.toList() ?? [],
+        'risk_today': (prediction['riskScore'] ?? 0.0).toDouble(),
+        'risk_j3': (prediction['riskScoreJ3'] ?? 0.0).toDouble(),
+        'top3_shap': (prediction['shapFactors'] as Map?)?.keys.toList() ?? [],
+        'skin_type': profile['skinType'] ?? 'mixte',
+        'allergies': (profile['cosmeticAllergies'] as List?)?.cast<String>() ?? [],
+        'acne_treatment': profile['acneTreatment'] ?? 'aucun',
+        'hormonal_treatment': profile['hormonalContraception'] ?? 'aucune',
+        'smoker': profile['isSmoker'] ?? false,
+        'alcohol': profile['alcoholConsumption'] ?? 'jamais',
+        'phase': daily['cyclePhase'] ?? 'folliculaire',
+        'stress': stress,
+        'sleep': sleep,
+        'hydration': water,
+        'diet': diet.cast<String>(),
+        'symptoms': (daily['symptoms'] as List?)?.cast<String>() ?? [],
+        'hygiene_score': hygieneScore,
+      };
+      
+      final response = await _dio.post('/recommend', data: requestData);
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> resultData = Map<String, dynamic>.from(response.data);
+        return RecommendationResult.fromJson(resultData);
+      } else {
+        throw Exception('Server error: ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('CRITICAL ERROR in getRecommendations: $e');
+      rethrow;
+    }
   }
 
-
-
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
   @override
-
   Future<void> saveResult(RecommendationResult result, String userId) async {
-
-    await _db
-
-        .collection(AppConstants.colRecommendations)
-
-        .doc(result.id)
-
-        .set({...result.toJson(), 'userId': userId});
-
+    try {
+      await _db
+          .collection(AppConstants.colRecommendations)
+          .doc(result.id)
+          .set({...result.toJson(), 'userId': userId});
+    } catch (e) {
+      debugPrint('Error saving recommendation: $e');
+    }
   }
-
-
-
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   @override
-
   Future<RecommendationResult?> getForDetection(String detectionId) async {
+    try {
+      final snap = await _db
+          .collection(AppConstants.colRecommendations)
+          .where('detectionId', isEqualTo: detectionId)
+          .limit(1)
+          .get();
 
-    final snap = await _db
-
-        .collection(AppConstants.colRecommendations)
-
-        .where('detectionId', isEqualTo: detectionId)
-
-        .limit(1)
-
-        .get();
-
-    if (snap.docs.isEmpty) return null;
-
-    return RecommendationResult.fromJson(snap.docs.first.data());
-
+      if (snap.docs.isEmpty) return null;
+      return RecommendationResult.fromJson(snap.docs.first.data());
+    } catch (e) {
+      debugPrint('Error fetching cached recommendation: $e');
+      return null;
+    }
   }
-
 }
-
-
-

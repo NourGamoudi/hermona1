@@ -35,8 +35,8 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   List<String> symptoms = [];
   bool spfUsed = false;
 
-  final List<String> foodOptions = ['sucre', 'laitages', 'fast-food', 'fruits', 'équilibrée'];
-  final List<String> symptomsOptions = ['crampes', 'ballonnements', 'sautes d\'humeur', 'fatigue', 'seins sensibles', 'maux de tête'];
+  final List<String> foodOptions = ['équilibrée', 'sucre', 'laitages', 'fast-food', 'fruits'];
+  final List<String> symptomsOptions = ['aucun', 'crampes', 'ballonnements', 'sautes d\'humeur', 'fatigue', 'seins sensibles', 'maux de tête'];
 
   @override
   void initState() {
@@ -53,6 +53,15 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   }
 
   Future<void> _save() async {
+    if (food.isEmpty) {
+      _showError('Veuillez sélectionner votre alimentation du jour.');
+      return;
+    }
+    if (symptoms.isEmpty) {
+      _showError('Veuillez sélectionner vos symptômes (ou "aucun").');
+      return;
+    }
+
     setState(() { loading = true; error = null; });
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -103,7 +112,12 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       });
 
       await _predictionService.saveResult(prediction, user.uid);
-      if (mounted) context.go('/prediction', extra: prediction);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Bilan quotidien enregistré ! Passons au bilan hebdomadaire.')),
+        );
+        context.pushReplacement('/weekly-survey');
+      }
     } catch (e) {
       setState(() => error = 'Erreur d\'analyse : $e');
     } finally {
@@ -115,7 +129,13 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(title: const Text('Bilan Quotidien')),
+      appBar: AppBar(
+        title: const Text('Bilan Quotidien'),
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_1),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: Stack(
         children: [
           // Background
@@ -226,17 +246,27 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                 duration: 300.ms,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                  color: sel ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.surfaceLight),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: sel ? Colors.transparent : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : AppColors.dividerLight)),
                 ),
-                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900)),
+                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textMutedPink, fontSize: 10, fontWeight: FontWeight.w900)),
               ),
             );
           }).toList(),
         ),
       ],
     ).animate().fadeIn(delay: 500.ms);
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg), 
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      )
+    );
   }
 }
 

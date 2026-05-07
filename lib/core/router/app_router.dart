@@ -140,44 +140,50 @@ final appRouter = GoRouter(
 
         GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
 
+        GoRoute(
+
+          path: '/detection/result',
+
+          builder: (_, state) => DetectionResultScreen(
+
+            data: state.extra as Map<String, dynamic>,
+
+          ),
+
+        ),
+
+        GoRoute(
+
+          path: '/recommendation/:detectionId',
+
+          builder: (_, state) => RecommendationScreen(
+
+            detectionId: state.pathParameters['detectionId']!,
+
+            detectionData: state.extra as Map<String, dynamic>?,
+
+          ),
+
+        ),
+
+        GoRoute(path: '/my-routine', builder: (_, __) => const MyRoutineScreen()),
+
       ],
 
     ),
 
 
 
-    // â”€â”€ Feature routes (full-screen) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // ————————————————————————————————————————————————————————
 
     GoRoute(
 
-      path: '/detection/result',
-
-      builder: (_, state) => DetectionResultScreen(
-
-        data: state.extra as Map<String, dynamic>,
-
-      ),
-
-    ),
-
-    GoRoute(
-
-      path: '/recommendation/:detectionId',
-
-      builder: (_, state) => RecommendationScreen(
-
-        detectionId: state.pathParameters['detectionId']!,
-
-        detectionData: state.extra as Map<String, dynamic>?,
-
-      ),
-
-    ),
-
-    GoRoute(
       path: '/history', 
+
       builder: (_, state) {
+
         final tab = int.tryParse(state.uri.queryParameters['tab'] ?? '0') ?? 0;
+
         return HistoryScreen(initialTab: tab);
       }
     ),
@@ -230,7 +236,6 @@ final appRouter = GoRouter(
 
     GoRoute(path: '/weekly-survey', builder: (_, __) => const WeeklyQuestionnaireScreen()),
 
-    GoRoute(path: '/my-routine',    builder: (_, __) => const MyRoutineScreen()),
 
   ],
 

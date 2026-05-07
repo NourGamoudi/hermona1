@@ -18,9 +18,6 @@ dependencies:
   cloud_firestore: ^4.17.0
   google_sign_in: ^6.2.1
 
-  # Appwrite
-  
-
   # HTTP
   dio: ^5.4.0
 
@@ -77,4 +74,4 @@ flutter:
     - assets/images/hermona_bg.jpg
     - assets/images/landing_bg.png
     - assets/images/feature_ai.png
-    - assets/images/feature_routine.png
+    - assets/images/feature_routine.png

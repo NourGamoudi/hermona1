@@ -6,13 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:percent_indicator/percent_indicator.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../../prediction/domain/entities/prediction_result.dart';
-import '../../../questionnaire/domain/entities/daily_survey.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -45,21 +44,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    final size = MediaQuery.of(context).size;
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor, 
       body: Stack(
         children: [
           // Background Blobs
           Positioned(
             top: -100,
             right: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.08)),
-          ),
-          Positioned(
-            bottom: 100,
-            left: -50,
-            child: _Blob(size: 250, color: AppColors.secondary.withOpacity(0.05)),
+            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.12)),
           ),
 
           SafeArea(
@@ -70,33 +64,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
                 children: [
-                  // ───────────────────────────────────────────────────────────
-                  // HEADER
-                  // ───────────────────────────────────────────────────────────
                   _buildHeader(context),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 20),
                   
-                  // ───────────────────────────────────────────────────────────
-                  // DASHBOARD METRICS (GLASS)
-                  // ───────────────────────────────────────────────────────────
-                  _buildDashboardMetrics(uid),
+                  // 1. DASHBOARD SECTION (Hygiene & Risk)
+                  _buildScoreRow(uid),
+                  const SizedBox(height: 12),
+                  _buildCyclePhaseBar(uid),
+                  const SizedBox(height: 12),
+                  _buildLatestAnalysis(uid),
+                  const SizedBox(height: 24),
+
+                  // 2. À REMPLIR SECTION
+                  const SectionHeader(title: 'À Remplir'),
+                  const SizedBox(height: 12),
+                  _buildToFillSection(context),
                   const SizedBox(height: 32),
 
-                  // ───────────────────────────────────────────────────────────
-                  // QUICK ACTIONS
-                  // ───────────────────────────────────────────────────────────
+                  // 3. EXPLORER SECTION
                   const SectionHeader(title: 'Explorer'),
-                  const SizedBox(height: 16),
-                  _buildQuickActions(context),
+                  const SizedBox(height: 12),
+                  _buildExplorerSection(context),
                   
-                  const SizedBox(height: 32),
-                  
-                  // ───────────────────────────────────────────────────────────
-                  // DAILY SURVEY (PREMIUM CARD)
-                  // ───────────────────────────────────────────────────────────
-                  _buildDailyFollowUp(context),
-                  
-                  const SizedBox(height: 100), // Bottom padding
+                  const SizedBox(height: 100),
                 ],
               ),
             ),
@@ -114,13 +104,13 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bienvenue,',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(letterSpacing: 1, fontWeight: FontWeight.w800),
+                'Bonjour,',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(letterSpacing: 1, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 '${_firstName ?? 'Chargement...'} ✨',
-                style: Theme.of(context).textTheme.displayMedium,
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: const Color(0xFF2D2D2D)),
               ),
             ],
           ),
@@ -128,365 +118,343 @@ class _HomeScreenState extends State<HomeScreen> {
         _HeaderAction(icon: Iconsax.notification, onTap: () => context.push('/notifications')),
         const SizedBox(width: 12),
         GestureDetector(
-          onTap: () => context.go('/profile'),
-          child: Hero(
-            tag: 'profile_avatar',
-            child: Container(
-              width: 45,
-              height: 45,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppTheme.primary, AppColors.primaryDark]),
-                shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
-              ),
-              child: const Center(child: Text('🌸', style: TextStyle(fontSize: 20))),
+          onTap: () => context.push('/profile'),
+          child: Container(
+            width: 45, height: 45,
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
+            child: const Center(child: Text('🌸', style: TextStyle(fontSize: 20))),
           ),
         ),
       ],
     ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.1);
   }
 
-  Widget _buildDashboardMetrics(String? uid) {
+  Widget _buildScoreRow(String? uid) {
+    if (uid == null) return const SizedBox();
+    return Row(
+      children: [
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection('daily_surveys').where('userId', isEqualTo: uid).snapshots(),
+            builder: (context, snapshot) {
+              int? score;
+              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                final docs = snapshot.data!.docs.toList();
+                docs.sort((a, b) => b['date'].compareTo(a['date']));
+                score = docs.first['lifestyleScore'] as int?;
+              }
+              return _SquareScoreCard(
+                title: 'Hygiène',
+                value: score != null ? '$score' : '--',
+                subtitle: 'sur 100',
+                icon: Iconsax.heart5,
+                color: AppColors.info,
+                onTap: () => context.push('/daily-survey'),
+              );
+            },
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance.collection(AppConstants.colPredictions).where('userId', isEqualTo: uid).snapshots(),
+            builder: (context, snapshot) {
+              PredictionResult? result;
+              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+                final docs = snapshot.data!.docs.toList();
+                docs.sort((a, b) => b['predictedAt'].compareTo(a['predictedAt']));
+                result = PredictionResult.fromJson(docs.first.data() as Map<String, dynamic>);
+              }
+              return _SquareScoreCard(
+                title: 'Risque',
+                value: result != null ? '${(result.riskScore * 100).toInt()}%' : '--',
+                subtitle: result?.riskLevel.name.toUpperCase() ?? 'Inconnu',
+                icon: Iconsax.status_up,
+                color: result?.riskLevel == RiskLevel.low ? AppColors.success : (result?.riskLevel == RiskLevel.medium ? AppColors.warning : AppColors.error),
+                onTap: () => context.push('/prediction'),
+              );
+            },
+          ),
+        ),
+      ],
+    ).animate().fadeIn(delay: 200.ms);
+  }
+
+  Widget _buildCyclePhaseBar(String? uid) {
+    if (uid == null) return const SizedBox();
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance.collection(AppConstants.colUsers).doc(uid).snapshots(),
+      builder: (context, snapshot) {
+        String phase = 'Inconnue';
+        int day = 0;
+        int avgCycle = 28;
+        if (snapshot.hasData && snapshot.data!.exists) {
+          final data = snapshot.data!.data() as Map<String, dynamic>;
+          
+          // Calculate average cycle
+          final lastCycles = (data['lastCyclesDuration'] as List<dynamic>?)?.map((e) => e as int).toList() ?? [28, 28, 28];
+          if (lastCycles.isNotEmpty) {
+            avgCycle = (lastCycles.reduce((a, b) => a + b) / lastCycles.length).round();
+          }
+
+          if (data['lastPeriodsDate'] != null) {
+            final lastDate = (data['lastPeriodsDate'] as Timestamp).toDate();
+            day = DateTime.now().difference(lastDate).inDays + 1;
+            
+            // Adjust phase based on current day and average cycle if needed
+            // For now keeping simple logic but we could scale based on avgCycle
+            if (day <= 5) phase = 'Menstruelle';
+            else if (day <= 13) phase = 'Folliculaire';
+            else if (day <= 15) phase = 'Ovulatoire';
+            else phase = 'Lutéale';
+          }
+        }
+        return GlassCard(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          onTap: () => _showCycleDetails(context, phase, day, avgCycle),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                child: Icon(Icons.waves, size: 18, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Phase $phase', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                    Text('Jour $day du cycle • Moyenne: $avgCycle jours', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCycleDetails(BuildContext context, String currentPhase, int day, int avgCycle) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => GlassCard(
+        borderRadius: 30,
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+            const SizedBox(height: 24),
+            Text('Votre Cycle Hormonal', style: Theme.of(context).textTheme.displaySmall),
+            const SizedBox(height: 8),
+            Text('Jour $day • Moyenne habituelle: $avgCycle jours', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 24),
+            if (currentPhase == 'Menstruelle')
+              _buildPhaseInfo('Menstruelle', 'Jours 1-5', 'Hormones au plus bas. Focus sur le nettoyage doux.', true),
+            if (currentPhase == 'Folliculaire')
+              _buildPhaseInfo('Folliculaire', 'Jours 6-13', 'Peau plus éclatante et réceptive aux soins.', true),
+            if (currentPhase == 'Ovulatoire')
+              _buildPhaseInfo('Ovulatoire', 'Jours 14-15', 'Pic hormonal. Risque de pores obstrués.', true),
+            if (currentPhase == 'Lutéale')
+              _buildPhaseInfo('Lutéale', 'Jours 16-$avgCycle', 'Pic de sébum. Risque d\'acné élevé.', true),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhaseInfo(String title, String days, String desc, bool isCur) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: isCur ? AppColors.primary.withOpacity(0.05) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+      child: Row(
+        children: [
+          Icon(isCur ? Icons.check_circle : Icons.circle_outlined, size: 18, color: isCur ? AppColors.primary : Colors.grey),
+          const SizedBox(width: 12),
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Phase $title ($days)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(desc, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+          ])),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLatestAnalysis(String? uid) {
+    if (uid == null) return const SizedBox();
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections).where('userId', isEqualTo: uid).orderBy('analyzedAt', descending: true).limit(1).snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
+        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+        return GlassCard(
+          onTap: () => context.push('/detection/result', extra: data),
+          child: Row(
+            children: [
+              Container(width: 45, height: 45, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Iconsax.scan, color: AppTheme.primary, size: 20)),
+              const SizedBox(width: 16),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Sévérité : ${data['severityScore']}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Text('Dernière analyse effectuée.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+              ])),
+              const Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildToFillSection(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const SizedBox();
 
     return Column(
       children: [
-        Row(
-          children: [
-            // Risk Analysis
-            Expanded(
-              flex: 3,
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection(AppConstants.colPredictions)
-                    .where('userId', isEqualTo: uid)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  PredictionResult? result;
-                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    final docs = snapshot.data!.docs.toList();
-                    docs.sort((a, b) {
-                      DateTime dateA = a['predictedAt'] is Timestamp ? (a['predictedAt'] as Timestamp).toDate() : DateTime.tryParse(a['predictedAt'].toString()) ?? DateTime(2000);
-                      DateTime dateB = b['predictedAt'] is Timestamp ? (b['predictedAt'] as Timestamp).toDate() : DateTime.tryParse(b['predictedAt'].toString()) ?? DateTime(2000);
-                      return dateB.compareTo(dateA);
-                    });
-                    result = PredictionResult.fromJson(docs.first.data() as Map<String, dynamic>);
-                  }
-
-                  return _GlassMetricCard(
-                    title: 'Risque Acné',
-                    value: result != null ? '${(result.riskScore * 100).toInt()}%' : '--',
-                    label: result?.riskLevel.name.toUpperCase() ?? 'Analyse...',
-                    icon: Iconsax.status_up,
-                    color: _getRiskColor(result?.riskLevel),
-                    onTap: () => context.go('/prediction'),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 16),
-            // Lifestyle Score
-            Expanded(
-              flex: 2,
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('daily_surveys')
-                    .where('userId', isEqualTo: uid)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  int? score;
-                  if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
-                    final docs = snapshot.data!.docs.toList();
-                    docs.sort((a, b) {
-                      DateTime dateA = a['date'] is Timestamp ? (a['date'] as Timestamp).toDate() : DateTime.tryParse(a['date'].toString()) ?? DateTime(2000);
-                      DateTime dateB = b['date'] is Timestamp ? (b['date'] as Timestamp).toDate() : DateTime.tryParse(b['date'].toString()) ?? DateTime(2000);
-                      return dateB.compareTo(dateA);
-                    });
-                    score = docs.first['lifestyleScore'] as int?;
-                  }
-
-                  return _GlassMetricCard(
-                    title: 'Hygiène',
-                    value: score != null ? '$score' : '--',
-                    label: '/100',
-                    icon: Iconsax.heart5,
-                    color: AppColors.info,
-                    onTap: () => context.push('/daily-survey'),
-                  );
-                },
-              ),
-            ),
-          ],
+        _RowAction(
+          icon: Iconsax.user_edit, 
+          title: 'Informations Personnelles', 
+          subtitle: 'Profil & Cycle', 
+          onTap: () => context.push('/onboarding')
         ),
-        const SizedBox(height: 16),
-        // Cycle Tracking
-        StreamBuilder<DocumentSnapshot>(
-          stream: FirebaseFirestore.instance.collection(AppConstants.colUsers).doc(uid).snapshots(),
+        const SizedBox(height: 12),
+        
+        // Daily Survey Status
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('daily_surveys')
+              .where('userId', isEqualTo: uid)
+              .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)))
+              .snapshots(),
           builder: (context, snapshot) {
-            String phase = 'Calcul...';
-            int day = 0;
-            if (snapshot.hasData && snapshot.data!.exists) {
-              final data = snapshot.data!.data() as Map<String, dynamic>;
-              if (data['lastPeriodsDate'] != null) {
-                final lastDate = (data['lastPeriodsDate'] as Timestamp).toDate();
-                day = DateTime.now().difference(lastDate).inDays + 1;
-                if (day <= 5) phase = 'Menstruelle';
-                else if (day <= 13) phase = 'Folliculaire';
-                else if (day <= 15) phase = 'Ovulatoire';
-                else phase = 'Lutéale';
-              }
-            }
+            final isDone = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+            return _RowAction(
+              icon: Iconsax.edit, 
+              title: 'Questionnaire Quotidien', 
+              subtitle: isDone ? '✓ Déjà rempli aujourd\'hui' : 'Suivi de vie', 
+              onTap: () => context.push('/daily-survey'),
+              isCompleted: isDone,
+            );
+          },
+        ),
+        const SizedBox(height: 12),
 
-            return GlassCard(
-              onTap: () => context.push('/onboarding'),
-              child: Row(
-                children: [
-                  CircularPercentIndicator(
-                    radius: 35.0,
-                    lineWidth: 7.0,
-                    percent: (day % 28) / 28,
-                    center: Text('$day', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
-                    progressColor: AppColors.secondary,
-                    backgroundColor: AppColors.secondary.withOpacity(0.1),
-                    circularStrokeCap: CircularStrokeCap.round,
-                    animation: true,
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Cycle : Phase $phase', style: Theme.of(context).textTheme.headlineMedium),
-                        const SizedBox(height: 2),
-                        Text('Jour $day • Influence hormonale modérée', style: Theme.of(context).textTheme.bodySmall),
-                      ],
-                    ),
-                  ),
-                  const Icon(Iconsax.moon, color: AppColors.secondary, size: 24),
-                ],
-              ),
+        // Weekly Survey Status
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('weekly_surveys')
+              .where('userId', isEqualTo: uid)
+              .where('year', isEqualTo: DateTime.now().year)
+              .where('weekNumber', isEqualTo: ((int.parse(DateFormat("D").format(DateTime.now())) - DateTime.now().weekday + 10) / 7).floor())
+              .snapshots(),
+          builder: (context, snapshot) {
+            final isDone = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+            return _RowAction(
+              icon: Iconsax.calendar_tick, 
+              title: 'Questionnaire Hebdomadaire', 
+              subtitle: isDone ? '✓ Déjà rempli cette semaine' : 'Analyse Photo', 
+              onTap: () => context.push('/weekly-survey'),
+              isCompleted: isDone,
             );
           },
         ),
       ],
-    ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1);
+    );
   }
 
-  Widget _buildQuickActions(BuildContext context) {
+  Widget _buildExplorerSection(BuildContext context) {
     return GridView.count(
-      crossAxisCount: 2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 1.4,
+      crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: 1.6,
       children: [
-        _PremiumAction(
-          title: 'IA Assistant',
-          subtitle: 'Conseils personnalisés',
-          icon: Iconsax.message_notif,
-          color: AppTheme.primary,
-          onTap: () => context.go('/chat'),
-        ),
-        _PremiumAction(
-          title: 'Selfie Scan',
-          subtitle: 'Analyse 5 zones',
-          icon: Iconsax.camera,
-          color: AppColors.accent,
-          onTap: () => context.push('/weekly-survey'),
-        ),
-        _PremiumAction(
-          title: 'Communauté',
-          subtitle: 'Échanges anonymes',
-          icon: Iconsax.people,
-          color: AppColors.secondary,
-          onTap: () => context.push('/forum'),
-        ),
-        _PremiumAction(
-          title: 'Historique',
-          subtitle: 'Suivi de progrès',
-          icon: Iconsax.chart,
-          color: AppColors.info,
-          onTap: () => context.push('/history'),
-        ),
+        _ExplorerCard(icon: Iconsax.message_notif, title: 'Assistant', color: AppTheme.primary, onTap: () => context.go('/chat')),
+        _ExplorerCard(icon: Iconsax.chart, title: 'Historique', color: AppColors.info, onTap: () => context.push('/history')),
+        _ExplorerCard(icon: Iconsax.people, title: 'Forum', color: AppColors.secondary, onTap: () => context.push('/forum')),
+        _ExplorerCard(icon: Iconsax.message_text, title: 'Messagerie', color: AppColors.accent, onTap: () => context.push('/messages')),
       ],
     );
   }
+}
 
-  Widget _buildDailyFollowUp(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [AppTheme.primary.withOpacity(0.1), AppColors.secondary.withOpacity(0.05)]),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: AppTheme.primary.withOpacity(0.1)),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(28),
-          onTap: () => context.push('/daily-survey'),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: AppTheme.primary,
-                    shape: BoxShape.circle,
-                    boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 15)],
-                  ),
-                  child: const Icon(Iconsax.edit, color: Colors.white, size: 24),
-                ),
-                const SizedBox(width: 20),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Bilan du jour', style: Theme.of(context).textTheme.headlineMedium),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Actualise tes données de vie pour une précision maximale.',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Iconsax.arrow_right_3, size: 20, color: AppColors.textSecondaryDark),
-              ],
-            ),
-          ),
+class _SquareScoreCard extends StatelessWidget {
+  final String title, value, subtitle; final IconData icon; final Color color; final VoidCallback onTap;
+  const _SquareScoreCard({required this.title, required this.value, required this.subtitle, required this.icon, required this.color, required this.onTap});
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(onTap: onTap, padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Icon(icon, color: color, size: 20),
+      const SizedBox(height: 8),
+      Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: color)),
+      const SizedBox(height: 2),
+      Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+      Text(subtitle, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+    ]));
+  }
+}
+
+class _RowAction extends StatelessWidget {
+  final IconData icon; final String title, subtitle; final VoidCallback onTap; final bool isCompleted;
+  const _RowAction({required this.icon, required this.title, required this.subtitle, required this.onTap, this.isCompleted = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      onTap: onTap, 
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16), 
+      child: Row(children: [
+        Container(
+          padding: const EdgeInsets.all(10), 
+          decoration: BoxDecoration(
+            color: isCompleted ? Colors.green.withOpacity(0.1) : AppTheme.primary.withOpacity(0.1), 
+            borderRadius: BorderRadius.circular(12)
+          ), 
+          child: Icon(icon, color: isCompleted ? Colors.green : AppTheme.primary, size: 20)
         ),
-      ),
-    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1);
-  }
-
-  Color _getRiskColor(RiskLevel? level) {
-    switch (level) {
-      case RiskLevel.low: return AppColors.success;
-      case RiskLevel.medium: return AppColors.warning;
-      case RiskLevel.high: return AppColors.error;
-      default: return AppColors.textSecondaryDark;
-    }
+        const SizedBox(width: 16),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+          Text(subtitle, style: TextStyle(fontSize: 11, color: isCompleted ? Colors.green : Colors.grey)),
+        ])),
+        Icon(isCompleted ? Icons.check_circle : Iconsax.arrow_right_3, size: 16, color: isCompleted ? Colors.green : Colors.grey),
+      ]));
   }
 }
 
-class _GlassMetricCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String label;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _GlassMetricCard({
-    required this.title,
-    required this.value,
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
+class _ExplorerCard extends StatelessWidget {
+  final IconData icon; final String title; final Color color; final VoidCallback onTap;
+  const _ExplorerCard({required this.icon, required this.title, required this.color, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          const SizedBox(height: 16),
-          Text(value, style: Theme.of(context).textTheme.displayMedium?.copyWith(color: color, height: 1, fontSize: 32)),
-          const SizedBox(height: 8),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-}
-
-class _PremiumAction extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _PremiumAction({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      onTap: onTap,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Icon(icon, color: color, size: 30),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-              Text(subtitle, style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
-            ],
-          ),
-        ],
-      ),
-    );
+    return GlassCard(onTap: onTap, padding: const EdgeInsets.all(12), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      Icon(icon, color: color, size: 22),
+      const SizedBox(height: 8),
+      Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+    ]));
   }
 }
 
 class _HeaderAction extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
+  final IconData icon; final VoidCallback onTap;
   const _HeaderAction({required this.icon, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Icon(icon, size: 20, color: AppColors.textPrimaryDark),
-      ),
-    );
+    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withOpacity(0.1))), child: Icon(icon, size: 20, color: Colors.grey.shade700)));
   }
 }
 
 class _Blob extends StatelessWidget {
-  final double size;
-  final Color color;
+  final double size; final Color color;
   const _Blob({required this.size, required this.color});
-
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: RadialGradient(colors: [color, color.withOpacity(0)]),
-      ),
-    );
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
   }
 }

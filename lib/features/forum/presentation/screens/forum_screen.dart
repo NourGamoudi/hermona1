@@ -49,6 +49,10 @@ class _ForumScreenState extends State<ForumScreen> {
         extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: const Text('Communauté Hermona'),
+          leading: IconButton(
+            icon: const Icon(Iconsax.arrow_left_1),
+            onPressed: () => context.pop(),
+          ),
           actions: [
             IconButton(
               icon: const Icon(Iconsax.info_circle, color: AppColors.primary), 

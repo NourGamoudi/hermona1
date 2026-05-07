@@ -361,9 +361,9 @@ class _ChatScreenState extends State<ChatScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                gradient: LinearGradient(colors: [AppTheme.primary, AppColors.primaryDark]),
+                color: AppTheme.primary,
                 borderRadius: BorderRadius.circular(18),
-                boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: _loading 
                   ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
@@ -413,28 +413,43 @@ class _ChatBubble extends StatelessWidget {
                         bottomLeft: Radius.circular(22),
                         bottomRight: Radius.circular(4),
                       ),
-                      boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))],
+                      boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
-                    child: Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 14, height: 1.5)),
+                    child: Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.5, fontWeight: FontWeight.w500)),
                   )
                 else
                   GlassCard(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(18),
                     borderRadius: 22,
+                    opacity: 0.4, // Slightly more opaque for assistant
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(msg.content, style: const TextStyle(fontSize: 14, height: 1.5)),
-                        const SizedBox(height: 10),
+                        Text(
+                          msg.content, 
+                          style: TextStyle(
+                            fontSize: 15, 
+                            height: 1.6, 
+                            color: Theme.of(context).textTheme.bodyLarge?.color,
+                          )
+                        ),
+                        const SizedBox(height: 14),
                         GestureDetector(
                           onTap: onSpeak,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary.withOpacity(0.7)),
-                              const SizedBox(width: 6),
-                              Text('ÉCOUTER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary.withOpacity(0.7), letterSpacing: 1)),
-                            ],
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primary.withOpacity(0.08),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.volume_up_rounded, size: 14, color: AppTheme.primary),
+                                const SizedBox(width: 8),
+                                Text('ÉCOUTER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1)),
+                              ],
+                            ),
                           ),
                         ),
                       ],
@@ -443,7 +458,7 @@ class _ChatBubble extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   '${msg.timestamp.hour}:${msg.timestamp.minute.toString().padLeft(2, '0')}',
-                  style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark),
+                  style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color),
                 ),
               ],
             ),

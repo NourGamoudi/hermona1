@@ -13,6 +13,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
 import '../../data/services/questionnaire_service.dart';
 import '../../domain/entities/weekly_survey.dart';
+import '../../../detection/data/services/detection_api_service.dart';
+import '../../../detection/domain/entities/detection_result.dart';
 
 class WeeklyQuestionnaireScreen extends StatefulWidget {
   final WeeklySurvey? initialSurvey;
@@ -99,7 +101,12 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     if (photos['face'] == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Veuillez ajouter une photo de face.')));
+      _showError('Veuillez ajouter une photo de face.');
+      return;
+    }
+
+    if (makeupFrequency.isEmpty || cleansingFrequency.isEmpty || routineFollowed.isEmpty || spfThisWeek.isEmpty) {
+      _showError('Veuillez répondre à toutes les questions du bilan.');
       return;
     }
 
@@ -129,19 +136,55 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
       );
       
       await _service.saveWeeklySurvey(survey);
-      if (mounted) context.go('/daily-survey');
+      
+      // TRIGGER AI ANALYSIS AUTOMATICALLY
+      if (photos.containsKey('face')) {
+        final detectionService = DetectionApiService();
+        final detectionResult = await detectionService.analyzeImages([File(photos['face']!)]);
+        await detectionService.saveResult(detectionResult, user.uid);
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Analyse IA terminée ! Découvrez vos résultats.')),
+          );
+          context.go('/detection/result', extra: detectionResult.toJson());
+        }
+      } else {
+        if (mounted) context.go('/home');
+      }
     } catch (e) {
       setState(() => error = e.toString());
+      _showError('Erreur lors de l\'analyse : $e');
     } finally {
       if (mounted) setState(() => loading = false);
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg), 
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      )
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(title: const Text('Bilan Hebdomadaire')),
+      appBar: AppBar(
+        title: const Text('Bilan Hebdomadaire'),
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_1),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            }
+          },
+        ),
+      ),
       body: Stack(
         children: [
           // Background
@@ -235,12 +278,35 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
           value: value.isEmpty ? null : value,
-          dropdownColor: AppColors.cardDark,
-          decoration: const InputDecoration(border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none, contentPadding: EdgeInsets.zero),
-          items: options.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)))).toList(),
+          dropdownColor: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : Colors.white,
+          decoration: const InputDecoration(
+            border: InputBorder.none, 
+            enabledBorder: InputBorder.none, 
+            focusedBorder: InputBorder.none, 
+            contentPadding: EdgeInsets.zero,
+            fillColor: Colors.transparent, // Let the GlassCard show through or keep it clean
+          ),
+          style: TextStyle(
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+          items: options.map((e) => DropdownMenuItem(
+            value: e, 
+            child: Text(
+              e.toUpperCase(), 
+              style: TextStyle(
+                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+              ),
+            ),
+          )).toList(),
           onChanged: onChanged,
           validator: (v) => v == null ? 'Requis' : null,
-          icon: const Icon(Iconsax.arrow_down_1, size: 16),
+          icon: Icon(
+            Iconsax.arrow_down_1, 
+            size: 16, 
+            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
+          ),
         ),
       ],
     );

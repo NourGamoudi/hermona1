@@ -81,6 +81,16 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   }
 
   void _next() {
+    if (_currentStep == 0) {
+      if (_firstNameCtrl.text.trim().isEmpty || 
+          _pseudoCtrl.text.trim().isEmpty || 
+          _ageCtrl.text.trim().isEmpty || 
+          _imcCtrl.text.trim().isEmpty) {
+        _showError('Veuillez remplir toutes vos informations personnelles.');
+        return;
+      }
+    }
+
     if (_currentStep < 4) {
       _pageController.nextPage(duration: 500.ms, curve: Curves.easeOutQuart);
       setState(() => _currentStep++);
@@ -94,6 +104,16 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
       _pageController.previousPage(duration: 500.ms, curve: Curves.easeOutQuart);
       setState(() => _currentStep--);
     }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg), 
+        backgroundColor: Colors.redAccent,
+        behavior: SnackBarBehavior.floating,
+      )
+    );
   }
 
   Future<void> _save() async {
@@ -140,7 +160,16 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Bilan Initial'),
-        leading: _currentStep > 0 ? IconButton(icon: const Icon(Iconsax.arrow_left_1), onPressed: _prev) : null,
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_1),
+          onPressed: () {
+            if (_currentStep > 0) {
+              _prev();
+            } else if (context.canPop()) {
+              context.pop();
+            }
+          },
+        ),
         actions: [
           Center(child: Padding(
             padding: const EdgeInsets.only(right: 20),
@@ -429,11 +458,11 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                 duration: 300.ms,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                  color: sel ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.surfaceLight),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: sel ? Colors.transparent : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : AppColors.dividerLight)),
                 ),
-                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900)),
+                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textMutedPink, fontSize: 10, fontWeight: FontWeight.w900)),
               ),
             );
           }).toList(),

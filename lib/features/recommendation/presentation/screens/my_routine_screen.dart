@@ -3,6 +3,8 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/common_widgets.dart';
@@ -45,16 +47,21 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
       final snap = await FirebaseFirestore.instance
           .collection('recommendations')
           .where('userId', isEqualTo: uid)
-          .orderBy('createdAt', descending: true)
-          .limit(1)
           .get();
 
       if (snap.docs.isEmpty) {
-        setState(() { _error = 'Aucune routine disponible pour l\'instant.\nEffectuez d\'abord une analyse photo.'; _loading = false; });
+        setState(() { _error = 'Aucune routine disponible.\nFaites une analyse photo.'; _loading = false; });
         return;
       }
 
-      final data = snap.docs.first.data();
+      final docs = snap.docs.toList();
+      docs.sort((a, b) {
+        final ta = a.data()['createdAt'] ?? '';
+        final tb = b.data()['createdAt'] ?? '';
+        return tb.compareTo(ta);
+      });
+
+      final data = docs.first.data();
       setState(() {
         _result = RecommendationResult.fromJson(data);
         _loading = false;
@@ -67,40 +74,46 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFFFF9F9),
       appBar: AppBar(
-        title: const Text('Ma Routine'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        centerTitle: true,
+        title: Text(
+          'Ma Routine',
+          style: GoogleFonts.playfairDisplay(
+            color: const Color(0xFF331E1E),
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         bottom: _result != null
             ? TabBar(
                 controller: _tab,
-                labelColor: AppTheme.primary,
-                unselectedLabelColor:
-                    Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
-                indicatorColor: AppTheme.primary,
-                indicatorSize: TabBarIndicatorSize.label,
+                labelColor: const Color(0xFFC46E6E),
+                unselectedLabelColor: Colors.grey,
+                indicatorColor: const Color(0xFFC46E6E),
+                indicatorWeight: 3,
+                labelStyle: GoogleFonts.outfit(fontWeight: FontWeight.bold),
                 tabs: const [
-                  Tab(icon: Icon(Iconsax.sun_1), text: 'Matin'),
-                  Tab(icon: Icon(Iconsax.moon), text: 'Soir'),
-                  Tab(icon: Icon(Iconsax.cup), text: 'Alimentation'),
+                  Tab(text: 'Matin'),
+                  Tab(text: 'Soir'),
+                  Tab(text: 'Vie'),
                 ],
               )
             : null,
       ),
       body: _loading
-          ? Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: List.generate(
-                  4,
-                  (_) => const Padding(
-                    padding: EdgeInsets.only(bottom: 12),
-                    child: SkeletonBox(width: double.infinity, height: 100),
-                  ),
-                ),
-              ),
-            )
+          ? const Center(child: CircularProgressIndicator(color: Color(0xFFC46E6E)))
           : _error != null
               ? _buildEmpty()
-              : _buildContent(),
+              : TabBarView(
+                  controller: _tab,
+                  children: [
+                    _RoutineTab(steps: _result!.morningRoutine, isMorning: true, duration: _result!.duration),
+                    _RoutineTab(steps: _result!.eveningRoutine, isMorning: false, duration: _result!.duration),
+                    _LifestyleTab(result: _result!),
+                  ],
+                ),
     );
   }
 
@@ -111,196 +124,148 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Iconsax.magic_star, size: 64, color: AppTheme.primary.withOpacity(0.4)),
+            const Icon(Iconsax.magic_star, size: 64, color: Color(0xFFE59A9A)),
             const SizedBox(height: 24),
             Text(
               _error!,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-                height: 1.6,
-              ),
+              style: GoogleFonts.outfit(color: Colors.grey[600], height: 1.6),
             ),
             const SizedBox(height: 32),
-            ElevatedButton.icon(
-              onPressed: () { setState(() { _loading = true; _error = null; }); _loadLatest(); },
-              icon: const Icon(Iconsax.refresh),
-              label: const Text('Réessayer'),
+            PrimaryButton(
+              label: 'Lancer une analyse',
+              onTap: () => context.go('/prediction'),
+              icon: Iconsax.magic_star,
             ),
           ],
         ),
       ).animate().fadeIn(),
     );
   }
-
-  Widget _buildContent() {
-    return Column(
-      children: [
-        // Programme duration chip
-        Container(
-          margin: const EdgeInsets.all(16),
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(colors: [
-              AppTheme.primary.withOpacity(0.15),
-              AppColors.secondary.withOpacity(0.08),
-            ]),
-            borderRadius: BorderRadius.circular(50),
-          ),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(Iconsax.clock, size: 16, color: AppTheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Programme de ${_result!.duration}',
-              style: TextStyle(
-                color: AppTheme.primary,
-                fontWeight: FontWeight.w600,
-                fontSize: 13,
-              ),
-            ),
-          ]),
-        ).animate().fadeIn(),
-
-        Expanded(
-          child: TabBarView(
-            controller: _tab,
-            children: [
-              _RoutineTab(steps: _result!.morningRoutine, isMorning: true),
-              _RoutineTab(steps: _result!.eveningRoutine, isMorning: false),
-              _DietTab(tips: _result!.dietTips),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
 class _RoutineTab extends StatelessWidget {
   final List<RoutineStep> steps;
   final bool isMorning;
-  const _RoutineTab({required this.steps, required this.isMorning});
+  final String duration;
+
+  const _RoutineTab({required this.steps, required this.isMorning, required this.duration});
 
   @override
   Widget build(BuildContext context) {
-    final color = isMorning ? AppColors.warning : AppColors.info;
+    final themeColor = isMorning ? const Color(0xFFE59A9A) : const Color(0xFFB784B7);
+
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-                colors: [color.withOpacity(0.2), color.withOpacity(0.04)]),
-            borderRadius: BorderRadius.circular(20),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(color: themeColor.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 5)),
+            ],
           ),
-          child: Row(children: [
-            Text(isMorning ? '☀️' : '🌙',
-                style: const TextStyle(fontSize: 32)),
-            const SizedBox(width: 16),
-            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(
-                isMorning ? 'Routine du matin' : 'Routine du soir',
-                style: Theme.of(context).textTheme.headlineMedium,
+          child: Row(
+            children: [
+              Icon(isMorning ? Iconsax.sun_1 : Iconsax.moon, color: themeColor, size: 30),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isMorning ? 'Routine Matinale' : 'Routine du Soir',
+                    style: GoogleFonts.playfairDisplay(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  Text('Programme de $duration', style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey)),
+                ],
               ),
-              Text(
-                isMorning ? 'Bien commencer la journée' : 'Régénérer votre peau',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ]),
-          ]),
+            ],
+          ),
         ).animate().fadeIn(),
-        const SizedBox(height: 18),
-        ...steps.asMap().entries.map((e) => PremiumFadeIn(
-              delay: e.key * 80,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                            colors: [AppTheme.primary, AppColors.secondary]),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(e.value.icon,
-                            style: const TextStyle(fontSize: 20)),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: GlassCard(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(e.value.product,
-                                style: Theme.of(context).textTheme.labelLarge),
-                            const SizedBox(height: 6),
-                            Text(e.value.instruction,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(height: 1.5)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+        const SizedBox(height: 24),
+        ...steps.asMap().entries.map((e) {
+          final step = e.value;
+          return PremiumFadeIn(
+            delay: e.key * 100,
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: themeColor.withOpacity(0.1)),
               ),
-            )),
+              child: Row(
+                children: [
+                  Text(step.icon, style: const TextStyle(fontSize: 20)),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(step.product, style: GoogleFonts.outfit(fontWeight: FontWeight.bold)),
+                        Text(step.instruction, style: GoogleFonts.outfit(fontSize: 13, color: Colors.grey[600])),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ],
     );
   }
 }
 
-class _DietTab extends StatelessWidget {
-  final List<String> tips;
-  const _DietTab({required this.tips});
+class _LifestyleTab extends StatelessWidget {
+  final RecommendationResult result;
+  const _LifestyleTab({required this.result});
 
   @override
   Widget build(BuildContext context) {
-    return ListView(padding: const EdgeInsets.all(20), children: [
-      Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: [
-            AppColors.accent.withOpacity(0.3),
-            AppColors.accent.withOpacity(0.05)
-          ]),
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Row(children: [
-          const Text('🥗', style: TextStyle(fontSize: 32)),
-          const SizedBox(width: 16),
-          Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Conseils alimentaires',
-                style: Theme.of(context).textTheme.headlineMedium),
-            Text('Rayonner de l\'intérieur',
-                style: Theme.of(context).textTheme.bodySmall),
-          ]),
-        ]),
-      ).animate().fadeIn(),
-      const SizedBox(height: 16),
-      ...tips.asMap().entries.map((e) => PremiumFadeIn(
-            delay: e.key * 70,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: GlassCard(
-                child: Text(e.value,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(height: 1.55)),
-              ),
-            ),
-          )),
-      const SizedBox(height: 80),
-    ]);
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        _buildSectionHeader('Alimentation', '🥗'),
+        const SizedBox(height: 12),
+        ...result.dietTips.map((tip) => _buildTipCard(tip, const Color(0xFF96C9B9))),
+        const SizedBox(height: 24),
+        _buildSectionHeader('Mode de vie', '✨'),
+        const SizedBox(height: 12),
+        ...result.lifestyle.map((tip) => _buildTipCard(tip, const Color(0xFFB784B7))),
+      ],
+    );
+  }
+
+  Widget _buildSectionHeader(String title, String emoji) {
+    return Row(
+      children: [
+        Text(emoji, style: const TextStyle(fontSize: 22)),
+        const SizedBox(width: 10),
+        Text(title, style: GoogleFonts.playfairDisplay(fontSize: 18, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildTipCard(String tip, Color color) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color.withOpacity(0.1)),
+      ),
+      child: Row(
+        children: [
+          Icon(Iconsax.tick_circle5, color: color, size: 18),
+          const SizedBox(width: 12),
+          Expanded(child: Text(tip, style: GoogleFonts.outfit(fontSize: 13))),
+        ],
+      ),
+    );
   }
 }

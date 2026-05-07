@@ -1,0 +1,7 @@
+{
+  "userId": "test_user",
+  "severity": 4.5,
+  "zones": ["chin"],
+  "risk_today": 0.6,
+  "hygiene_score": 80
+}

@@ -84,7 +84,13 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(title: const Text('Bilan Prédictif')),
+      appBar: AppBar(
+        title: const Text('Bilan Prédictif'),
+        leading: IconButton(
+          icon: const Icon(Iconsax.arrow_left_1),
+          onPressed: () => context.pop(),
+        ),
+      ),
       body: Stack(
         children: [
           // Background
@@ -142,6 +148,10 @@ class _ResultView extends StatelessWidget {
         extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: const Text('Rapport Hermona'),
+          leading: IconButton(
+            icon: const Icon(Iconsax.arrow_left_1),
+            onPressed: () => context.pop(),
+          ),
           bottom: PreferredSize(
             preferredSize: const Size.fromHeight(60),
             child: Container(
