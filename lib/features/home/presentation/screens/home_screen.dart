@@ -307,7 +307,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLatestAnalysis(String? uid) {
     if (uid == null) return const SizedBox();
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections).where('userId', isEqualTo: uid).limit(10).snapshots(),
+      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections)
+          .where('userId', isEqualTo: uid)
+          .orderBy('analyzedAt', descending: true)
+          .limit(10)
+          .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
         
@@ -358,6 +362,7 @@ class _HomeScreenState extends State<HomeScreen> {
           stream: FirebaseFirestore.instance
               .collection('daily_surveys')
               .where('userId', isEqualTo: uid)
+              .orderBy('date', descending: true)
               .limit(10)
               .snapshots(),
           builder: (context, snapshot) {

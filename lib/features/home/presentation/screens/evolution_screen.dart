@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -20,9 +19,11 @@ import 'package:acneia/core/widgets/common_widgets.dart';
 class _SeverityPoint {
   final DateTime date;
   final double score; // 0–100
-  final String? imageBase64; // première image de la détection
   final String docId;
-  _SeverityPoint({required this.date, required this.score, this.imageBase64, required this.docId});
+  // imageBase64 intentionally removed: base64 images are never stored in
+  // Firestore (CursorWindow NO_MEMORY fix). Images only exist in-memory
+  // during the active detection session.
+  _SeverityPoint({required this.date, required this.score, required this.docId});
 }
 
 class _RiskPoint {
@@ -57,33 +58,29 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     if (uid == null) { setState(() => _loading = false); return; }
 
     try {
-      // ── Severity (detections) ──────────────────────────────────────────────
+      // MEMORY FIX: limit(15) + one-time .get() — no unbounded snapshots.
+      // imageUrls are always [] in Firestore (stripped at save time).
       final detSnap = await FirebaseFirestore.instance
           .collection(AppConstants.colDetections)
           .where('userId', isEqualTo: uid)
-          .limit(30)
-          .get();
+          .orderBy('analyzedAt', descending: true)
+          .limit(15)
+          .get(const GetOptions(source: Source.serverAndCache));
 
       final sPoints = detSnap.docs.map((d) {
         final data = d.data();
         final date = _parseDate(data['analyzedAt']);
         final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
-        final urls = (data['imageUrls'] as List?)?.cast<String>() ?? [];
-        return _SeverityPoint(
-          date: date,
-          score: score,
-          imageBase64: urls.isNotEmpty ? urls.first : null,
-          docId: d.id,
-        );
+        return _SeverityPoint(date: date, score: score, docId: d.id);
       }).toList();
       sPoints.sort((a, b) => a.date.compareTo(b.date));
 
-      // ── Risk (predictions) ────────────────────────────────────────────────
       final predSnap = await FirebaseFirestore.instance
           .collection(AppConstants.colPredictions)
           .where('userId', isEqualTo: uid)
-          .limit(30)
-          .get();
+          .orderBy('predictedAt', descending: true)
+          .limit(15)
+          .get(const GetOptions(source: Source.serverAndCache));
 
       final rPoints = predSnap.docs.map((d) {
         final data = d.data();
@@ -178,21 +175,26 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Image
-                  if (point.imageBase64 != null)
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(18),
-                      child: _buildImage(point.imageBase64!),
-                    )
-                  else
-                    Container(
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Center(child: Text('Aucune image disponible', style: TextStyle(color: Colors.grey))),
+                  // Info: images live only in the active session
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(14),
                     ),
+                    child: Row(
+                      children: [
+                        Icon(Iconsax.info_circle, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Photo visible uniquement en session active',
+                            style: TextStyle(fontSize: 11, color: AppColors.primary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
 
                   const SizedBox(height: 20),
                   SizedBox(
@@ -278,24 +280,6 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     );
   }
 
-  // ──────────────────────────────────────────────────────────────────────────
-  // IMAGE HELPER (base64 or network)
-  // ──────────────────────────────────────────────────────────────────────────
-  Widget _buildImage(String src) {
-    if (src.startsWith('data:image')) {
-      // base64 data URI
-      final comma = src.indexOf(',');
-      if (comma != -1) {
-        try {
-          final bytes = base64Decode(src.substring(comma + 1));
-          return Image.memory(bytes, height: 220, width: double.infinity, fit: BoxFit.cover);
-        } catch (_) {}
-      }
-    }
-    // Fallback: network URL
-    return Image.network(src, height: 220, width: double.infinity, fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => const SizedBox(height: 220, child: Center(child: Icon(Icons.broken_image, color: Colors.grey))));
-  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // CHART HELPERS

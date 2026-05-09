@@ -116,6 +116,7 @@ class DetectionApiService implements DetectionRepository {
       final snap = await _db
           .collection(AppConstants.colDetections)
           .where('userId', isEqualTo: userId)
+          .orderBy('analyzedAt', descending: true)
           .limit(50)
           .get()
           .timeout(const Duration(seconds: 5));
@@ -146,14 +147,26 @@ class DetectionApiService implements DetectionRepository {
 
   Future<void> saveResult(DetectionResult result, String userId) async {
 
+    // ⚠️ MEMORY FIX: Never store base64 imageUrls in Firestore.
+    // Each detection contains 5 PNG images (~100KB each = ~500KB per document).
+    // Storing them causes CursorWindow NO_MEMORY on Android (SQLite local cache overflow).
+    // Images live only in-memory for the current session (DetectionResultScreen).
+    final lightweightJson = {
+      'id': result.id,
+      'severityScore': result.severityScore,
+      'severityLevel': result.severityLevel.name,
+      'classifications': result.classifications.map((c) => c.toJson()).toList(),
+      'analyzedAt': result.analyzedAt.toIso8601String(),
+      'imageUrls': <String>[],   // intentionally empty — never store base64 in Firestore
+      'zoneCounts': result.zoneCounts,
+      'zoneRisks': result.zoneRisks,
+      'userId': userId,
+    };
+
     await _db
-
         .collection(AppConstants.colDetections)
-
         .doc(result.id)
-
-        .set({...result.toJson(), 'userId': userId});
-
+        .set(lightweightJson);
   }
 
 }

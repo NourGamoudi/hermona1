@@ -22,7 +22,7 @@ class TrendsError extends TrendsState {
 class TrendsCubit extends Cubit<TrendsState> {
   TrendsCubit() : super(TrendsInitial());
 
-  void loadData() {
+  Future<void> loadData() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) {
       emit(TrendsError("Non connecté"));
@@ -31,28 +31,35 @@ class TrendsCubit extends Cubit<TrendsState> {
 
     emit(TrendsLoading());
 
-    // In a real app, we would use a repository and combine streams or wait for futures.
-    // For simplicity, we'll fetch both collections.
-    
-    FirebaseFirestore.instance
-        .collection('detections')
-        .where('userId', isEqualTo: uid)
-        .snapshots()
-        .listen((detSnap) {
-          FirebaseFirestore.instance
-              .collection('predictions')
-              .where('userId', isEqualTo: uid)
-              .snapshots()
-              .listen((predSnap) {
-                if (!isClosed) {
-                  emit(TrendsLoaded(
-                    detections: detSnap.docs,
-                    predictions: predSnap.docs,
-                  ));
-                }
-              });
-        }, onError: (e) {
-          if (!isClosed) emit(TrendsError(e.toString()));
-        });
+    try {
+      // MEMORY FIX: Use one-time .get() with .limit(20) instead of unbounded
+      // real-time .snapshots(). This prevents loading all historical documents
+      // (each potentially containing 500KB+ of base64 image data) into the
+      // Android SQLite local cache, which caused CursorWindow NO_MEMORY errors.
+      final detFuture = FirebaseFirestore.instance
+          .collection('detections')
+          .where('userId', isEqualTo: uid)
+          .orderBy('analyzedAt', descending: true)
+          .limit(20)
+          .get(const GetOptions(source: Source.serverAndCache));
+
+      final predFuture = FirebaseFirestore.instance
+          .collection('predictions')
+          .where('userId', isEqualTo: uid)
+          .orderBy('predictedAt', descending: true)
+          .limit(20)
+          .get(const GetOptions(source: Source.serverAndCache));
+
+      final results = await Future.wait([detFuture, predFuture]);
+
+      if (!isClosed) {
+        emit(TrendsLoaded(
+          detections: results[0].docs,
+          predictions: results[1].docs,
+        ));
+      }
+    } catch (e) {
+      if (!isClosed) emit(TrendsError(e.toString()));
+    }
   }
 }

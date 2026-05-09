@@ -235,7 +235,27 @@ class DetectionResultScreen extends StatelessWidget {
   }
 
   Widget _buildFacePartsGrid(BuildContext context, DetectionResult result) {
-    if (result.imageUrls.isEmpty) return const SizedBox.shrink();
+    if (result.imageUrls.isEmpty) {
+      return GlassCard(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Icon(Iconsax.image, size: 48, color: AppColors.primary.withValues(alpha: 0.2)),
+            const SizedBox(height: 16),
+            const Text(
+              'Visualisation indisponible',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Les photos détaillées par zone ne sont pas conservées pour optimiser la mémoire de l\'appareil.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+            ),
+          ],
+        ),
+      );
+    }
     final zones = ['front', 'menton', 'joue_gauche', 'joue_droite', 'nez'];
     final zoneNames = ['FRONT', 'MENTON', 'JOUE GAUCHE', 'JOUE DROITE', 'NEZ'];
 

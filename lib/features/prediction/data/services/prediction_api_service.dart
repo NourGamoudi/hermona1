@@ -75,6 +75,8 @@ class PredictionApiService implements PredictionRepository {
     final snap = await _db
         .collection(AppConstants.colPredictions)
         .where('userId', isEqualTo: userId)
+        .orderBy('predictedAt', descending: true)
+        .limit(50)
         .get();
 
     final List<QueryDocumentSnapshot> docs = snap.docs.toList();
