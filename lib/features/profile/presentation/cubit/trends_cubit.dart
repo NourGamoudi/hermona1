@@ -32,34 +32,40 @@ class TrendsCubit extends Cubit<TrendsState> {
     emit(TrendsLoading());
 
     try {
-      // MEMORY FIX: Use one-time .get() with .limit(20) instead of unbounded
-      // real-time .snapshots(). This prevents loading all historical documents
-      // (each potentially containing 500KB+ of base64 image data) into the
-      // Android SQLite local cache, which caused CursorWindow NO_MEMORY errors.
-      final detFuture = FirebaseFirestore.instance
+      // 1. SEVERITY SOURCE: Weekly analysis history (colDetections)
+      // Field: severityScore, Date: analyzedAt
+      // We fetch latest 20 for chronological evolution preview.
+      final detSnap = await FirebaseFirestore.instance
           .collection('detections')
           .where('userId', isEqualTo: uid)
           .orderBy('analyzedAt', descending: true)
           .limit(20)
           .get(const GetOptions(source: Source.serverAndCache));
 
-      final predFuture = FirebaseFirestore.instance
+      // 2. RISK SOURCE: Daily questionnaire predictions (colPredictions)
+      // Field: riskScore, Date: predictedAt
+      final predSnap = await FirebaseFirestore.instance
           .collection('predictions')
           .where('userId', isEqualTo: uid)
           .orderBy('predictedAt', descending: true)
           .limit(20)
           .get(const GetOptions(source: Source.serverAndCache));
 
-      final results = await Future.wait([detFuture, predFuture]);
+      // DATA INTEGRITY: Sort chronologically (ascending) for the chart
+      final detections = detSnap.docs.toList();
+      detections.sort((a, b) => (a['analyzedAt'] as String).compareTo(b['analyzedAt'] as String));
+
+      final predictions = predSnap.docs.toList();
+      predictions.sort((a, b) => (a['predictedAt'] as String).compareTo(b['predictedAt'] as String));
 
       if (!isClosed) {
         emit(TrendsLoaded(
-          detections: results[0].docs,
-          predictions: results[1].docs,
+          detections: detections,
+          predictions: predictions,
         ));
       }
     } catch (e) {
-      if (!isClosed) emit(TrendsError(e.toString()));
+      if (!isClosed) emit(TrendsError("Erreur historique: $e"));
     }
   }
 }

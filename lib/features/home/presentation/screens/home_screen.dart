@@ -6,6 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
+import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:acneia/features/profile/presentation/cubit/trends_cubit.dart';
+import 'package:acneia/features/profile/presentation/screens/trends_screen.dart';
+import 'package:acneia/features/home/presentation/screens/evolution_screen.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
@@ -83,6 +88,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SectionHeader(title: 'Explorer'),
                   const SizedBox(height: 12),
                   _buildExplorerSection(context),
+                  const SizedBox(height: 32),
+
+                  // 4. EVOLUTION SECTION
+                  const SectionHeader(title: 'Mon Évolution'),
+                  const SizedBox(height: 12),
+                  _buildEvolutionPreview(uid),
                   
                   const SizedBox(height: 100),
                 ],
@@ -431,12 +442,149 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'Bonsoir';
   }
 
+  Widget _buildEvolutionPreview(String? uid) {
+    if (uid == null) return const SizedBox();
+    return BlocProvider(
+      create: (context) => TrendsCubit()..loadData(),
+      child: BlocBuilder<TrendsCubit, TrendsState>(
+        builder: (context, state) {
+          if (state is TrendsLoading) {
+            return const SizedBox(
+              height: 160,
+              child: GlassCard(child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+            );
+          }
+          if (state is TrendsLoaded) {
+            // Process Detections (Severity)
+            final sPoints = state.detections.map((d) {
+              final data = d.data() as Map<String, dynamic>;
+              final date = _parseDate(data['analyzedAt']);
+              final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
+              return _SeverityPoint(date: date, score: score, docId: d.id);
+            }).toList();
+            sPoints.sort((a, b) => a.date.compareTo(b.date));
+
+            // Process Predictions (Risk)
+            final rPoints = state.predictions.map((d) {
+              final data = d.data() as Map<String, dynamic>;
+              final date = _parseDate(data['predictedAt']);
+              final score = (data['riskScore'] as num?)?.toDouble() ?? 0.0;
+              return _RiskPoint(date: date, score: score);
+            }).toList();
+            rPoints.sort((a, b) => a.date.compareTo(b.date));
+
+            if (sPoints.isEmpty && rPoints.isEmpty) {
+              return GlassCard(
+                onTap: () => context.push('/evolution'),
+                padding: const EdgeInsets.all(20),
+                child: const Center(child: Text('Commencez vos analyses pour voir votre évolution', style: TextStyle(fontSize: 12, color: Colors.grey))),
+              );
+            }
+
+            return GlassCard(
+              onTap: () => context.push('/evolution'),
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _MiniChart(
+                          title: 'Sévérité',
+                          color: AppColors.primary,
+                          spots: sPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score)).toList(),
+                        ),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: _MiniChart(
+                          title: 'Risque',
+                          color: AppColors.error,
+                          spots: rPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score * 100)).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Appuyez pour voir le détail complet', style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)),
+                ],
+              ),
+            );
+          }
+          return const SizedBox();
+        },
+      ),
+    );
+  }
+
   DateTime _parseDate(dynamic val) {
     if (val == null) return DateTime.fromMillisecondsSinceEpoch(0);
     if (val is String) return DateTime.tryParse(val) ?? DateTime.fromMillisecondsSinceEpoch(0);
     if (val is Timestamp) return val.toDate();
     try { return (val as dynamic).toDate(); } catch (_) { return DateTime.fromMillisecondsSinceEpoch(0); }
   }
+}
+
+class _MiniChart extends StatelessWidget {
+  final String title;
+  final Color color;
+  final List<FlSpot> spots;
+
+  const _MiniChart({required this.title, required this.color, required this.spots});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
+        const SizedBox(height: 8),
+        SizedBox(
+          height: 80,
+          child: spots.isEmpty 
+            ? const Center(child: Text('--', style: TextStyle(color: Colors.grey)))
+            : LineChart(
+                LineChartData(
+                  minY: 0, maxY: 100,
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  titlesData: const FlTitlesData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: spots,
+                      isCurved: true,
+                      color: color,
+                      barWidth: 2,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0)],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SeverityPoint {
+  final DateTime date;
+  final double score;
+  final String docId;
+  _SeverityPoint({required this.date, required this.score, required this.docId});
+}
+
+class _RiskPoint {
+  final DateTime date;
+  final double score;
+  _RiskPoint({required this.date, required this.score});
 }
 
 class _SquareScoreCard extends StatelessWidget {

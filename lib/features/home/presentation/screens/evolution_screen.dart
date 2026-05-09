@@ -59,8 +59,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     if (uid == null) { setState(() => _loading = false); return; }
 
     try {
-      // MEMORY FIX: limit(15) + one-time .get() — no unbounded snapshots.
-      // imageUrls are always [] in Firestore (stripped at save time).
+      // 1. SEVERITY: Fetch latest 15 weekly analysis documents
       final detSnap = await FirebaseFirestore.instance
           .collection(AppConstants.colDetections)
           .where('userId', isEqualTo: uid)
@@ -68,14 +67,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
           .limit(15)
           .get(const GetOptions(source: Source.serverAndCache));
 
-      final sPoints = detSnap.docs.map((d) {
-        final data = d.data();
-        final date = _parseDate(data['analyzedAt']);
-        final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
-        return _SeverityPoint(date: date, score: score, docId: d.id);
-      }).toList();
-      sPoints.sort((a, b) => a.date.compareTo(b.date));
-
+      // 2. RISK: Fetch latest 15 daily risk predictions
       final predSnap = await FirebaseFirestore.instance
           .collection(AppConstants.colPredictions)
           .where('userId', isEqualTo: uid)
@@ -83,13 +75,20 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
           .limit(15)
           .get(const GetOptions(source: Source.serverAndCache));
 
+      // DATA INTEGRITY: Strict mapping & chronological sorting (Left -> Right)
+      final sPoints = detSnap.docs.map((d) {
+        final data = d.data();
+        final date = _parseDate(data['analyzedAt']);
+        final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
+        return _SeverityPoint(date: date, score: score, docId: d.id);
+      }).toList()..sort((a, b) => a.date.compareTo(b.date));
+
       final rPoints = predSnap.docs.map((d) {
         final data = d.data();
         final date = _parseDate(data['predictedAt']);
         final score = (data['riskScore'] as num?)?.toDouble() ?? 0.0;
         return _RiskPoint(date: date, score: score);
-      }).toList();
-      rPoints.sort((a, b) => a.date.compareTo(b.date));
+      }).toList()..sort((a, b) => a.date.compareTo(b.date));
 
       if (mounted) {
         setState(() {
@@ -99,6 +98,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
         });
       }
     } catch (e) {
+      debugPrint("Evolution Error: $e");
       if (mounted) setState(() => _loading = false);
     }
   }
