@@ -231,6 +231,27 @@ class _ChatScreenState extends State<ChatScreen> {
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: const Text('Assistant Hermona'),
+        leading: Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                  width: 1,
+                ),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new_rounded,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
+          ),
+        ),
         actions: [
           if (_isSpeaking)
             IconButton(
