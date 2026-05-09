@@ -1,20 +1,16 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/services/language_service.dart';
-import '../../../../core/localization/app_localizations.dart';
-import '../../../../main.dart';
+import 'package:acneia/core/services/language_service.dart';
+import 'package:acneia/main.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
     final isFr = Localizations.localeOf(context).languageCode == 'fr';
     final size = MediaQuery.of(context).size;
     
@@ -69,7 +65,7 @@ class WelcomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
                   child: Row(
                     children: [
-                      _LogoBadge(brandColor: brandPink),
+                      const _LogoBadge(brandColor: brandPink),
                       const Spacer(),
                       _LanguageToggle(
                         isFr: isFr,
@@ -194,7 +190,7 @@ class _LogoBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(50),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -237,7 +233,7 @@ class _LanguageToggle extends StatelessWidget {
         borderRadius: BorderRadius.circular(50),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),

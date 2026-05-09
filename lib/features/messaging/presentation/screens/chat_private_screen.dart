@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -6,9 +5,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../data/services/messaging_service.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/messaging/data/services/messaging_service.dart';
 
 class ChatPrivateScreen extends StatefulWidget {
   final String conversationId;
@@ -70,7 +69,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
           Positioned(
             top: -100,
             left: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.05)),
+            child: _Blob(size: 300, color: AppTheme.primary.withValues(alpha: 0.05)),
           ),
 
           Column(
@@ -80,7 +79,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
-                color: AppColors.warning.withOpacity(0.05),
+                color: AppColors.warning.withValues(alpha: 0.05),
                 child: const Row(
                   children: [
                     Icon(Iconsax.shield_tick, size: 14, color: AppColors.warning),
@@ -99,13 +98,13 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollBottom());
                     
                     if (docs.isEmpty) {
-                      return Center(
+                      return const Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Iconsax.message_text, size: 48, color: AppColors.primary),
-                            const SizedBox(height: 16),
-                            const Text('Dites bonjour !', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark)),
+                            Icon(Iconsax.message_text, size: 48, color: AppColors.primary),
+                            SizedBox(height: 16),
+                            Text('Dites bonjour !', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark)),
                           ],
                         ),
                       ).animate().fadeIn();
@@ -153,7 +152,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                         onTap: _send,
                         child: Container(
                           padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                           child: _sending 
                               ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                               : const Icon(Iconsax.send_1, color: Colors.white, size: 20),
@@ -192,22 +191,22 @@ class _MessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
-                gradient: isMe ? LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]) : null,
-                color: isMe ? null : Colors.white.withOpacity(0.05),
+                gradient: isMe ? const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]) : null,
+                color: isMe ? null : Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
                   topRight: const Radius.circular(20),
                   bottomLeft: Radius.circular(isMe ? 20 : 4),
                   bottomRight: Radius.circular(isMe ? 4 : 20),
                 ),
-                border: isMe ? null : Border.all(color: Colors.white.withOpacity(0.1)),
+                border: isMe ? null : Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
               child: Column(
                 crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
-                  Text(content, style: TextStyle(color: isMe ? Colors.white : Colors.white.withOpacity(0.9), fontSize: 14, height: 1.4)),
+                  Text(content, style: TextStyle(color: isMe ? Colors.white : Colors.white.withValues(alpha: 0.9), fontSize: 14, height: 1.4)),
                   const SizedBox(height: 6),
-                  Text(date, style: TextStyle(color: (isMe ? Colors.white : AppColors.textSecondaryDark).withOpacity(0.5), fontSize: 10, fontWeight: FontWeight.bold)),
+                  Text(date, style: TextStyle(color: (isMe ? Colors.white : AppColors.textSecondaryDark).withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
@@ -228,9 +227,9 @@ class _AnonymAvatar extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        gradient: LinearGradient(colors: [AppColors.secondary.withOpacity(0.4), AppColors.primary.withOpacity(0.4)]),
+        gradient: LinearGradient(colors: [AppColors.secondary.withValues(alpha: 0.4), AppColors.primary.withValues(alpha: 0.4)]),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Center(child: Icon(Iconsax.user, color: Colors.white, size: size * 0.4)),
     );
@@ -242,6 +241,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

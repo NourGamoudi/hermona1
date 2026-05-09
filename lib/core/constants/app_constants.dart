@@ -1,11 +1,10 @@
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart' show kIsWeb, kReleaseMode;
+import 'package:flutter/foundation.dart' show kReleaseMode;
 
 class AppConstants {
   // ——————————————————————————————————————————————————————————————————————————————————————
-  static final String apiBaseUrl = kReleaseMode 
+  static const String apiBaseUrl = kReleaseMode 
       ? 'https://hermona-api.onrender.com' // PROD
-      : (kIsWeb ? 'http://localhost:8000' : 'http://192.168.100.232:8000'); // DEV (Local IP for Real Device)
+      : 'http://10.255.170.131:8000'; // DEV (Auto-detected IP)
   static const String apiKey     = 'hermona_secret_2026';
 
 
@@ -44,7 +43,8 @@ class AppConstants {
 
   static const String colReports         = 'reports';
   static const String colNotifications   = 'notifications';
-  static const String colPublicProfiles = 'public_profiles';
+  static const String colDailySurveys   = 'daily_surveys';
+  static const String colPublicProfiles  = 'public_profiles';
 
 
 

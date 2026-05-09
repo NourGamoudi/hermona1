@@ -1,17 +1,15 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
-import 'dart:convert';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../../../core/localization/app_localizations.dart';
-import '../../../../core/constants/app_constants.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import '../cubit/trends_cubit.dart';
 
 class TrendsScreen extends StatefulWidget {
@@ -22,7 +20,6 @@ class TrendsScreen extends StatefulWidget {
 }
 
 class _TrendsScreenState extends State<TrendsScreen> {
-  final _uid = FirebaseAuth.instance.currentUser?.uid;
   int _selectedDays = 365;
 
   @override
@@ -129,8 +126,11 @@ class _TrendsScreenState extends State<TrendsScreen> {
                 final data = d.data() as Map<String, dynamic>;
                 final ts = data[dateField];
                 DateTime? dt;
-                if (ts is Timestamp) dt = ts.toDate();
-                else if (ts is String) dt = DateTime.tryParse(ts);
+                if (ts is Timestamp) {
+                  dt = ts.toDate();
+                } else if (ts is String) {
+                  dt = DateTime.tryParse(ts);
+                }
                 if (dt == null) continue;
                 
                 final absW = (dt.year * 52) + ((dt.difference(DateTime(dt.year, 1, 1)).inDays) / 7).ceil();
@@ -143,9 +143,13 @@ class _TrendsScreenState extends State<TrendsScreen> {
                 final data = d.data() as Map<String, dynamic>;
                 final ts = data[dateField];
                 DateTime dt;
-                if (ts is Timestamp) dt = ts.toDate();
-                else if (ts is String) dt = DateTime.tryParse(ts) ?? DateTime.now();
-                else continue;
+                if (ts is Timestamp) {
+                  dt = ts.toDate();
+                } else if (ts is String) {
+                  dt = DateTime.tryParse(ts) ?? DateTime.now();
+                } else {
+                  continue;
+                }
 
                 if (dt.isBefore(cutoff)) continue;
 
@@ -247,7 +251,7 @@ class _LineChartWidget extends StatelessWidget {
             }
           },
           touchTooltipData: LineTouchTooltipData(
-            tooltipBgColor: color.withOpacity(0.8),
+            tooltipBgColor: color.withValues(alpha: 0.8),
             getTooltipItems: (spots) => spots.map((s) => LineTooltipItem(
               '${s.y.round()}%',
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -259,8 +263,8 @@ class _LineChartWidget extends StatelessWidget {
           drawVerticalLine: true,
           horizontalInterval: 25,
           verticalInterval: 1,
-          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.withOpacity(0.1), strokeWidth: 1),
-          getDrawingVerticalLine: (v) => FlLine(color: Colors.grey.withOpacity(0.1), strokeWidth: 1),
+          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.1), strokeWidth: 1),
+          getDrawingVerticalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.1), strokeWidth: 1),
         ),
         titlesData: FlTitlesData(
           bottomTitles: AxisTitles(
@@ -293,8 +297,8 @@ class _LineChartWidget extends StatelessWidget {
         borderData: FlBorderData(
           show: true,
           border: Border(
-            bottom: BorderSide(color: Colors.grey.withOpacity(0.2)),
-            left: BorderSide(color: Colors.grey.withOpacity(0.2)),
+            bottom: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
+            left: BorderSide(color: Colors.grey.withValues(alpha: 0.2)),
           ),
         ),
         lineBarsData: [
@@ -316,7 +320,7 @@ class _LineChartWidget extends StatelessWidget {
             belowBarData: BarAreaData(
               show: true,
               gradient: LinearGradient(
-                colors: [color.withOpacity(0.2), color.withOpacity(0.0)],
+                colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0.0)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),

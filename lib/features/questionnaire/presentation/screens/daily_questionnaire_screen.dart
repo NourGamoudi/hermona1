@@ -1,16 +1,14 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../data/services/questionnaire_service.dart';
-import '../../domain/entities/daily_survey.dart';
-import '../../../prediction/data/services/prediction_api_service.dart';
-import '../../../prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
+import 'package:acneia/features/questionnaire/domain/entities/daily_survey.dart';
+import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
 
 class DailyQuestionnaireScreen extends StatefulWidget {
   final DailySurvey? initialSurvey;
@@ -72,20 +70,24 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       String cyclePhase = 'inconnue';
       
       if (profile != null) {
-        cycleDay = DateTime.now().difference(profile.lastPeriodsDate).inDays + 1;
-        if (cycleDay <= 5) cyclePhase = 'menstruelle';
-        else if (cycleDay <= 13) cyclePhase = 'folliculaire';
-        else if (cycleDay <= 15) cyclePhase = 'ovulatoire';
-        else cyclePhase = 'lutéale';
+        final avgCycle = profile.lastCyclesDuration.isNotEmpty 
+            ? profile.lastCyclesDuration.reduce((a, b) => a + b) / profile.lastCyclesDuration.length 
+            : 28.0;
+        
+        final daysSinceLast = DateTime.now().difference(profile.lastPeriodsDate).inDays;
+        cycleDay = (daysSinceLast % avgCycle.toInt()) + 1;
+        
+        // Dynamic phase mapping based on cycle length
+        if (cycleDay <= 5) {
+          cyclePhase = 'menstruelle';
+        } else if (cycleDay <= (avgCycle * 0.45).toInt()) {
+          cyclePhase = 'folliculaire';
+        } else if (cycleDay <= (avgCycle * 0.55).toInt()) {
+          cyclePhase = 'ovulatoire';
+        } else {
+          cyclePhase = 'lutéale';
+        }
       }
-
-      int score = 100;
-      if (sleepDuration < 7) score -= 15;
-      if (hydration < 6) score -= 10;
-      if (stress > 7) score -= 20;
-      if (food.contains('sucre') || food.contains('laitages')) score -= 15;
-      if (food.contains('fast-food')) score -= 10;
-      score = score.clamp(0, 100);
 
       final survey = DailySurvey(
         id: '${user.uid}_${DateTime.now().toIso8601String().split('T')[0]}',
@@ -99,27 +101,38 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
         symptoms: symptoms,
         cycleDay: cycleDay,
         cyclePhase: cyclePhase,
-        lifestyleScore: score,
+        lifestyleScore: 70, // Default or placeholder
       );
 
+      // 1. Save the survey data locally (Firestore) first so progress is never lost
       await _service.saveDailySurvey(survey);
-      final prediction = await _predictionService.predict({
-        'stress': stress > 7 ? 'high' : stress > 4 ? 'medium' : 'low',
-        'sleep': sleepDuration < 6 ? 'poor' : 'good',
-        'diet': (food.contains('sucre') || food.contains('laitages')) ? 'bad' : 'good',
-        'hormonal_cycle': cyclePhase,
-        'hygieneScore': score,
-      });
 
-      await _predictionService.saveResult(prediction, user.uid);
+      try {
+        // 2. Attempt AI prediction
+        final prediction = await _predictionService.predict({
+          'stress': stress > 7 ? 'high' : stress > 4 ? 'medium' : 'low',
+          'sleep': sleepDuration < 6 ? 'poor' : 'good',
+          'diet': (food.contains('sucre') || food.contains('laitages')) ? 'bad' : 'good',
+          'hormonal_cycle': cyclePhase,
+          'hydration': hydration,
+          'spf_used': spfUsed,
+        });
+
+        await _predictionService.saveResult(prediction, user.uid);
+      } catch (predictError) {
+        debugPrint('AI Prediction failed (offline or server error): $predictError');
+        // We don't block the user here, they can still proceed
+      }
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bilan quotidien enregistré ! Passons au bilan hebdomadaire.')),
+          const SnackBar(content: Text('Bilan quotidien enregistré !')),
         );
+        // Move to the next page regardless of AI success
         context.pushReplacement('/weekly-survey');
       }
     } catch (e) {
-      setState(() => error = 'Erreur d\'analyse : $e');
+      setState(() => error = 'Erreur lors de l\'enregistrement : $e');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -142,7 +155,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
           Positioned(
             top: -50,
             right: -50,
-            child: _Blob(size: 250, color: AppTheme.primary.withOpacity(0.05)),
+            child: _Blob(size: 250, color: AppTheme.primary.withValues(alpha: 0.12)),
           ),
 
           loading 
@@ -151,7 +164,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(24, 110, 24, 100),
               children: [
-                _HeaderSection(title: 'Suivi Bien-être', sub: 'Tes données permettent à l\'IA d\'affiner ses prédictions.'),
+                const _HeaderSection(title: 'Suivi Bien-être', sub: 'Tes données permettent à l\'IA d\'affiner ses prédictions.'),
                 const SizedBox(height: 32),
 
                 _SliderCard(
@@ -220,7 +233,8 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
       child: SwitchListTile.adaptive(
-        activeColor: AppColors.primary,
+        activeTrackColor: AppColors.primary,
+        activeThumbColor: Colors.white,
         contentPadding: EdgeInsets.zero,
         title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
         value: val,
@@ -230,6 +244,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   }
 
   Widget _buildChipSection(String title, List<String> options, List<String> current, Function(String, bool) onSel) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -246,9 +261,9 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                 duration: 300.ms,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.surfaceLight),
+                  color: sel ? AppColors.primary : (isDark ? Colors.white.withValues(alpha: 0.12) : AppColors.surfaceLight),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: sel ? Colors.transparent : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : AppColors.dividerLight)),
+                  border: Border.all(color: sel ? Colors.transparent : (isDark ? Colors.white.withValues(alpha: 0.25) : AppColors.dividerLight)),
                 ),
                 child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textMutedPink, fontSize: 10, fontWeight: FontWeight.w900)),
               ),
@@ -315,9 +330,9 @@ class _SliderCard extends StatelessWidget {
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: AppColors.primary,
-              inactiveTrackColor: AppColors.primary.withOpacity(0.1),
+              inactiveTrackColor: AppColors.primary.withValues(alpha: 0.25),
               thumbColor: Colors.white,
-              overlayColor: AppColors.primary.withOpacity(0.1),
+              overlayColor: AppColors.primary.withValues(alpha: 0.25),
               trackHeight: 4,
             ),
             child: Slider(value: value, min: min, max: max, onChanged: onChanged),
@@ -333,6 +348,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

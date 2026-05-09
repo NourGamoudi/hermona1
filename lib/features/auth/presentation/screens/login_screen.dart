@@ -6,10 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../../../core/localization/app_localizations.dart';
-import '../../data/services/auth_service.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
+import 'package:acneia/features/auth/data/services/auth_service.dart';
 import '../cubit/auth_cubit.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -49,7 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     final l = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return BlocProvider(
       create: (context) => AuthCubit(_auth),
@@ -75,7 +74,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     right: -size.width * 0.1,
                     child: _Blob(
                       size: size.width * 0.8,
-                      color: AppTheme.primary.withOpacity(0.12),
+                      color: AppTheme.primary.withValues(alpha: 0.12),
                     ).animate(onPlay: (c) => c.repeat()).moveY(begin: 0, end: 30, duration: 4.seconds, curve: Curves.easeInOut),
                   ),
                   Positioned(
@@ -83,7 +82,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     left: -size.width * 0.1,
                     child: _Blob(
                       size: size.width * 0.7,
-                      color: AppColors.secondary.withOpacity(0.08),
+                      color: AppColors.secondary.withValues(alpha: 0.08),
                     ).animate(onPlay: (c) => c.repeat()).moveX(begin: 0, end: 20, duration: 5.seconds, curve: Curves.easeInOut),
                   ),
 
@@ -155,8 +154,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                   TextFormField(
                                     controller: _emailCtrl,
                                     keyboardType: TextInputType.emailAddress,
-                                    decoration: InputDecoration(
-                                      prefixIcon: const Icon(Iconsax.sms, size: 20),
+                                    decoration: const InputDecoration(
+                                      prefixIcon: Icon(Iconsax.sms, size: 20),
                                       hintText: 'name@example.com',
                                     ),
                                     validator: (v) => (v == null || !v.contains('@')) ? l.translate('invalid_email') : null,
@@ -189,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       onPressed: () => _showForgotPassword(context),
                                       child: Text(
                                         l.translate('forgot_password'),
-                                        style: TextStyle(
+                                        style: const TextStyle(
                                           color: AppColors.primary,
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -224,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               children: [
                                 Row(
                                   children: [
-                                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withOpacity(0.1))),
+                                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.1))),
                                     Padding(
                                       padding: const EdgeInsets.symmetric(horizontal: 16),
                                       child: Text(
@@ -232,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         style: Theme.of(context).textTheme.bodySmall?.copyWith(letterSpacing: 1, fontWeight: FontWeight.w800),
                                       ),
                                     ),
-                                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withOpacity(0.1))),
+                                    Expanded(child: Divider(color: Theme.of(context).dividerColor.withValues(alpha: 0.1))),
                                   ],
                                 ),
                                 const SizedBox(height: 24),
@@ -260,7 +259,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onTap: () => context.go('/register'),
                                 child: Text(
                                   l.translate('register'),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 14,
@@ -316,9 +315,11 @@ class _LoginScreenState extends State<LoginScreen> {
             ElevatedButton(
               onPressed: () async {
                 if (ctrl.text.isNotEmpty) {
-                  await context.read<AuthCubit>().resetPassword(ctrl.text.trim());
+                  final cubit = context.read<AuthCubit>();
+                  final navigator = Navigator.of(ctx);
+                  await cubit.resetPassword(ctrl.text.trim());
                   if (mounted) {
-                    Navigator.pop(ctx);
+                    navigator.pop();
                     _snack(l.translate('email_sent'), isError: false);
                   }
                 }
@@ -349,7 +350,7 @@ class _Blob extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          colors: [color, color.withOpacity(0)],
+          colors: [color, color.withValues(alpha: 0)],
         ),
       ),
     );
@@ -365,14 +366,14 @@ class _HeroIcon extends StatelessWidget {
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.6)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.6)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
+            color: AppColors.primary.withValues(alpha: 0.4),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -394,9 +395,9 @@ class _BackButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: const Icon(Iconsax.arrow_left_1, size: 20),
       ),
@@ -415,7 +416,7 @@ class _FieldLabel extends StatelessWidget {
       style: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w900,
-        color: AppColors.textSecondaryDark.withOpacity(0.8),
+        color: AppColors.textSecondaryDark.withValues(alpha: 0.8),
         letterSpacing: 1.5,
       ),
     );
@@ -437,9 +438,9 @@ class _SocialButton extends StatelessWidget {
         width: double.infinity,
         height: 60,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
+          color: Colors.white.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,

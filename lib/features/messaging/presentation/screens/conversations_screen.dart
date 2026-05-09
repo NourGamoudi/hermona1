@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -6,9 +5,9 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../data/services/messaging_service.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/messaging/data/services/messaging_service.dart';
 
 class ConversationsScreen extends StatefulWidget {
   const ConversationsScreen({super.key});
@@ -41,7 +40,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
           Positioned(
             top: -50,
             right: -50,
-            child: _Blob(size: 250, color: AppColors.primary.withOpacity(0.05)),
+            child: _Blob(size: 250, color: AppColors.primary.withValues(alpha: 0.05)),
           ),
 
           Column(
@@ -49,15 +48,15 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               SizedBox(height: MediaQuery.of(context).padding.top + 60),
               
               // Safety Warning
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: GlassCard(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      const Icon(Iconsax.shield_tick, color: AppColors.warning, size: 20),
-                      const SizedBox(width: 16),
-                      const Expanded(
+                      Icon(Iconsax.shield_tick, color: AppColors.warning, size: 20),
+                      SizedBox(width: 16),
+                      Expanded(
                         child: Text(
                           'Messagerie 100% anonyme. Ne partagez jamais vos données réelles.',
                           style: TextStyle(color: AppColors.warning, fontSize: 11, fontWeight: FontWeight.w600),
@@ -87,7 +86,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Iconsax.message_text, size: 64, color: AppColors.textSecondaryDark.withOpacity(0.2)),
+                            Icon(Iconsax.message_text, size: 64, color: AppColors.textSecondaryDark.withValues(alpha: 0.2)),
                             const SizedBox(height: 24),
                             const Text('Aucune conversation', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
                             const SizedBox(height: 8),
@@ -165,12 +164,12 @@ class _AnonymAvatar extends StatelessWidget {
       height: 50,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary.withOpacity(0.5), AppColors.secondary.withOpacity(0.5)],
+          colors: [AppColors.primary.withValues(alpha: 0.5), AppColors.secondary.withValues(alpha: 0.5)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: const Center(child: Icon(Iconsax.user, color: Colors.white, size: 20)),
     );
@@ -188,13 +187,13 @@ class _ConversationMenu extends StatelessWidget {
       color: AppColors.cardDark,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       itemBuilder: (_) => [
-        PopupMenuItem(
+        const PopupMenuItem(
           value: 'del',
           child: Row(
             children: [
-              const Icon(Iconsax.trash, size: 16, color: AppColors.error),
-              const SizedBox(width: 12),
-              const Text('Supprimer', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              Icon(Iconsax.trash, size: 16, color: AppColors.error),
+              SizedBox(width: 12),
+              Text('Supprimer', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
@@ -209,6 +208,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

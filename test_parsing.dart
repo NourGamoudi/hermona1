@@ -1,4 +1,4 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class UserProfile {
   final String id;
@@ -43,15 +43,15 @@ void main() {
 
   try {
     final profile = UserProfile.fromJson(newUserJson, "123");
-    print("UserProfile parsed successfully: ${profile.firstName}");
+    debugPrint("UserProfile parsed successfully: ${profile.firstName}");
     
     // Simulate what happens in _populate:
     List<String> ca = List<String>.from(profile.cosmeticAllergies);
-    print("Cosmetic allergies populated: $ca");
+    debugPrint("Cosmetic allergies populated: $ca");
     
   } catch (e, stack) {
-    print("Error during parsing:");
-    print(e);
-    print(stack);
+    debugPrint("Error during parsing:");
+    debugPrint(e.toString());
+    debugPrint(stack.toString());
   }
 }

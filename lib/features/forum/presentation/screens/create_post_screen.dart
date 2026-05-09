@@ -8,13 +8,13 @@ import 'package:go_router/go_router.dart';
 
 import 'package:iconsax/iconsax.dart';
 
-import '../../../../core/constants/app_constants.dart';
+import 'package:acneia/core/constants/app_constants.dart';
 
-import '../../../../core/theme/app_theme.dart';
+import 'package:acneia/core/theme/app_theme.dart';
 
-import '../../../../core/widgets/common_widgets.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
 
-import '../../data/services/forum_service.dart';
+import 'package:acneia/features/forum/data/services/forum_service.dart';
 
 
 
@@ -84,9 +84,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
         Container(padding: const EdgeInsets.all(12),
 
-          decoration: BoxDecoration(color: AppColors.info.withOpacity(0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.info.withOpacity(0.25))),
+          decoration: BoxDecoration(color: AppColors.info.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.info.withValues(alpha: 0.25))),
 
-          child: Row(children: [Icon(Iconsax.shield_tick, color: AppColors.info, size: 18), const SizedBox(width: 10),
+          child: Row(children: [const Icon(Iconsax.shield_tick, color: AppColors.info, size: 18), const SizedBox(width: 10),
 
             Expanded(child: Text('Post anonyme. Ne partagez pas d\'infos personnelles.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.info)))])).animate().fadeIn(),
 
@@ -106,7 +106,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
 
-              decoration: BoxDecoration(color: sel ? AppTheme.primary : AppTheme.primary.withOpacity(0.08), borderRadius: BorderRadius.circular(50)),
+              decoration: BoxDecoration(color: sel ? AppTheme.primary : AppTheme.primary.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(50)),
 
               child: Text(c, style: TextStyle(color: sel ? Colors.white : AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600))));
 

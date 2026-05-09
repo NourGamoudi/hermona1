@@ -2,7 +2,6 @@ import os
 import uuid
 import logging
 from typing import List, Dict, Any, Optional
-
 from datetime import datetime
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
@@ -10,7 +9,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
 import pandas as pd
+import cv2
+import numpy as np
+import base64
+import copy
+import hashlib
+import json
 from dotenv import load_dotenv
+from model.yolo_model import get_model
 
 from .services.recommendation_engine import RecommendationEngine
 
@@ -20,7 +26,7 @@ load_dotenv(env_path)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("HermonaBackend")
 
-app = FastAPI(title="Hermona AI Backend - Senior Architecture")
+app = FastAPI(title="Hermona AI Backend")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 HERMONA_API_KEY = os.getenv("HERMONA_API_KEY", "hermona_secret_2026")
@@ -44,87 +50,439 @@ except Exception as e:
 
 class PredictPayload(BaseModel):
     answers: Dict[str, Any]
+    schema_version: str = "v8"
+
+from pydantic import BaseModel, Field
 
 class RecommendationRequest(BaseModel):
     userId: str
     severity: float
     zones: List[str]
-    detectionId: Optional[str] = ""
-    risk_today: Optional[float] = 0.0
-    risk_j3: Optional[float] = 0.0
-    top3_shap: Optional[List[str]] = []
-    skin_type: Optional[str] = "mixte"
-    allergies: Optional[List[str]] = []
-    acne_treatment: Optional[str] = "aucun"
-    hormonal_treatment: Optional[str] = "aucune"
-    smoker: Optional[bool] = False
-    alcohol: Optional[str] = "jamais"
-    phase: Optional[str] = "folliculaire"
-    stress: Optional[int] = 5
-    sleep: Optional[float] = 7.0
-    hydration: Optional[int] = 5
-    diet: Optional[List[str]] = []
-    symptoms: Optional[List[str]] = []
-    hygiene_score: Optional[int] = 70
+    detectionId: str = ""
+    risk_today: float = Field(0.0, alias="riskScore")
+    risk_j3: float = Field(0.0, alias="riskJ3")
+    top3_shap: List[str] = []
+    skin_type: str = Field("mixte", alias="skinType")
+    allergies: List[str] = []
+    acne_treatment: str = Field("aucun", alias="acneTreatment")
+    hormonal_treatment: str = Field("aucune", alias="hormonalTreatment")
+    smoker: bool = False
+    alcohol: str = "jamais"
+    phase: str = "folliculaire"
+    stress: int = 5
+    sleep: float = 7.0
+    hydration: int = 5
+    diet: List[str] = []
+    symptoms: List[str] = []
+    hygiene_score: int = Field(70, alias="hygieneScore")
+
+    class Config:
+        populate_by_name = True
 
 # --- ENDPOINTS ---
 
-@app.post("/predict")
-async def predict(body: PredictPayload, _ = Depends(verify_api_key)):
-    answers = body.answers
-    profile = answers.get('profile', {})
+# --- V7.1 & V8 DATA CONTRACTS ---
+ALLOWED_STABLE_KEYS = {
+    "age", "imc", "skinType", "isSmoker", "smoker", "cigarettesPerDay", 
+    "alcohol", "acneFamilyHistory", "sopk", "routineMatin", "routineSoir", 
+    "sleep", "diet", "stress", "lastPeriodDate", "cycleDuration"
+}
+REQUIRED_PILLARS = {"age", "skinType"}
+LIFESTYLE_PILLARS = {"sleep", "diet", "stress"}
+
+# V8.1 FINAL PRO STATUS CODES
+DATA_VALID = "VALID"
+DATA_INVALID = "INVALID_STRUCTURE"
+CLINICAL_OK = "OK"
+PHYSIOLOGICAL_WARNING = "PHYSIOLOGICAL_WARNING"
+BEHAVIORAL_WARNING = "BEHAVIORAL_WARNING"
+CLINICAL_INVALID = "INVALID_CLINICAL"
+
+SCORE_COMPUTABLE = "computable"
+SCORE_DEGRADED = "degraded"
+SCORE_BLOCKED = "blocked"
+
+def analyze_and_sanitize(raw_profile: dict) -> tuple:
+    """
+    LAYER 1: CLINICAL SANITIZER & ANALYZER (V8.1 PRO Dual-Path)
+    Analyzes Clinical Status on RAW data, Sanitizes for Scoring.
+    """
+    sanitized = copy.deepcopy(raw_profile)
+    log = []
+    data_status = DATA_VALID
+    clinical_status = CLINICAL_OK
     
-    # Defaults
-    data = {
-        'age': 25, 'pcos': 0, 'stress': 5, 'sommeil': 7, 'alimentation_impact': 0.5,
-        'LH': 5.0, 'estradiol': 50.0, 'progesterone': 10.0, 'testosterone': 0.5,
-        'jour_cycle': 14, 'soleil_heures': 1.0, 'protection_solaire': 1,
-        'allergies': 0, 'antecedents_familiaux': 0, 'maquillage': 1,
-        'hydratation_verres': 6, 'fumeur': 0, 'cigarettes': 0, 'imc': 22.0,
-        'alcool_jamais': 1, 'alcool_occasionnel': 0, 'alcool_régulier': 0,
-        'type_peau_acnéique': 0, 'type_peau_déshydratée': 0, 'type_peau_grasse': 0, 
-        'type_peau_mixte': 1, 'type_peau_normale': 0, 'type_peau_seche': 0, 'type_peau_sensible': 0,
-        'sport_1-2x/semaine': 1, 'sport_3-4x/semaine': 0, 'sport_jamais': 0,
-        'lavage_1x/jour': 0, 'lavage_2x/jour': 1, 'lavage_3x/jour': 0, 'lavage_parfois': 0,
-        'phase_folliculaire': 1, 'phase_luteale': 0, 'phase_menstruelle': 0, 'phase_ovulatoire': 0
-    }
-
-    # Simplified mapping
-    if profile:
-        data['age'] = int(profile.get('age', 25))
-        if profile.get('sopk') in [True, 'oui']: data['pcos'] = 1
-        if profile.get('isSmoker'): data['fumeur'] = 1
+    if not isinstance(raw_profile, dict) or not raw_profile:
+        return {}, [], DATA_INVALID, CLINICAL_INVALID
+    
+    # 1. Data Structure Check
+    missing = [k for k in REQUIRED_PILLARS if k not in raw_profile or raw_profile[k] is None]
+    if missing:
+        data_status = DATA_INVALID
         
-    hormonal = str(answers.get('hormonal_cycle', 'folliculaire')).lower()
-    if 'luteale' in hormonal: data['phase_luteale'] = 1
-    elif 'menstruelle' in hormonal: data['phase_menstruelle'] = 1
+    # 2. Dual-Path Analysis (Age)
+    try:
+        age_raw = int(raw_profile.get('age', 0))
+        if age_raw < 10:
+            clinical_status = CLINICAL_INVALID
+        elif age_raw > 100:
+            clinical_status = PHYSIOLOGICAL_WARNING
+            log.append({"field": "age", "raw": age_raw, "used": 100, "rule": "CLAMP_MAX_100"})
+            sanitized['age'] = 100
+    except (ValueError, TypeError):
+        data_status = DATA_INVALID
 
-    risk_score = 0.35
-    if pkl_model:
+    # 3. Dual-Path Analysis (Stress)
+    stress_raw = raw_profile.get('stress')
+    if stress_raw is not None:
         try:
-            df = pd.DataFrame([data])
-            risk_score = float(pkl_model.predict_proba(df)[0][1]) if hasattr(pkl_model, 'predict_proba') else float(pkl_model.predict(df)[0])
+            if isinstance(stress_raw, (int, float)) and stress_raw > 10:
+                clinical_status = BEHAVIORAL_WARNING if clinical_status == CLINICAL_OK else clinical_status
+                log.append({"field": "stress", "raw": stress_raw, "used": 10, "rule": "CLAMP_MAX_10"})
+                sanitized['stress'] = 10
         except: pass
 
-    risk_j3 = min(1.0, risk_score + 0.1) if data.get('phase_luteale') == 1 else max(0.0, risk_score - 0.05)
+    return sanitized, log, data_status, clinical_status
+
+# --- LAYER 2.4: CLINICAL POLICY (Audit-Grade V8.6) ---
+CLINICAL_POLICY_V86 = {
+    "version": "v8.6-clinical-policy",
+    "structural_rules": {
+        DATA_INVALID: {"rule_id": "STRUCT_BREAK", "block": True, "score_validity": SCORE_BLOCKED, "flag": "STRUCTURAL_BREAK"}
+    },
+    "clinical_rules": {
+        CLINICAL_INVALID: {"rule_id": "CLIN_HARD_BLOCK", "block": True, "score_validity": SCORE_BLOCKED, "flag": "CLINICAL_HARD_BLOCK"},
+        PHYSIOLOGICAL_WARNING: {"rule_id": "PHYS_WARN", "block": False, "score_validity": SCORE_DEGRADED, "flag": PHYSIOLOGICAL_WARNING},
+        BEHAVIORAL_WARNING: {"rule_id": "BEHAV_WARN", "block": False, "score_validity": SCORE_DEGRADED, "flag": BEHAVIORAL_WARNING}
+    }
+}
+
+def calculate_policy_hash(policy: dict) -> str:
+    policy_string = json.dumps(policy, sort_keys=True)
+    return f"sha256:{hashlib.sha256(policy_string.encode()).hexdigest()}"
+
+def calculate_execution_hash(trace: list) -> str:
+    trace_string = json.dumps(trace, sort_keys=True)
+    return f"sha256:{hashlib.sha256(trace_string.encode()).hexdigest()}"
+
+POLICY_HASH_V87 = calculate_policy_hash(CLINICAL_POLICY_V86)
+
+def execute_scl_policy(data_status: str, clinical_status: str, policy: dict) -> dict:
+    """
+    LAYER 2.5: SCL EXECUTION ENGINE (V8.7 Crypto-Audit)
+    Returns: { "block": bool, "flags": [], "score_validity": str, "trace": [], "execution_hash": str }
+    """
+    flags = []
+    trace = []
+    block = False
+    score_validity = SCORE_COMPUTABLE
+    
+    # 1. Structural Trace
+    struct_rule = policy["structural_rules"].get(data_status)
+    if struct_rule:
+        block = struct_rule["block"]
+        score_validity = struct_rule["score_validity"]
+        flags.append(struct_rule["flag"])
+        trace.append({
+            "rule_id": struct_rule["rule_id"],
+            "input": data_status,
+            "decision": score_validity,
+            "applied": True
+        })
+        
+    # 2. Clinical Trace
+    clin_rule = policy["clinical_rules"].get(clinical_status)
+    if clin_rule:
+        if clin_rule["block"]: block = True
+        if clin_rule["score_validity"] == SCORE_BLOCKED or score_validity == SCORE_COMPUTABLE:
+            score_validity = clin_rule["score_validity"]
+        flags.append(clin_rule["flag"])
+        trace.append({
+            "rule_id": clin_rule["rule_id"],
+            "input": clinical_status,
+            "decision": clin_rule["score_validity"],
+            "applied": True
+        })
+
+    # [V8.7] Cryptographic Fingerprinting
+    exec_hash = calculate_execution_hash(trace)
+    pol_hash = calculate_policy_hash(policy)
     
     return {
+        "block": block,
+        "flags": flags,
+        "score_validity": score_validity,
+        "trace": trace,
+        "execution_hash": exec_hash,
+        "policy_info": {
+            "version": policy["version"],
+            "hash": pol_hash
+        }
+    }
+
+def enforce_contract(data: dict, allowed_keys: set, engine_name: str, version: str = None):
+    """Hard-fail validation for Data Contract V7.1"""
+    if version and version not in ["v7", "v8"]:
+        raise ValueError(f"SCHEMA VERSION MISMATCH: Expected v7 or v8, got {version}")
+    if not isinstance(data, dict): return
+    violations = [k for k in data.keys() if k not in allowed_keys]
+    if violations:
+        logger.critical(f"DATA CONTRACT VIOLATION in {engine_name}: Forbidden keys {violations}")
+        raise ValueError(f"DATA CONTRACT VIOLATION: {engine_name} cannot process {violations}")
+
+ALLOWED_WEEKLY_KEYS = {"weekly_assessment"}
+
+# --- SCORING ENGINE (V8-STABLE-PURE) ---
+def calculate_hygiene_metrics(sanitized_profile: dict):
+    """
+    LAYER 2: PURE SCORING (Immutable Logic)
+    No knowledge of clinical validity, only computes based on input.
+    """
+    if not sanitized_profile:
+        return 0, 0, {"status": "VOID", "message": "No data"}
+    
+    enforce_contract(sanitized_profile, ALLOWED_STABLE_KEYS, "ScoringEngine")
+    
+    # ----------------------------------------
+    
+    scoring_modules = [] 
+    breakdown = {}
+
+    def normalize_routine(routine):
+        if not routine: return ""
+        text = " ".join(routine) if isinstance(routine, list) else str(routine)
+        import unicodedata
+        text = "".join(c for c in unicodedata.normalize('NFD', text) if unicodedata.category(c) != 'Mn')
+        return text.lower().strip()
+
+    morning_raw = sanitized_profile.get('routineMatin')
+    evening_raw = sanitized_profile.get('routineSoir')
+    morning = normalize_routine(morning_raw)
+    evening = normalize_routine(evening_raw)
+
+    cleanser_keywords = ["nettoyant", "cleanser", "gel", "lait", "micellaire", "savon", "mousse", "eau"]
+    moisturizer_keywords = ["creme", "moisturizer", "hydratant", "serum", "baume", "lotion", "nuit"]
+    spf_keywords = ["spf", "solaire", "ecran", "protection", "uv", "sun"]
+
+    # A. Skincare Modules (40 pts possible - STABLE/WEEKLY)
+    if morning_raw or evening_raw:
+        m_clean = 10 if any(x in morning for x in cleanser_keywords) else 0
+        e_clean = 10 if any(x in evening for x in cleanser_keywords + ["demaquillant", "remover"]) else 0
+        moist = 10 if any(x in morning for x in moisturizer_keywords) or any(x in evening for x in moisturizer_keywords) else 0
+        has_spf_profile = any(x in morning for x in spf_keywords)
+        spf = 10 if has_spf_profile else 0
+        
+        scoring_modules.append((m_clean, 10))
+        scoring_modules.append((e_clean, 10))
+        scoring_modules.append((moist, 10))
+        scoring_modules.append((spf, 10))
+        
+        breakdown['routine_matin_cleanse'] = m_clean
+        breakdown['routine_soir_cleanse'] = e_clean
+        breakdown['moisturizer'] = moist
+        breakdown['spf'] = spf
+
+    # B. Lifestyle Modules (40 pts possible - STABLE/STRUCTUREL)
+    def add_stable_module(key, weight, mapping):
+        val = sanitized_profile.get(key) # Look in profile for stability
+        if val is not None:
+            pts = mapping.get(str(val).lower(), 0)
+            scoring_modules.append((pts, weight))
+            breakdown[key] = pts
+
+    add_stable_module('sleep', 15, {'good': 15, 'medium': 10, 'poor': 5})
+    add_stable_module('diet', 15, {'good': 15, 'medium': 10, 'poor': 5, 'bad': 5})
+    add_stable_module('stress', 10, {'low': 10, 'medium': 7, 'high': 3})
+    
+    # C. Profile Modules (20 pts possible - STABLE)
+    smoker_val = sanitized_profile.get('isSmoker') if 'isSmoker' in sanitized_profile else sanitized_profile.get('smoker')
+    if smoker_val is not None:
+        pts = 0 if smoker_val else 10
+        scoring_modules.append((pts, 10))
+        breakdown['smoker'] = pts
+    history_val = sanitized_profile.get('acneFamilyHistory')
+    if history_val is not None:
+        pts = 0 if history_val else 5
+        scoring_modules.append((pts, 5))
+        breakdown['acneFamilyHistory'] = pts
+    sopk_val = sanitized_profile.get('sopk')
+    if sopk_val is not None:
+        pts = 0 if sopk_val else 5
+        scoring_modules.append((pts, 5))
+        breakdown['sopk'] = pts
+
+    # FINAL AGGREGATION (V8-PRODUCTION SAFE - MATHEMATICAL FORMULA)
+    earned = sum(m[0] for m in scoring_modules)
+    possible = sum(m[1] for m in scoring_modules)
+    
+    # 4. CLINICAL STATUS AGGREGATION
+    status_internal = "VALID" if (possible / 100.0) * 100 >= 70 else "PARTIAL"
+    
+    interpretation = {
+        "status": status_internal,
+        "type": "high" if (possible / 100.0) * 100 >= 70 else "medium" if (possible / 100.0) * 100 >= 40 else "low",
+        "message": "Calculated"
+    }
+
+    if possible == 0:
+        return 0, 0, interpretation, breakdown
+    
+    # 1. S_clinical: HEALTH ESTIMATE (Q) - Observation pure
+    s_clinical_ratio = (earned / possible)
+    s_clinical = int(s_clinical_ratio * 100)
+    
+    # 2. C_coverage: DATA COVERAGE INDEX (C) - Complétude pure
+    c_coverage_ratio = (possible / 100.0)
+    c_coverage = int(c_coverage_ratio * 100)
+
+    # 3. S_final: SCORE FINAL AFFICHE (Penalizes missing data)
+    # Mathematical simplification of: s_clinical * (c_coverage / 100.0)
+    s_final = int(earned)
+
+    return s_final, c_coverage, interpretation, breakdown
+
+@app.post("/predict")
+async def predict(body: PredictPayload, _ = Depends(verify_api_key)):
+    # V7.1: Version Enforcement
+    # V8: Version Enforcement
+    if body.schema_version not in ["v7", "v8"]:
+        raise HTTPException(status_code=400, detail=f"SCHEMA VERSION MISMATCH: Expected v7 or v8, got {body.schema_version}")
+
+    answers = body.answers
+    # --- LAYER 1: SANITIZATION & ANALYSIS (CCL PRO) ---
+    profile_raw = answers.get('profile', {})
+    profile_sanitized, transformation_log, data_status, clinical_status = analyze_and_sanitize(profile_raw)
+    
+    # --- LAYER 2: PURE SCORING (Immutable) ---
+    hygiene_score_pct, confidence_score_pct, scoring_meta, hygiene_breakdown = calculate_hygiene_metrics(profile_sanitized)
+
+    # --- LAYER 2.5: SCL EXECUTION ENGINE (V8.7 Crypto-Audit) ---
+    scl_report = execute_scl_policy(data_status, clinical_status, CLINICAL_POLICY_V86)
+
+    # --- LAYER 3: ORCHESTRATION (DUMB MAPPING) ---
+    ui_config = {
+        "label": "Optimal" if clinical_status == CLINICAL_OK else "Clinical Warning",
+        "display_mode": "visible" if not scl_report["block"] else "hidden"
+    }
+    
+    # 1. RISK DATA PREP (Using sanitized values for ML safety)
+    def parse_factor(val, mapping, default):
+        if isinstance(val, (int, float)): return float(val)
+        if isinstance(val, str) and val.lower() in mapping: return float(mapping[val.lower()])
+        try:
+            return float(val)
+        except:
+            return float(default)
+
+    stress_val = parse_factor(profile_sanitized.get('stress', 5), {'low': 2, 'medium': 5, 'high': 8}, 5)
+    sleep_val = parse_factor(profile_sanitized.get('sleep', 7), {'poor': 4, 'medium': 6, 'good': 8}, 7)
+
+    data = {
+        'age': profile_sanitized.get('age', 25),
+        'pcos': 1 if profile_sanitized.get('sopk') in [True, 'oui', 1] else 0,
+        'fumeur': 1 if profile_sanitized.get('isSmoker') else 0,
+        'imc': parse_factor(profile_sanitized.get('imc', 22.0), {}, 22.0),
+        'stress': stress_val,
+        'sommeil': sleep_val, 
+        'alimentation_impact': 0.5, 'jour_cycle': 14
+    }
+
+    # --- LAYER 2: OBSERVATION (WEEKLY) ---
+    raw_weekly = {k: v for k, v in answers.items() if k in ALLOWED_WEEKLY_KEYS}
+    enforce_contract(raw_weekly, ALLOWED_WEEKLY_KEYS, "WeeklyInsightEngine", version=body.schema_version)
+    
+    weekly_assessment = raw_weekly.get('weekly_assessment')
+    weekly_insight = None
+    if weekly_assessment:
+        weekly_map = {
+            'excellent': {'trend': 'improving', 'observance': 100, 'notes': 'Excellente observance.'},
+            'good': {'trend': 'stable', 'observance': 80, 'notes': 'Bonne observance.'},
+            'average': {'trend': 'stable', 'observance': 50, 'notes': 'Observance moyenne.'},
+            'bad': {'trend': 'declining', 'observance': 30, 'notes': 'Observance en baisse.'},
+            'very_bad': {'trend': 'declining', 'observance': 10, 'notes': 'Observance critique.'}
+        }
+        weekly_insight = weekly_map.get(str(weekly_assessment).lower(), None)
+
+    # --- LAYER 3: PREDICTION (RISK) ---
+    # Dynamic Risk Formula
+    r_stress = data.get('stress', 5) * 0.25
+    r_sleep = max(0, 10 - data.get('sommeil', 7)) * 0.2
+    r_smoker = 1 if data.get('fumeur', 0) else 0
+    r_pcos = 1.5 if data.get('pcos', 0) else 0
+    
+    risk_raw = (r_stress + r_sleep + r_smoker + r_pcos) / 4
+    risk_score = min(1.0, max(0.0, risk_raw))
+    
+    risk_breakdown = {
+        "stress_factor": r_stress,
+        "sleep_factor": r_sleep,
+        "smoker_factor": r_smoker,
+        "pcos_factor": r_pcos,
+        "raw_computed": risk_raw
+    }
+    
+    # Temporal Risk Logic (J+3)
+    risk_j3 = min(1.0, risk_score + 0.15) if data.get('jour_cycle', 14) > 14 else max(0.0, risk_score - 0.05)
+    
+    # Cycle phase
+    hormonal = "Luteale" if data.get('jour_cycle', 14) > 14 else "Folliculaire"
+    
+    # --- OBSERVABILITY: TRUTH RECONCILIATION METRICS (Offline Audit Only) ---
+    # Calculates statistical coherence purely for data science monitoring.
+    # NEVER produces runtime API flags or blocks.
+    coherence_score = abs((1.0 - (hygiene_score_pct / 100.0)) - risk_score)
+    is_anomaly = coherence_score > 0.5 and not scl_report["block"]
+
+    # --- IMMUTABILITY: INPUT SNAPSHOT HASH ---
+    input_string = json.dumps(answers, sort_keys=True)
+    input_hash = f"sha256:{hashlib.sha256(input_string.encode()).hexdigest()}"
+
+    return {
         "id": f"pred_{uuid.uuid4().hex[:8]}",
+        "score": {
+            "value": None if scl_report["block"] else hygiene_score_pct,
+            "confidence": 0 if scl_report["block"] else confidence_score_pct,
+            "validity": scl_report["score_validity"]
+        },
+        "scl": {
+            "flags": scl_report["flags"]
+        },
+        "policy": scl_report["policy_info"],
+        "ui": ui_config,
+        "weekly_insight": weekly_insight,
         "riskScore": round(risk_score, 2),
         "riskJ3": round(risk_j3, 2),
         "riskLevel": "high" if risk_score > 0.6 else "medium" if risk_score > 0.35 else "low",
         "trend": "increasing" if risk_j3 > risk_score else "decreasing",
         "shapFactors": {"Hormones": 0.4, "Stress": 0.3, "Sommeil": 0.3},
-        "hygieneScore": answers.get('hygieneScore', 70),
-        "cycleDay": data['jour_cycle'],
+        "cycleDay": data.get('jour_cycle', 14),
         "cyclePhase": hormonal,
+        "audit": {
+            "execution_trace": scl_report["trace"],
+            "execution_hash": scl_report["execution_hash"],
+            "policy_hash": scl_report["policy_info"]["hash"],
+            "input_hash": input_hash,
+            "coherence_metrics": {
+                "score": round(coherence_score, 3),
+                "anomaly_detected": is_anomaly
+            },
+            "engine_version": "v8.7-crypto-audit",
+            "schema_version": body.schema_version
+        },
+        "debug": {
+            "input_profile": data,
+            "hygiene_breakdown": hygiene_breakdown,
+            "risk_breakdown": risk_breakdown
+        },
         "predictedAt": datetime.now().isoformat() + "Z"
     }
 
 @app.post("/recommend")
 async def recommend(req: RecommendationRequest, _ = Depends(verify_api_key)):
     try:
-        engine = RecommendationEngine(req.dict())
+        # Use model_dump for Pydantic v2 compatibility if available
+        data = req.model_dump() if hasattr(req, 'model_dump') else req.dict()
+        engine = RecommendationEngine(data)
         response = engine.get_recommendations()
         return response
     except Exception as e:
@@ -133,7 +491,151 @@ async def recommend(req: RecommendationRequest, _ = Depends(verify_api_key)):
 
 @app.post("/detect")
 async def detect(files: List[UploadFile] = File(...), _ = Depends(verify_api_key)):
-    return {"id": f"det_{uuid.uuid4().hex[:8]}", "severityScore": 45.0, "severityLevel": "moderate", "analyzedAt": datetime.now().isoformat()}
+    try:
+        model = get_model()
+        contents = await files[0].read()
+        nparr = np.frombuffer(contents, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            raise HTTPException(status_code=400, detail="Image invalide")
+
+        img_h, img_w, _ = img.shape
+        
+        # 1. Détection du visage principal (Haarcascade simple)
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.1, 4)
+        
+        if len(faces) == 0:
+            # Fallback si aucun visage n'est détecté : on prend toute l'image
+            x, y, w, h = 0, 0, img_w, img_h
+        else:
+            # On prend le plus grand visage détecté
+            faces = sorted(faces, key=lambda f: f[2]*f[3], reverse=True)
+            x, y, w, h = faces[0]
+
+        # 2. Application de VOS FORMULES de découpage
+        # (y1, y2, x1, x2)
+        zones_coords = {
+            "Front": (
+                max(0, y - int(h * 0.1)), 
+                min(img_h, y + int(h * 0.35)), 
+                max(0, x - int(w * 0.1)), 
+                min(img_w, x + w + int(w * 0.1))
+            ),
+            "Menton": (
+                max(0, y + int(h * 0.7)), 
+                min(img_h, y + int(h * 1.15)), 
+                max(0, x + int(w * 0.2)), 
+                min(img_w, x + int(w * 0.8))
+            ),
+            "Joue Gauche": (
+                max(0, y + int(h * 0.3)), 
+                min(img_h, y + int(h * 0.8)), 
+                max(0, x + int(w * 0.5)), 
+                min(img_w, x + w + int(w * 0.1))
+            ),
+            "Joue Droite": (
+                max(0, y + int(h * 0.3)), 
+                min(img_h, y + int(h * 0.8)), 
+                max(0, x - int(w * 0.1)), 
+                min(img_w, x + int(w * 0.5))
+            ),
+            "Nez": (
+                max(0, y + int(h * 0.40)), 
+                min(img_h, y + int(h * 0.65)), 
+                max(0, x + int(w * 0.35)), 
+                min(img_w, x + int(w * 0.65))
+            )
+        }
+
+        # L'ordre demandé : Front, Menton, Joue Gauche, Joue Droite, Nez
+        ordered_zones = ["Front", "Menton", "Joue Gauche", "Joue Droite", "Nez"]
+        
+        image_urls = []
+        zone_counts = {}
+        total_lesions = 0
+        global_class_counts = {}
+
+        for zone_name in ordered_zones:
+            y1, y2, x1, x2 = zones_coords[zone_name]
+            crop = img[y1:y2, x1:x2].copy()
+            
+            # Vérifier si le crop est valide (pas vide)
+            if crop.size == 0:
+                crop = np.zeros((100, 100, 3), dtype=np.uint8)
+
+            # Inférence YOLO
+            results = model.predict(crop, conf=0.25, verbose=False)
+            
+            counts = {}
+            crop_with_boxes = crop.copy()
+            for r in results:
+                crop_with_boxes = r.plot()
+                for box in r.boxes:
+                    cls_id = int(box.cls[0])
+                    label = model.names[cls_id]
+                    counts[label] = counts.get(label, 0) + 1
+                    global_class_counts[label] = global_class_counts.get(label, 0) + 1
+                    total_lesions += 1
+            
+            # Identifiant technique pour le JSON (minuscule, snake_case)
+            zone_id = zone_name.lower().replace(" ", "_")
+            zone_counts[zone_id] = counts
+            
+            _, buffer = cv2.imencode('.png', crop_with_boxes)
+            b64_str = base64.b64encode(buffer).decode('utf-8')
+            image_urls.append(f"data:image/png;base64,{b64_str}")
+
+        severity_score = min(total_lesions * 3, 100.0) 
+        severity_level = "normal"
+        if total_lesions > 30: severity_level = "verySevere"
+        elif total_lesions > 15: severity_level = "severe"
+        elif total_lesions > 5: severity_level = "moderate"
+
+        classifications = []
+        for label, count in global_class_counts.items():
+            classifications.append({
+                "type": label.capitalize(),
+                "percentage": count / total_lesions if total_lesions > 0 else 0,
+                "cause": _get_cause(label),
+                "description": _get_description(label)
+            })
+
+        return {
+            "id": f"det_{uuid.uuid4().hex[:8]}",
+            "severityScore": float(severity_score),
+            "severityLevel": severity_level,
+            "analyzedAt": datetime.now().isoformat(),
+            "classifications": classifications,
+            "imageUrls": image_urls,
+            "zoneCounts": zone_counts,
+            "zoneRisks": {z.lower().replace(" ", "_"): min(sum(c.values()) * 10, 100.0) for z, c in zone_counts.items()}
+        }
+    except Exception as e:
+        logger.error(f"Erreur de détection IA: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+def _get_cause(label):
+    causes = {
+        "blackhead": "Pores obstrués par excès de sébum oxydé",
+        "papule": "Inflammation due aux bactéries P. acnes",
+        "pustule": "Infection bactérienne avec accumulation de pus",
+        "whitehead": "Pores obstrués par sébum et cellules mortes",
+        "nodule": "Inflammation profonde et douloureuse"
+    }
+    return causes.get(label.lower(), "Facteurs hormonaux ou environnementaux")
+
+def _get_description(label):
+    descriptions = {
+        "blackhead": "Points noirs visibles sur la surface de la peau",
+        "papule": "Bosses rouges et douloureuses sans pus visible",
+        "pustule": "Boutons avec un centre blanc ou jaune rempli de pus",
+        "whitehead": "Petits boutons blancs sous la surface de la peau",
+        "nodule": "Lésions larges, dures et situées profondément"
+    }
+    return descriptions.get(label.lower(), "Lésion acnéique détectée par l'IA")
 
 if __name__ == "__main__":
     import uvicorn

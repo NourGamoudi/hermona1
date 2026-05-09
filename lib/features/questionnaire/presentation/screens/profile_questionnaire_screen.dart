@@ -1,17 +1,15 @@
-import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../data/services/questionnaire_service.dart';
-import '../../domain/entities/user_profile.dart';
-import '../../../../core/localization/app_localizations.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 
 class ProfileQuestionnaireScreen extends StatefulWidget {
   final UserProfile? initialProfile;
@@ -58,7 +56,24 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   @override
   void initState() {
     super.initState();
-    if (widget.initialProfile != null) _populate(widget.initialProfile!);
+    if (widget.initialProfile != null) {
+      _populate(widget.initialProfile!);
+    } else {
+      _fetchExistingData();
+    }
+  }
+
+  Future<void> _fetchExistingData() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    
+    // Fetch from Public Profile
+    final snap = await FirebaseFirestore.instance.collection('public_profiles').doc(user.uid).get();
+    if (snap.exists && mounted) {
+      setState(() {
+        _pseudoCtrl.text = snap.data()?['pseudonym'] ?? '';
+      });
+    }
   }
 
   void _populate(UserProfile p) {
@@ -83,7 +98,6 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   void _next() {
     if (_currentStep == 0) {
       if (_firstNameCtrl.text.trim().isEmpty || 
-          _pseudoCtrl.text.trim().isEmpty || 
           _ageCtrl.text.trim().isEmpty || 
           _imcCtrl.text.trim().isEmpty) {
         _showError('Veuillez remplir toutes vos informations personnelles.');
@@ -153,8 +167,6 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
   @override
   Widget build(BuildContext context) {
-    final l = AppLocalizations.of(context);
-    final size = MediaQuery.of(context).size;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -183,7 +195,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
           Positioned(
             top: -100,
             left: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.05)),
+            child: _Blob(size: 300, color: AppTheme.primary.withValues(alpha: 0.05)),
           ),
 
           Column(
@@ -247,7 +259,25 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
             children: [
               TextField(controller: _firstNameCtrl, decoration: const InputDecoration(labelText: 'Prénom', prefixIcon: Icon(Iconsax.user, size: 20))),
               const SizedBox(height: 20),
-              TextField(controller: _pseudoCtrl, decoration: const InputDecoration(labelText: 'Pseudonyme (Forum)', prefixIcon: Icon(Iconsax.mask, size: 20))),
+              // Pseudonym is now read-only or hidden if already set
+              if (_pseudoCtrl.text.isEmpty)
+                TextField(controller: _pseudoCtrl, decoration: const InputDecoration(labelText: 'Pseudonyme (Forum)', prefixIcon: Icon(Iconsax.mask, size: 20)))
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Iconsax.mask, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 12),
+                      Text('Pseudonyme : ${_pseudoCtrl.text}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    ],
+                  ),
+                ),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -343,7 +373,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                 },
                 child: Container(
                   padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.1))),
+                  decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
                   child: Row(
                     children: [
                       const Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
@@ -397,9 +427,9 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                   margin: const EdgeInsets.symmetric(horizontal: 4),
                   padding: const EdgeInsets.symmetric(vertical: 12),
                   decoration: BoxDecoration(
-                    color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                    color: sel ? AppColors.primary : Colors.white.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
+                    border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: 0.1)),
                   ),
                   child: Center(child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900))),
                 ),
@@ -428,9 +458,9 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                 duration: 300.ms,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : Colors.white.withOpacity(0.05),
+                  color: sel ? AppColors.primary : Colors.white.withValues(alpha: 0.05),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: sel ? Colors.transparent : Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: sel ? Colors.transparent : Colors.white.withValues(alpha: 0.1)),
                 ),
                 child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textSecondaryDark, fontSize: 10, fontWeight: FontWeight.w900)),
               ),
@@ -458,9 +488,9 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                 duration: 300.ms,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                 decoration: BoxDecoration(
-                  color: sel ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : AppColors.surfaceLight),
+                  color: sel ? AppColors.primary : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.05) : AppColors.surfaceLight),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: sel ? Colors.transparent : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withOpacity(0.1) : AppColors.dividerLight)),
+                  border: Border.all(color: sel ? Colors.transparent : (Theme.of(context).brightness == Brightness.dark ? Colors.white.withValues(alpha: 0.1) : AppColors.dividerLight)),
                 ),
                 child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textMutedPink, fontSize: 10, fontWeight: FontWeight.w900)),
               ),
@@ -479,14 +509,16 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
         const SizedBox(height: 12),
         GlassCard(
           padding: EdgeInsets.zero,
-          child: Column(
-            children: options.map((o) => RadioListTile<String>(
-              activeColor: AppColors.primary,
-              title: Text(o.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-              value: o,
-              groupValue: current,
-              onChanged: (v) => onSel(v!),
-            )).toList(),
+          child: RadioGroup<String>(
+            groupValue: current,
+            onChanged: (v) => onSel(v!),
+            child: Column(
+              children: options.map((o) => RadioListTile<String>(
+                activeColor: AppColors.primary,
+                title: Text(o.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                value: o,
+              )).toList(),
+            ),
           ),
         ),
       ],
@@ -516,7 +548,8 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
   Widget _buildSwitch(String label, bool val, Function(bool) onCh) {
     return SwitchListTile.adaptive(
-      activeColor: AppColors.primary,
+      activeTrackColor: AppColors.primary,
+      activeThumbColor: Colors.white,
       contentPadding: EdgeInsets.zero,
       title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
       value: val,
@@ -538,7 +571,7 @@ class _StepIndicator extends StatelessWidget {
             duration: 500.ms,
             height: 4,
             margin: const EdgeInsets.symmetric(horizontal: 4),
-            decoration: BoxDecoration(color: active ? AppColors.primary : Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(2)),
+            decoration: BoxDecoration(color: active ? AppColors.primary : Colors.white.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(2)),
           ),
         );
       }),
@@ -551,6 +584,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

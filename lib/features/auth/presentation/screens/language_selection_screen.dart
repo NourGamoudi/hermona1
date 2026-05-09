@@ -1,14 +1,13 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/theme/app_theme.dart';
+import 'package:acneia/core/theme/app_theme.dart';
 
-import '../../../../core/services/language_service.dart';
+import 'package:acneia/core/services/language_service.dart';
 
-import '../../../../core/widgets/common_widgets.dart';
 
 
 
@@ -102,7 +101,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
             end: Alignment.bottomCenter,
 
-            colors: [AppTheme.primary.withOpacity(0.05), Colors.white],
+            colors: [AppTheme.primary.withValues(alpha: 0.05), Colors.white],
 
           ),
 
@@ -210,19 +209,19 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
         decoration: BoxDecoration(
 
-          color: isSelected ? AppTheme.primary.withOpacity(0.1) : Colors.white,
+          color: isSelected ? AppTheme.primary.withValues(alpha: 0.1) : Colors.white,
 
           borderRadius: BorderRadius.circular(20),
 
           border: Border.all(
 
-            color: isSelected ? AppTheme.primary : Colors.grey.withOpacity(0.2),
+            color: isSelected ? AppTheme.primary : Colors.grey.withValues(alpha: 0.2),
 
             width: isSelected ? 2 : 1,
 
           ),
 
-          boxShadow: isSelected ? [BoxShadow(color: AppTheme.primary.withOpacity(0.1), blurRadius: 15)] : [],
+          boxShadow: isSelected ? [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.1), blurRadius: 15)] : [],
 
         ),
 

@@ -60,9 +60,11 @@ class UserProfile {
       acneTreatment: json['acneTreatment'] ?? '',
       routineMatin: List<String>.from(json['routineMatin'] ?? []),
       routineSoir: List<String>.from(json['routineSoir'] ?? []),
-      lastPeriodsDate: json['lastPeriodsDate'] is Timestamp
-          ? (json['lastPeriodsDate'] as Timestamp).toDate()
-          : DateTime.now(),
+      lastPeriodsDate: json['lastPeriodsDate'] is String
+          ? DateTime.parse(json['lastPeriodsDate'])
+          : (json['lastPeriodsDate'] != null
+              ? (json['lastPeriodsDate'] as dynamic).toDate()
+              : DateTime.now()),
       lastCyclesDuration: List<int>.from(json['lastCyclesDuration'] ?? []),
       initialPhotos: json['initialPhotos'] != null
           ? Map<String, String>.from(json['initialPhotos'])

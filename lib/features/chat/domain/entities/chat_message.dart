@@ -1,10 +1,4 @@
-import 'package:dio/dio.dart';
-
 import 'package:equatable/equatable.dart';
-
-import '../../../questionnaire/domain/entities/user_profile.dart';
-
-import '../../../prediction/domain/entities/prediction_result.dart';
 
 
 
@@ -92,29 +86,4 @@ class ChatMessage extends Equatable {
 
 
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-
-abstract class ChatRepository {
-
-  /// Envoie l'historique + le message de l'utilisateur au backend et retourne
-
-  /// la réponse de l'assistante IA.
-
-  Future<String> getChatResponse({
-    required String userMessage,
-    List<ChatMessage> history = const [],
-    UserProfile? profile,
-    PredictionResult? prediction,
-    CancelToken? cancelToken,
-  });
-
-  Future<List<ChatMessage>> loadHistory(String userId);
-
-  Future<void> saveMessage(ChatMessage msg, String userId);
-
-  Future<void> clearHistory(String userId);
-
-  Future<String> transcribeAudio(String path);
-
-}
 

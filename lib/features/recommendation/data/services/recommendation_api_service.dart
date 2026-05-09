@@ -1,20 +1,21 @@
-import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '../../domain/entities/recommendation_result.dart';
-import '../../domain/repositories/recommendation_repository.dart';
-import '../../../detection/domain/entities/detection_result.dart';
-import '../../../../core/constants/app_constants.dart';
+
+import 'package:acneia/features/recommendation/domain/entities/recommendation_result.dart';
+import 'package:acneia/features/recommendation/domain/repositories/recommendation_repository.dart';
+import 'package:acneia/features/detection/domain/entities/detection_result.dart';
+import 'package:acneia/core/constants/app_constants.dart';
 
 class RecommendationApiService implements RecommendationRepository {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
   final Dio _dio = Dio(BaseOptions(
     baseUrl: AppConstants.apiBaseUrl,
     headers: {'X-API-Key': AppConstants.apiKey},
-    connectTimeout: const Duration(seconds: 15), // NEW: Added Timeout
-    receiveTimeout: const Duration(seconds: 15), // NEW: Added Timeout
-    sendTimeout: const Duration(seconds: 15),    // NEW: Added Timeout
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 15),
+    sendTimeout: const Duration(seconds: 15),
   ));
 
   @override
@@ -23,61 +24,67 @@ class RecommendationApiService implements RecommendationRepository {
     required String userId,
   }) async {
     try {
-      debugPrint('DEBUG: Starting getRecommendations for user: $userId');
-      
-      final profileSnap = await _db.collection(AppConstants.colUsers).doc(userId).get();
+      debugPrint('DEBUG: getRecommendations for $userId');
+
+      final profileSnap = await _db
+          .collection(AppConstants.colUsers)
+          .doc(userId)
+          .get();
+
       final profile = profileSnap.data() ?? {};
 
       final predSnap = await _db
           .collection(AppConstants.colPredictions)
           .where('userId', isEqualTo: userId)
           .get();
-      
-      final List<QueryDocumentSnapshot> predDocs = predSnap.docs.toList();
-      predDocs.sort((a, b) {
-        final ta = a.data() as Map<String, dynamic>;
-        final tb = b.data() as Map<String, dynamic>;
-        final da = ta['predictedAt'] ?? '';
-        final db = tb['predictedAt'] ?? '';
-        return db.compareTo(da);
-      });
-      final prediction = predDocs.isNotEmpty ? predDocs.first.data() as Map<String, dynamic> : {};
+
+      final predictions = predSnap.docs.map((e) => e.data()).toList()
+        ..sort((a, b) {
+          final da = a['predictedAt'];
+          final db = b['predictedAt'];
+          final DateTime dateA = da is Timestamp ? da.toDate() : DateTime.tryParse(da.toString()) ?? DateTime(2000);
+          final DateTime dateB = db is Timestamp ? db.toDate() : DateTime.tryParse(db.toString()) ?? DateTime(2000);
+          return dateB.compareTo(dateA);
+        });
+
+      final prediction = predictions.isNotEmpty ? predictions.first : {};
 
       final dailySnap = await _db
           .collection('daily_surveys')
           .where('userId', isEqualTo: userId)
           .get();
 
-      final List<QueryDocumentSnapshot> dailyDocs = dailySnap.docs.toList();
-      dailyDocs.sort((a, b) {
-        final ta = a.data() as Map<String, dynamic>;
-        final tb = b.data() as Map<String, dynamic>;
-        final da = ta['date'] ?? '';
-        final db = tb['date'] ?? '';
-        return db.compareTo(da);
-      });
-      final daily = dailyDocs.isNotEmpty ? dailyDocs.first.data() as Map<String, dynamic> : {};
+      final dailyDocs = dailySnap.docs.map((e) => e.data()).toList()
+        ..sort((a, b) {
+          final da = (a['date'] ?? '') as String;
+          final db = (b['date'] ?? '') as String;
+          return db.compareTo(da);
+        });
 
-      int hygieneScore = 100;
-      final double sleep = (daily['sleep_hours'] ?? 8.0).toDouble();
-      final int water = (daily['water_glasses'] ?? 8);
+      final daily = dailyDocs.isNotEmpty ? dailyDocs.first : {};
+
+      // SAFE extraction
+      final double sleep = (daily['sleep_hours'] ?? 8).toDouble();
+      final int water = (daily['water_glasses'] ?? 6);
       final int stress = (daily['stress_level'] ?? 5);
-      final List diet = daily['diet_tags'] ?? [];
 
-      if (sleep < 7) hygieneScore -= 15;
-      if (water < 6) hygieneScore -= 10;
-      if (stress > 7) hygieneScore -= 20;
-      if (diet.contains('sucre') || diet.contains('produits_laitiers') || diet.contains('fast_food')) hygieneScore -= 15;
-      if (hygieneScore < 0) hygieneScore = 0;
+      final List<String> diet =
+          (daily['diet_tags'] as List?)?.cast<String>() ?? [];
+
+      // Use the hygiene score calculated by the AI prediction
+      int hygieneScore = (prediction['hygieneScore'] ?? 70).toInt();
 
       final requestData = {
         'userId': userId,
         'detectionId': detection.id,
-        'severity': (detection.severityScore).toDouble(),
+        'severity': detection.severityScore.toDouble(),
         'zones': detection.zoneCounts?.keys.toList() ?? [],
-        'risk_today': (prediction['riskScore'] ?? 0.0).toDouble(),
-        'risk_j3': (prediction['riskScoreJ3'] ?? 0.0).toDouble(),
-        'top3_shap': (prediction['shapFactors'] as Map?)?.keys.toList() ?? [],
+        'risk_today': (prediction['riskScore'] ?? 0).toDouble(),
+        'risk_j3': (prediction['riskJ3'] ?? prediction['riskScoreJ3'] ?? 0).toDouble(),
+        'top3_shap': (prediction['shapFactors'] as Map?)
+                ?.keys
+                .toList() ??
+            [],
         'skin_type': profile['skinType'] ?? 'mixte',
         'allergies': (profile['cosmeticAllergies'] as List?)?.cast<String>() ?? [],
         'acne_treatment': profile['acneTreatment'] ?? 'aucun',
@@ -88,23 +95,59 @@ class RecommendationApiService implements RecommendationRepository {
         'stress': stress,
         'sleep': sleep,
         'hydration': water,
-        'diet': diet.cast<String>(),
+        'diet': diet,
         'symptoms': (daily['symptoms'] as List?)?.cast<String>() ?? [],
         'hygiene_score': hygieneScore,
       };
-      
+
       final response = await _dio.post('/recommend', data: requestData);
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> resultData = Map<String, dynamic>.from(response.data);
-        return RecommendationResult.fromJson(resultData);
-      } else {
-        throw Exception('Server error: ${response.statusCode}');
+        return RecommendationResult.fromJson(
+          Map<String, dynamic>.from(response.data),
+        );
       }
+
+      throw Exception('Server error: ${response.statusCode}');
     } catch (e) {
-      debugPrint('CRITICAL ERROR in getRecommendations: $e');
-      rethrow;
+      debugPrint('API ERROR: $e');
+      return _buildFallbackResult(userId, detection.id, error: e.toString());
     }
+  }
+
+  // fallback safe
+  RecommendationResult _buildFallbackResult(
+    String userId,
+    String detectionId, {
+    String? error,
+  }) {
+    final errorMsg = error != null ? '\nErreur: $error' : '';
+
+    return RecommendationResult(
+      id: 'fallback_${DateTime.now().millisecondsSinceEpoch}',
+      detectionId: detectionId,
+      morningRoutine: const [],
+      eveningRoutine: const [],
+      actives: const ['Acide Hyaluronique'],
+      avoid: const ['Acides forts'],
+      lifestyle: const ['Dormir 8h'],
+      nutrition: const ['Boire de l’eau'],
+      habits: const ['Ne pas toucher le visage'],
+      strategy: 'SAFE MODE',
+      alternativeStrategy: '',
+      variationIndex: 0,
+      explanation:
+          'Mode secours activé. Routine générique appliquée.$errorMsg',
+      brands: 'CeraVe, La Roche-Posay',
+      disclaimer: 'Fallback system',
+      riskScore: 0.5,
+      hygieneScore: 70,
+      severity: 0.5,
+      createdAt: DateTime.now(),
+      duration: '7 jours',
+      whyThis: const ['Mode sécurité'],
+      dietTips: const [],
+    );
   }
 
   @override
@@ -115,7 +158,7 @@ class RecommendationApiService implements RecommendationRepository {
           .doc(result.id)
           .set({...result.toJson(), 'userId': userId});
     } catch (e) {
-      debugPrint('Error saving recommendation: $e');
+      debugPrint('SAVE ERROR: $e');
     }
   }
 
@@ -129,9 +172,10 @@ class RecommendationApiService implements RecommendationRepository {
           .get();
 
       if (snap.docs.isEmpty) return null;
+
       return RecommendationResult.fromJson(snap.docs.first.data());
     } catch (e) {
-      debugPrint('Error fetching cached recommendation: $e');
+      debugPrint('FETCH ERROR: $e');
       return null;
     }
   }

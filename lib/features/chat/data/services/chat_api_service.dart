@@ -4,13 +4,11 @@ import 'package:dio/dio.dart';
 
 import 'package:flutter/foundation.dart';
 
-import '../../domain/entities/chat_message.dart';
-
-import '../../../../core/constants/app_constants.dart';
-
-import '../../../questionnaire/domain/entities/user_profile.dart';
-
-import '../../../prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/features/chat/domain/entities/chat_message.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/features/chat/domain/repositories/chat_repository.dart';
 
 // import removed
 

@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 
 
@@ -68,7 +68,9 @@ class DailySurvey {
 
       userId: json['userId'] ?? '',
 
-      date: (json['date'] as Timestamp).toDate(),
+      date: json['date'] is String 
+          ? DateTime.parse(json['date']) 
+          : (json['date'] as dynamic).toDate(),
 
       stress: json['stress'] ?? 0,
 

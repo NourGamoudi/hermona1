@@ -1,5 +1,3 @@
-import 'dart:io';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,10 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../../prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -53,7 +51,7 @@ class _HomeScreenState extends State<HomeScreen> {
           Positioned(
             top: -100,
             right: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.12)),
+            child: _Blob(size: 300, color: AppTheme.primary.withValues(alpha: 0.12)),
           ),
 
           SafeArea(
@@ -104,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Bonjour,',
+                '${_getGreeting()},',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(letterSpacing: 1, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 2),
@@ -122,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             width: 45, height: 45,
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               shape: BoxShape.circle,
             ),
             child: const Center(child: Text('🌸', style: TextStyle(fontSize: 20))),
@@ -138,18 +136,26 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance.collection('daily_surveys').where('userId', isEqualTo: uid).snapshots(),
+            stream: FirebaseFirestore.instance
+                .collection(AppConstants.colPredictions)
+                .where('userId', isEqualTo: uid)
+                .snapshots(),
             builder: (context, snapshot) {
               int? score;
               if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                 final docs = snapshot.data!.docs.toList();
-                docs.sort((a, b) => b['date'].compareTo(a['date']));
-                score = docs.first['lifestyleScore'] as int?;
+                docs.sort((a, b) {
+                  final da = _parseDate(a['predictedAt']);
+                  final db = _parseDate(b['predictedAt']);
+                  return db.compareTo(da);
+                });
+                final data = docs.first.data() as Map<String, dynamic>;
+                score = data['hygieneScore'] as int?;
               }
               return _SquareScoreCard(
                 title: 'Hygiène',
-                value: score != null ? '$score' : '--',
-                subtitle: 'sur 100',
+                value: score != null ? '$score%' : '--',
+                subtitle: 'Score IA',
                 icon: Iconsax.heart5,
                 color: AppColors.info,
                 onTap: () => context.push('/daily-survey'),
@@ -165,7 +171,11 @@ class _HomeScreenState extends State<HomeScreen> {
               PredictionResult? result;
               if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
                 final docs = snapshot.data!.docs.toList();
-                docs.sort((a, b) => b['predictedAt'].compareTo(a['predictedAt']));
+                docs.sort((a, b) {
+                  final da = _parseDate(a['predictedAt']);
+                  final db = _parseDate(b['predictedAt']);
+                  return db.compareTo(da);
+                });
                 result = PredictionResult.fromJson(docs.first.data() as Map<String, dynamic>);
               }
               return _SquareScoreCard(
@@ -201,15 +211,20 @@ class _HomeScreenState extends State<HomeScreen> {
           }
 
           if (data['lastPeriodsDate'] != null) {
-            final lastDate = (data['lastPeriodsDate'] as Timestamp).toDate();
-            day = DateTime.now().difference(lastDate).inDays + 1;
+            final lastDate = _parseDate(data['lastPeriodsDate']);
+            final daysSinceLast = DateTime.now().difference(lastDate).inDays;
+            day = (daysSinceLast % avgCycle) + 1;
             
-            // Adjust phase based on current day and average cycle if needed
-            // For now keeping simple logic but we could scale based on avgCycle
-            if (day <= 5) phase = 'Menstruelle';
-            else if (day <= 13) phase = 'Folliculaire';
-            else if (day <= 15) phase = 'Ovulatoire';
-            else phase = 'Lutéale';
+            // Dynamic phase mapping based on cycle length (sync with Daily Survey)
+            if (day <= 5) {
+              phase = 'Menstruelle';
+            } else if (day <= (avgCycle * 0.45).toInt()) {
+              phase = 'Folliculaire';
+            } else if (day <= (avgCycle * 0.55).toInt()) {
+              phase = 'Ovulatoire';
+            } else {
+              phase = 'Lutéale';
+            }
           }
         }
         return GlassCard(
@@ -219,7 +234,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
+                decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
                 child: Icon(Icons.waves, size: 18, color: AppTheme.primary),
               ),
               const SizedBox(width: 16),
@@ -275,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: isCur ? AppColors.primary.withOpacity(0.05) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: isCur ? AppColors.primary.withValues(alpha: 0.05) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
       child: Row(
         children: [
           Icon(isCur ? Icons.check_circle : Icons.circle_outlined, size: 18, color: isCur ? AppColors.primary : Colors.grey),
@@ -292,15 +307,25 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildLatestAnalysis(String? uid) {
     if (uid == null) return const SizedBox();
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections).where('userId', isEqualTo: uid).orderBy('analyzedAt', descending: true).limit(1).snapshots(),
+      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections).where('userId', isEqualTo: uid).limit(10).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
-        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+        
+        final docs = snapshot.data!.docs.toList();
+        docs.sort((a, b) {
+          final ta = a.data() as Map<String, dynamic>;
+          final tb = b.data() as Map<String, dynamic>;
+          final da = ta['analyzedAt'] is Timestamp ? (ta['analyzedAt'] as Timestamp).toDate() : DateTime.tryParse(ta['analyzedAt'].toString()) ?? DateTime(2000);
+          final db = tb['analyzedAt'] is Timestamp ? (tb['analyzedAt'] as Timestamp).toDate() : DateTime.tryParse(tb['analyzedAt'].toString()) ?? DateTime(2000);
+          return db.compareTo(da);
+        });
+
+        final data = docs.first.data() as Map<String, dynamic>;
         return GlassCard(
           onTap: () => context.push('/detection/result', extra: data),
           child: Row(
             children: [
-              Container(width: 45, height: 45, decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Iconsax.scan, color: AppTheme.primary, size: 20)),
+              Container(width: 45, height: 45, decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(Iconsax.scan, color: AppTheme.primary, size: 20)),
               const SizedBox(width: 16),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Sévérité : ${data['severityScore']}%', style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -333,10 +358,19 @@ class _HomeScreenState extends State<HomeScreen> {
           stream: FirebaseFirestore.instance
               .collection('daily_surveys')
               .where('userId', isEqualTo: uid)
-              .where('date', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day)))
+              .limit(10)
               .snapshots(),
           builder: (context, snapshot) {
-            final isDone = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
+            bool isDone = false;
+            if (snapshot.hasData) {
+              final today = DateTime.now();
+              final todayStr = '${today.year}-${today.month}-${today.day}';
+              isDone = snapshot.data!.docs.any((doc) {
+                final d = doc.data() as Map<String, dynamic>;
+                final date = d['date'] is Timestamp ? (d['date'] as Timestamp).toDate() : DateTime.tryParse(d['date'].toString()) ?? DateTime(2000);
+                return '${date.year}-${date.month}-${date.day}' == todayStr;
+              });
+            }
             return _RowAction(
               icon: Iconsax.edit, 
               title: 'Questionnaire Quotidien', 
@@ -382,6 +416,21 @@ class _HomeScreenState extends State<HomeScreen> {
       ],
     );
   }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 5) return 'Bonne nuit';
+    if (hour < 12) return 'Bonjour';
+    if (hour < 18) return 'Bon après-midi';
+    return 'Bonsoir';
+  }
+
+  DateTime _parseDate(dynamic val) {
+    if (val == null) return DateTime.fromMillisecondsSinceEpoch(0);
+    if (val is String) return DateTime.tryParse(val) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    if (val is Timestamp) return val.toDate();
+    try { return (val as dynamic).toDate(); } catch (_) { return DateTime.fromMillisecondsSinceEpoch(0); }
+  }
 }
 
 class _SquareScoreCard extends StatelessWidget {
@@ -413,7 +462,7 @@ class _RowAction extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(10), 
           decoration: BoxDecoration(
-            color: isCompleted ? Colors.green.withOpacity(0.1) : AppTheme.primary.withOpacity(0.1), 
+            color: isCompleted ? Colors.green.withValues(alpha: 0.1) : AppTheme.primary.withValues(alpha: 0.1), 
             borderRadius: BorderRadius.circular(12)
           ), 
           child: Icon(icon, color: isCompleted ? Colors.green : AppTheme.primary, size: 20)
@@ -446,7 +495,7 @@ class _HeaderAction extends StatelessWidget {
   const _HeaderAction({required this.icon, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withOpacity(0.1))), child: Icon(icon, size: 20, color: Colors.grey.shade700)));
+    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withValues(alpha: 0.1))), child: Icon(icon, size: 20, color: Colors.grey.shade700)));
   }
 }
 
@@ -455,6 +504,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

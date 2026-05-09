@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
-import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:iconsax/iconsax.dart';
 
@@ -12,13 +11,13 @@ import 'package:timeago/timeago.dart' as timeago;
 
 
 
-import '../../../../core/constants/app_constants.dart';
+import 'package:acneia/core/constants/app_constants.dart';
 
-import '../../../../core/theme/app_theme.dart';
+import 'package:acneia/core/theme/app_theme.dart';
 
-import '../../../../core/widgets/common_widgets.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
 
-import '../../data/services/forum_service.dart';
+import 'package:acneia/features/forum/data/services/forum_service.dart';
 
 
 
@@ -44,7 +43,6 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
   bool _sending = false;
 
-  final _uid = FirebaseAuth.instance.currentUser?.uid;
 
 
 
@@ -96,12 +94,12 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
                   Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
 
-                    decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(50)),
+                    decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(50)),
 
                     child: Text(post['category'] ?? '', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600))),
                   const SizedBox(width: 8),
                   FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance.collection(AppConstants.colPublicProfiles).doc(post['authorId']).get(),
+                    future: _svc.getAuthorProfile(post['authorId']),
                     builder: (ctx, uSnap) {
                       final uData = uSnap.data?.data() as Map<String, dynamic>?;
                       final pseudo = uData?['pseudonym'] ?? 'Anonyme';
@@ -161,9 +159,11 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
                   }
 
-                  if (top.isEmpty) return Center(child: Padding(padding: const EdgeInsets.all(24),
+                  if (top.isEmpty) {
+                    return Center(child: Padding(padding: const EdgeInsets.all(24),
 
                       child: Text('Soyez la première à répondre ! 🧴’¬', style: Theme.of(ctx).textTheme.bodySmall)));
+                  }
 
                   return Column(children: top.asMap().entries.map((e) => _ReplyCard(
 
@@ -197,7 +197,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
 
-          color: AppTheme.primary.withOpacity(0.07),
+          color: AppTheme.primary.withValues(alpha: 0.07),
 
           child: Row(children: [
 
@@ -285,7 +285,7 @@ class _LikeRowState extends State<_LikeRow> {
 
     child: Row(children: [
 
-      Icon(_liked ? Iconsax.heart5 : Iconsax.heart, size: 20, color: _liked ? AppColors.error : Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+      Icon(_liked ? Iconsax.heart5 : Iconsax.heart, size: 20, color: _liked ? AppColors.error : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
 
       const SizedBox(width: 6),
 
@@ -335,20 +335,20 @@ class _ReplyCardState extends State<_ReplyCard> {
 
       Container(padding: const EdgeInsets.all(14),
 
-        decoration: BoxDecoration(color: Theme.of(context).cardTheme.color, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.primary.withOpacity(0.08))),
+        decoration: BoxDecoration(color: Theme.of(context).cardTheme.color, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppTheme.primary.withValues(alpha: 0.08))),
 
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
           Row(children: [
 
-            Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), shape: BoxShape.circle),
+            Container(padding: const EdgeInsets.all(6), decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle),
 
               child: Icon(Iconsax.user, size: 12, color: AppTheme.primary)),
 
             const SizedBox(width: 8),
 
             FutureBuilder<DocumentSnapshot>(
-              future: FirebaseFirestore.instance.collection(AppConstants.colPublicProfiles).doc(d['authorId']).get(),
+              future: widget.svc.getAuthorProfile(d['authorId']),
               builder: (ctx, uSnap) {
                 final uData = uSnap.data?.data() as Map<String, dynamic>?;
                 final pseudo = uData?['pseudonym'] ?? 'Anonyme';
@@ -382,7 +382,7 @@ class _ReplyCardState extends State<_ReplyCard> {
 
               child: Row(children: [
 
-                Icon(_liked ? Iconsax.heart5 : Iconsax.heart, size: 16, color: _liked ? AppColors.error : Theme.of(context).colorScheme.onSurface.withOpacity(0.4)),
+                Icon(_liked ? Iconsax.heart5 : Iconsax.heart, size: 16, color: _liked ? AppColors.error : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4)),
 
                 const SizedBox(width: 4),
 
@@ -408,7 +408,7 @@ class _ReplyCardState extends State<_ReplyCard> {
 
             if (isOwn) GestureDetector(onTap: () async { await widget.svc.deleteReply(widget.replyId, widget.postId); },
 
-              child: Icon(Iconsax.trash, size: 15, color: AppColors.error)),
+              child: const Icon(Iconsax.trash, size: 15, color: AppColors.error)),
 
           ]),
 
@@ -426,7 +426,7 @@ class _ReplyCardState extends State<_ReplyCard> {
 
             padding: const EdgeInsets.all(12),
 
-            decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.05), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.primary.withOpacity(0.1))),
+            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.primary.withValues(alpha: 0.1))),
 
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
@@ -437,7 +437,7 @@ class _ReplyCardState extends State<_ReplyCard> {
                 const SizedBox(width: 4),
 
                 FutureBuilder<DocumentSnapshot>(
-                  future: FirebaseFirestore.instance.collection(AppConstants.colPublicProfiles).doc(nd['authorId']).get(),
+                  future: widget.svc.getAuthorProfile(nd['authorId']),
                   builder: (ctx, uSnap) {
                     final uData = uSnap.data?.data() as Map<String, dynamic>?;
                     final pseudo = uData?['pseudonym'] ?? 'Anonyme';

@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -8,10 +7,10 @@ import 'package:go_router/go_router.dart';
 import 'package:percent_indicator/linear_percent_indicator.dart';
 import 'package:percent_indicator/circular_percent_indicator.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../data/services/prediction_api_service.dart';
-import '../../domain/entities/prediction_result.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 
 class PredictionScreen extends StatefulWidget {
   final PredictionResult? initialResult;
@@ -40,27 +39,24 @@ class _PredictionScreenState extends State<PredictionScreen> {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('Utilisateur non connecté');
 
+      // Optimization: Fetch only the most recent daily survey using index
       final dailySnap = await FirebaseFirestore.instance
           .collection('daily_surveys')
           .where('userId', isEqualTo: uid)
+          .orderBy('date', descending: true)
+          .limit(1)
           .get();
 
       Map<String, dynamic> answers = {};
       if (dailySnap.docs.isNotEmpty) {
-        final docs = dailySnap.docs.toList();
-        docs.sort((a, b) {
-          DateTime dateA = a['date'] is Timestamp ? (a['date'] as Timestamp).toDate() : DateTime.tryParse(a['date'].toString()) ?? DateTime(2000);
-          DateTime dateB = b['date'] is Timestamp ? (b['date'] as Timestamp).toDate() : DateTime.tryParse(b['date'].toString()) ?? DateTime(2000);
-          return dateB.compareTo(dateA);
-        });
-        
-        final d = docs.first.data();
+        final d = dailySnap.docs.first.data();
         answers = {
-          'stress': d['stress'] > 7 ? 'high' : d['stress'] > 4 ? 'medium' : 'low',
-          'sleep': d['sleepDuration'] < 6 ? 'poor' : 'good',
-          'diet': (d['food'] as List).contains('sucre') ? 'bad' : 'good',
+          'stress': (d['stress'] ?? 0) > 7 ? 'high' : (d['stress'] ?? 0) > 4 ? 'medium' : 'low',
+          'sleep': (d['sleepDuration'] ?? 0) < 6 ? 'poor' : 'good',
+          'diet': (d['food'] is List && (d['food'] as List).contains('sucre')) ? 'bad' : 'good',
           'hormonal_cycle': d['cyclePhase'],
           'hygieneScore': d['lifestyleScore'],
+          'spf_used': d['spfUsed'] ?? false,
         };
       }
 
@@ -97,7 +93,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
           Positioned(
             top: -100,
             right: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.05)),
+            child: _Blob(size: 300, color: AppTheme.primary.withAlpha(12)),
           ),
           
           Center(
@@ -157,9 +153,9 @@ class _ResultView extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withAlpha(12),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.white.withOpacity(0.05)),
+                border: Border.all(color: Colors.white.withAlpha(12)),
               ),
               child: TabBar(
                 indicator: BoxDecoration(
@@ -238,7 +234,7 @@ class _AnalysisTab extends StatelessWidget {
                   ],
                 ),
                 progressColor: color,
-                backgroundColor: color.withOpacity(0.1),
+                backgroundColor: color.withAlpha(25),
                 circularStrokeCap: CircularStrokeCap.round,
                 animation: true,
                 animationDuration: 1200,
@@ -250,6 +246,8 @@ class _AnalysisTab extends StatelessWidget {
                   _InfoBox(label: 'Tendance', value: result.trend == TrendDirection.increasing ? 'EN HAUSSE' : 'STABLE', color: color),
                   _VerticalDivider(),
                   _InfoBox(label: 'Phase Cycle', value: result.cyclePhase.toUpperCase(), color: AppColors.secondary),
+                  _VerticalDivider(),
+                  _InfoBox(label: 'Hygiène', value: '${result.hygieneScore}%', color: AppColors.success),
                 ],
               ),
             ],
@@ -331,7 +329,7 @@ class _ScanIcon extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.1),
+        color: AppColors.primary.withAlpha(25),
         shape: BoxShape.circle,
       ),
       child: Stack(
@@ -342,7 +340,7 @@ class _ScanIcon extends StatelessWidget {
             width: 120,
             height: 120,
             decoration: BoxDecoration(
-              border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
+              border: Border.all(color: AppColors.primary.withAlpha(75), width: 2),
               shape: BoxShape.circle,
             ),
           ).animate(onPlay: (c) => c.repeat()).scale(begin: const Offset(0.8, 0.8), end: const Offset(1.2, 1.2), duration: 2.seconds).fadeIn(duration: 1.seconds).fadeOut(delay: 1.seconds),
@@ -372,7 +370,7 @@ class _InfoBox extends StatelessWidget {
 class _VerticalDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(width: 1, height: 30, color: Colors.white.withOpacity(0.1));
+    return Container(width: 1, height: 30, color: Colors.white.withAlpha(25));
   }
 }
 
@@ -400,7 +398,7 @@ class _ShapIndicator extends StatelessWidget {
             lineHeight: 6,
             percent: value.clamp(0, 1),
             progressColor: AppColors.error,
-            backgroundColor: AppColors.error.withOpacity(0.1),
+            backgroundColor: AppColors.error.withAlpha(25),
             barRadius: const Radius.circular(4),
             padding: EdgeInsets.zero,
             animation: true,
@@ -428,7 +426,7 @@ class _TipCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), shape: BoxShape.circle),
+              decoration: BoxDecoration(color: color.withAlpha(25), shape: BoxShape.circle),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 20),
@@ -449,7 +447,7 @@ class _Blob extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])),
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withAlpha(0)])),
     );
   }
 }

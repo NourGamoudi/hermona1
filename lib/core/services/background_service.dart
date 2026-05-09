@@ -8,17 +8,12 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-import 'package:flutter/services.dart';
-
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 import 'package:dio/dio.dart';
-
-import 'notification_service.dart';
-
-import '../constants/app_constants.dart';
-
-import '../../../firebase_options.dart';
+import 'package:flutter/foundation.dart';
+import 'package:acneia/core/services/notification_service.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/firebase_options.dart';
 
 
 
@@ -178,7 +173,7 @@ void callbackDispatcher() {
 
     } catch (e) {
 
-      print("âŒ Background Task Error: $e");
+      debugPrint("â Œ Background Task Error: $e");
 
       return false;
 
@@ -270,7 +265,7 @@ class BackgroundService {
 
     if (kIsWeb) return;
 
-    await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+    await Workmanager().initialize(callbackDispatcher);
 
   }
 

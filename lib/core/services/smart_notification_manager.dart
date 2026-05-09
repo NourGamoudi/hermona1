@@ -1,4 +1,4 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -92,15 +92,17 @@ class SmartNotificationManager {
 
     final ts = data['lastPeriodsDate'];
 
-    if (ts is Timestamp) lastDate = ts.toDate();
-
-    else lastDate = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+    if (ts is Timestamp) {
+      lastDate = ts.toDate();
+    } else {
+      lastDate = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+    }
 
 
 
     final diff = DateTime.now().difference(lastDate).inDays;
 
-    final cycleLen = 28; 
+    const cycleLen = 28; 
 
     final dayInCycle = (diff % cycleLen) + 1;
 
@@ -284,11 +286,13 @@ class SmartNotificationManager {
 
       DateTime lastDate;
 
-      if (lastTs is Timestamp) lastDate = lastTs.toDate();
-
-      else if (lastTs is String) lastDate = DateTime.tryParse(lastTs) ?? now;
-
-      else lastDate = now;
+      if (lastTs is Timestamp) {
+        lastDate = lastTs.toDate();
+      } else if (lastTs is String) {
+        lastDate = DateTime.tryParse(lastTs) ?? now;
+      } else {
+        lastDate = now;
+      }
 
 
 
@@ -384,9 +388,11 @@ class SmartNotificationManager {
 
     final ts = data['lastPeriodsDate'];
 
-    if (ts is Timestamp) lastDate = ts.toDate();
-
-    else lastDate = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+    if (ts is Timestamp) {
+      lastDate = ts.toDate();
+    } else {
+      lastDate = DateTime.tryParse(ts.toString()) ?? DateTime.now();
+    }
 
 
 

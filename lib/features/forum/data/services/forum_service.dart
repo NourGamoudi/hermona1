@@ -1,10 +1,10 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'package:uuid/uuid.dart';
 
-import '../../../../core/constants/app_constants.dart';
+import 'package:acneia/core/constants/app_constants.dart';
 
 
 
@@ -26,30 +26,34 @@ class ForumService {
 
 
 
-  // â”€â”€ Posts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ——————————————————————————————————————————————————————————————————————————————————————————————————
 
-  Stream<QuerySnapshot> getPosts({String? category, String sort = 'date'}) {
+  // --- Optimization: Cache for user profiles to avoid N+1 queries ---
+  static final Map<String, DocumentSnapshot> _profileCache = {};
 
+  Stream<QuerySnapshot> getPosts({String? category, String sort = 'date', int limit = 25}) {
     Query q = _db
-
         .collection(AppConstants.colForumPosts)
-
         .where('visible', isEqualTo: true);
 
     if (category != null && category != 'Tous') {
-
       q = q.where('category', isEqualTo: category);
-
     }
 
     q = sort == 'popular'
-
         ? q.orderBy('likesCount', descending: true)
-
         : q.orderBy('createdAt', descending: true);
 
-    return q.snapshots();
+    return q.limit(limit).snapshots();
+  }
 
+  Future<DocumentSnapshot> getAuthorProfile(String authorId) async {
+    if (_profileCache.containsKey(authorId)) {
+      return _profileCache[authorId]!;
+    }
+    final doc = await _db.collection(AppConstants.colPublicProfiles).doc(authorId).get();
+    _profileCache[authorId] = doc;
+    return doc;
   }
 
 

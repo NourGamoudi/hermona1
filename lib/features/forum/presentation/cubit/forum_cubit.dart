@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../../data/services/forum_service.dart';
+import 'package:acneia/features/forum/data/services/forum_service.dart';
 
 abstract class ForumState {}
 

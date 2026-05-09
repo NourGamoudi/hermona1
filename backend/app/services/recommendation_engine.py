@@ -3,6 +3,8 @@ import os
 import logging
 import math
 import unicodedata
+import hashlib
+import random
 from datetime import datetime, timezone
 from typing import List, Dict, Any, Set, Optional, Tuple
 from groq import Groq
@@ -16,6 +18,32 @@ logger = logging.getLogger("RecommendationEngine")
 load_dotenv()
 
 # --- GLOBAL UTILS ---
+
+# In-process lightweight anti-repetition cache {userId: [lastStrategy1, lastStrategy2]}
+_STRATEGY_HISTORY: Dict[str, List[str]] = {}
+
+def get_variation_seed(user_id: str) -> int:
+    """Deterministic seed based on userId + current UTC date. Stable within a day."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    seed_str = f"{user_id}_{today}"
+    return int(hashlib.sha256(seed_str.encode()).hexdigest(), 16) % 100000
+
+def softmax(scores: List[float], temperature: float = 1.0) -> List[float]:
+    """Softmax with temperature control.
+    temperature < 1 → more deterministic (safer for extreme profiles)
+    temperature > 1 → more exploratory (for balanced profiles)
+    """
+    t = max(temperature, 0.01)
+    scaled = [s / t for s in scores]
+    max_s = max(scaled)  # numerical stability
+    exps = [math.exp(s - max_s) for s in scaled]
+    total = sum(exps)
+    return [e / total for e in exps]
+
+def score_entropy(probs: List[float]) -> float:
+    """Shannon entropy of probability distribution. Higher = more balanced."""
+    return -sum(p * math.log(p + 1e-9) for p in probs)
+
 def normalize(t: str) -> str:
     """Centralized normalization for all IDs, inputs, and synonyms"""
     if not t: return ""
@@ -40,6 +68,22 @@ INGREDIENT_DB = {
     "centella_asiatica": {"display": "Centella Asiatica", "type": "apaisant", "strength": 1.0},
     "panthenol": {"display": "Panthénol (B5)", "type": "apaisant", "strength": 1.0},
     "aloe_vera": {"display": "Aloe Vera", "type": "hydratant", "strength": 1.0},
+    "acide_salicylique": {"display": "Acide Salicylique (BHA)", "type": "acide", "strength": 3.0},
+}
+
+PRODUCT_EXAMPLES = {
+    "gel_nettoyant_purifiant": ["CeraVe Gel Moussant", "La Roche-Posay Effaclar", "Avène Cleanance"],
+    "nettoyant_doux_hydratant": ["CeraVe Hydratant", "La Roche-Posay Toleriane", "Avène Tolérance"],
+    "serum_vitamine_c": ["La Roche-Posay Pure Vit C10", "Vichy Liftactiv Vit C", "SVR Ampoule [C]"],
+    "serum_niacinamide": ["The Ordinary Niacinamide 10%", "La Roche-Posay Pure Niacinamide 10", "The Inkey List Niacinamide"],
+    "serum_retinol": ["CeraVe Rétinol Anti-Marques", "La Roche-Posay Rétinol B3", "The Ordinary Rétinol 0.2%"],
+    "serum_acide_salicylique": ["Paula's Choice 2% BHA", "The Ordinary Salicylic Acid 2%", "The Inkey List BHA"],
+    "fluide_hydratant": ["La Roche-Posay Effaclar Mat", "SVR Sebiaclear Mat+Pores", "Vichy Normaderm Phytosolution"],
+    "creme_riche": ["CeraVe Crème Hydratante", "La Roche-Posay Lipikar Baume AP+", "Avène Xeracalm AD"],
+    "solaire_spf_50+": ["Anthelios UVmune 400", "Eucerin Sun Oil Control", "Vichy Capital Soleil UV-Clear"],
+    "baume_nettoyant": ["Clinique Take The Day Off", "The Ordinary Squalane Cleanser", "Beauty of Joseon Radiance Cleansing Balm"],
+    "creme_nuit": ["CeraVe Baume Hydratant", "La Roche-Posay Cicaplast Baume B5", "Avène Cicalfate+"],
+    "baume_reparateur": ["La Roche-Posay Cicaplast Baume B5", "Avène Cicalfate+", "Uriage Bariéderm-Cica"],
 }
 
 # Synonyms for allergy detection
@@ -73,9 +117,19 @@ class RecommendationEngine:
         self.lifestyle_tips: List[str] = []
         self.nutrition_tips: List[str] = []
         self.habits_tips: List[str] = []
-        self.explanation = ""
+        self.why_this: List[str] = []
+        self.explanation = "✅ CONNEXION RÉUSSIE ! Votre routine est en cours de génération personnalisée..."
         self.message = ""
         self.debug_mode = os.getenv("DEBUG_MODE", "false").lower() == "true"
+        self.level = "maintenance"
+        self.zone_focus = {}
+        
+        # Deterministic seed per user per day
+        self.user_id = str(self.req.get('userId', self.req.get('user_id', 'default_user')))
+        self._seed = get_variation_seed(self.user_id)
+        self._rng = random.Random(self._seed)  # isolated RNG — never touches global state
+        self.variation_index = 0
+        self.alternative_strategy = ""
 
     def _norm(self, v: Any) -> float:
         try:
@@ -120,6 +174,7 @@ class RecommendationEngine:
             self.message = "Sous isotrétinoïne — Douceur absolue requise. Consultez votre dermatologue."
             self.lifestyle_tips.append("Changez votre taie d'oreiller tous les 2 jours")
             self.nutrition_tips.append("Hydratez-vous : 2L d'eau par jour minimum")
+            self.habits_tips.append("ÉVITEZ le gommage à grains (ex: St. Ives) qui déchire votre barrière cutanée.")
             return True
 
         # ANTIBIOTICS
@@ -131,25 +186,148 @@ class RecommendationEngine:
         return False
 
     def _check_risk_strategy(self):
-        risk = self._norm(self.req.get('risk_today', 0.0))
-        severity = self._norm(self.req.get('severity', 0.0))
+        try:
+            risk = float(self.req.get('risk_today', 0.0))
+        except (TypeError, ValueError):
+            risk = 0.0
+        try:
+            severity = float(self.req.get('severity', 0.0))
+        except (TypeError, ValueError):
+            severity = 0.0
 
-        # CNN OVERRIDE (Step 4)
-        if severity > 0.6:
-            self.strategy = STRATEGY_PROTECTION
-            self.avoid_pool.update({"retinol", "aha", "bha", "vitamine_c"})
-            self.message = "Sévérité visuelle élevée — repos cutané préconisé."
-            return
+        if risk > 1.0: risk = risk / 100.0
+        if severity > 1.0: severity = severity / 100.0
 
-        # ML RISK (Step 3)
-        if risk < 0.35:
-            self.strategy = STRATEGY_PREVENTION
-        elif risk <= 0.60:
-            self.strategy = STRATEGY_EQUILIBRE
+        hygiene = int(self.req.get('hygiene_score', 50))
+        stress = int(self.req.get('stress', 5))
+        phase = normalize(self.req.get('phase', ''))
+        skin = normalize(self.req.get('skin_type', 'mixte'))
+
+        # ── STEP 1 : CLINICAL BASE SCORES ────────────────────────────────────
+        # These encode the medical logic — never overridden by noise
+        repair_score  = 10.0 + (severity * 55) + (risk * 55) + (((100 - hygiene) / 100) * 45)
+        balance_score = 15.0
+        prevent_score = 10.0 + ((1 - severity) * 30) + ((1 - risk) * 30) + ((hygiene / 100) * 40)
+
+        if stress > 6:
+            repair_score  += 20; balance_score += 15
         else:
-            self.strategy = STRATEGY_PROTECTION
+            prevent_score += 15
+
+        if "menstruelle" in phase or "luteale" in phase:
+            balance_score += 35; repair_score += 15
+        else:
+            prevent_score += 20
+
+        if "sensible" in skin or "acneique" in skin:
+            repair_score += 25; balance_score += 10
+
+        raw_scores = [repair_score, balance_score, prevent_score]
+
+        # ── STEP 2 : ADAPTIVE NOISE  ─────────────────────────────────────────
+        # noise is stable per user per day (hash-based), but amplitude adapts
+        # to how close the scores are — high sensitivity when near a tie.
+        noise_raw = (self._seed % 10000) / 10000.0   # 0.0 → 0.9999, stable today
+        top2_diff = sorted(raw_scores, reverse=True)[0] - sorted(raw_scores, reverse=True)[1]
+
+        if top2_diff < 8:
+            # Scores close → inject significant noise to force diversity
+            sensitivity = 12.0
+        elif top2_diff < 20:
+            sensitivity = 5.0
+        else:
+            # Clear winner → tiny noise, preserve clinical signal
+            sensitivity = 1.5
+
+        repair_score  += noise_raw * sensitivity
+        balance_score += noise_raw * sensitivity * 0.6
+        prevent_score += noise_raw * sensitivity * 0.3
+
+        # ── STEP 3 : TIE BREAKING ────────────────────────────────────────────
+        if abs(repair_score - balance_score) < 2:
+            repair_score  += self._rng.uniform(0, 4)
+        if abs(balance_score - prevent_score) < 2:
+            balance_score += self._rng.uniform(0, 4)
+        if abs(repair_score - prevent_score) < 2:
+            prevent_score += self._rng.uniform(0, 4)
+
+        logger.info(
+            f"RECO | user={self.user_id} | hygiene={hygiene} risk={risk:.2f} "
+            f"severity={severity:.2f} stress={stress} phase={phase} skin={skin}"
+        )
+        logger.info(
+            f"SCORES | repair={repair_score:.2f} balance={balance_score:.2f} "
+            f"prevent={prevent_score:.2f} | diff_top2={top2_diff:.2f} sensitivity={sensitivity}"
+        )
+
+        # ── STEP 4 : TEMPERATURE → SOFTMAX → PROBABILISTIC SAMPLING ─────────
+        # temperature: lower = safer/more clinical, higher = more exploratory
+        if severity > 0.6 or risk > 0.65:
+            temperature = 0.6   # high risk → tighter, safer distribution
+        elif top2_diff > 20:
+            temperature = 0.8   # clear winner → slightly deterministic
+        else:
+            temperature = 1.1   # balanced profile → exploratory
+
+        strat_keys   = [STRATEGY_PROTECTION, STRATEGY_EQUILIBRE, STRATEGY_PREVENTION]
+        strat_scores = [max(0.1, repair_score), max(0.1, balance_score), max(0.1, prevent_score)]
+        strat_probs  = softmax(strat_scores, temperature=temperature)
+
+        # ── STEP 5 : ANTI-REPETITION CHECK ───────────────────────────────────
+        # If the probable winner was used the last 2 calls, shift probability
+        # 25% toward the alternative — never forces a clinically wrong choice.
+        history = _STRATEGY_HISTORY.get(self.user_id, [])
+        tentative_winner = self._rng.choices(strat_keys, weights=strat_probs)[0]
+
+        if len(history) >= 2 and history[-1] == tentative_winner and history[-2] == tentative_winner:
+            # Redistribute 25% from winner to runner-up
+            winner_idx = strat_keys.index(tentative_winner)
+            penalty = strat_probs[winner_idx] * 0.25
+            strat_probs[winner_idx] -= penalty
+            # Add penalty to the 2nd highest
+            runner_idx = sorted(
+                [i for i in range(3) if i != winner_idx],
+                key=lambda i: strat_probs[i], reverse=True
+            )[0]
+            strat_probs[runner_idx] += penalty
+            logger.info(f"ANTI-REPEAT | redistributing 25% away from {tentative_winner}")
+
+        selected_key = self._rng.choices(strat_keys, weights=strat_probs)[0]
+
+        # Update history (keep last 3)
+        history.append(selected_key)
+        _STRATEGY_HISTORY[self.user_id] = history[-3:]
+
+        # ── STEP 6 : VARIATION INDEX + ALTERNATIVE ───────────────────────────
+        entropy = score_entropy(strat_probs)
+        max_entropy = math.log(3)   # uniform 3-class = ~1.099
+        normalized_entropy = min(100, int((entropy / max_entropy) * 100))
+        self.variation_index = normalized_entropy
+
+        remaining_sorted = sorted(
+            [(k, p) for k, p in zip(strat_keys, strat_probs) if k != selected_key],
+            key=lambda x: x[1], reverse=True
+        )
+
+        strat_meta = {
+            STRATEGY_PROTECTION: {"level": "intensive",    "msg": "Risque ou inflammation — Priorité à l'apaisement et la réparation."},
+            STRATEGY_EQUILIBRE:  {"level": "moderate",     "msg": "Stratégie d'équilibre — Maintenance et régulation du sébum."},
+            STRATEGY_PREVENTION: {"level": "maintenance",  "msg": "Score optimal — Routine de prévention et maintien de la barrière."},
+        }
+
+        self.strategy            = selected_key
+        self.level               = strat_meta[selected_key]["level"]
+        self.message             = strat_meta[selected_key]["msg"]
+        self.alternative_strategy = remaining_sorted[0][0]
+
+        logger.info(
+            f"SELECTED: {self.strategy} | alt={self.alternative_strategy} "
+            f"| temp={temperature} | entropy={entropy:.3f} | variation_index={self.variation_index}"
+        )
+
+        if self.strategy == STRATEGY_PROTECTION:
             self.avoid_pool.update({"retinol", "aha", "bha", "vitamine_c"})
-            self.message = "Risque élevé — Priorité à l'apaisement."
+            self.why_this.append("Votre profil actuel nécessite une approche protectrice pour éviter l'inflammation.")
 
     def _apply_phase_rules(self):
         if self.strategy == STRATEGY_PROTECTION: return
@@ -166,6 +344,7 @@ class RecommendationEngine:
                 self.actives_pool.update({"bha", "niacinamide"})
             else:
                 self.actives_pool.add("niacinamide") # Risk rule wins over phase
+                self.why_this.append("La niacinamide a été choisie pour réguler le sébum sans irriter votre peau en phase lutéale.")
         elif "menstruelle" in phase:
             self.actives_pool.update({"centella_asiatica", "aloe_vera", "acide_hyaluronique"})
             self.avoid_pool.update({"retinol", "aha", "bha"})
@@ -211,9 +390,18 @@ class RecommendationEngine:
 
         # 2. PERSONALIZED ADVICE BASED ON PROFILE & DIET (Section 4.B)
         diet = self.req.get('diet', [])
-        if "fast_food" in diet:
+        if "fast_food" in diet or "fastfood" in diet:
             self.nutrition_tips.append("Le fast-food sature le foie et augmente l'inflammation en phase " + phase)
-        if "sugar" in diet:
+        if "sugar" in diet or "sucre" in diet:
+            self.nutrition_tips.append("Réduire les sucres rapides aide à calmer l'acné inflammatoire.")
+            
+        stress = self.req.get('stress', 5)
+        if stress > 7:
+            self.lifestyle_tips.append("Niveau de stress élevé détecté → ajoutez 10min de relaxation et réduisez sucres/produits laitiers.")
+            
+        sleep = self.req.get('sleep', 7)
+        if sleep < 6:
+            self.lifestyle_tips.append("Manque de sommeil → la régénération de votre barrière cutanée est ralentie.")
             self.nutrition_tips.append("Le sucre spike l'IGF-1 : évitez les sodas et pâtisseries cette semaine.")
         if "dairy" in diet:
             self.nutrition_tips.append("Les produits laitiers contiennent des hormones de croissance qui stimulent l'acné.")
@@ -274,14 +462,56 @@ class RecommendationEngine:
         if not key: return
         try:
             client = Groq(api_key=key)
-            prompt = f"Assistant Hermona. Explique cette routine. Stratégie: {self.strategy}. Actifs: {list(self.actives_pool)}. Phase: {self.req.get('phase')}. Sois court et empathique."
+            
+            # Prepare context for AI
+            risk = self._norm(self.req.get('risk_today', 0.0))
+            severity = self._norm(self.req.get('severity', 0.0))
+            shaps = self.req.get('top3_shap', [])
+            lifestyle = f"Stress: {self.req.get('stress')}, Sommeil: {self.req.get('sleep')}h, Hydratation: {self.req.get('hydration')} verres"
+            phase = self.req.get('phase', 'inconnue')
+            skin = self.req.get('skin_type', 'mixte')
+            
+            prompt = f"""
+            TU ES HERMONA AI — TON RÔLE : COACH PERSONNEL EN SOINS DE LA PEAU (HUMAN SKINCARE COACH).
+            Tu n'es pas un système clinique, mais une voix experte, douce et empathique.
+
+            CONTEXTE UTILISATRICE :
+            - Risque aujourd'hui : {risk}/1
+            - Sévérité visuelle : {severity}/1
+            - Facteurs SHAP (Causes) : {shaps}
+            - Phase du cycle : {phase}
+            - Type de peau : {skin}
+            - Lifestyle : {lifestyle}
+            - Allergies : {self.req.get('allergies')}
+            - Traitement actuel : {self.req.get('acne_treatment')}
+
+            TES MISSIONS :
+            1. EXPLIQUE LA ROUTINE ÉTAPE PAR ÉTAPE comme un tuteur humain.
+            2. DÉCRIS LE "COMMENT" : gestuelle, pression des doigts, timing (ex: massage de 60s).
+            3. ADAPTE TON TON : Calme et rassurant si la peau est enflammée (risque/sévérité élevés), encourageant si la peau est stable.
+            4. INTERPRÈTE LES CAUSES (SHAP) : Explique l'impact du stress ou du sommeil sur sa peau cette semaine.
+            5. EXPLIQUE LE "POURQUOI" : Pourquoi cet actif ? Pourquoi cette étape ?
+            6. CONSEILS LIFESTYLE : Explique l'impact de son alimentation/sommeil au lieu de juste lister des faits.
+
+            STYLE DE RÉPONSE :
+            - Langage humain simple (pas de jargon médical complexe).
+            - Ton chaleureux et protecteur.
+            - Utilise "Je" pour parler en tant que coach.
+            - Structure par 🌅 Routine Matin, 🌙 Routine Soir, et 🌿 Conseils de Coach.
+            - TERMINE TOUJOURS par cette phrase exacte : "⚕️ DISCLAIMER : Ceci est un système de recommandation de soins de la peau et non un diagnostic médical. Consultez un dermatologue si nécessaire."
+
+            RÈGLE D'OR : Fais en sorte que l'utilisatrice se sente guidée, en sécurité et comprise.
+            """
+
             chat_completion = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}], 
                 model="llama-3.3-70b-versatile",
-                timeout=5.0
+                timeout=15.0 # Increased timeout for more detailed response
             )
             self.explanation = chat_completion.choices[0].message.content
-        except: pass
+        except Exception as e:
+            logger.error(f"Groq narrative error: {e}")
+            pass
 
     def _build_response(self) -> Dict[str, Any]:
         # Filter actives by avoid pool
@@ -302,12 +532,25 @@ class RecommendationEngine:
             "habits": list(set(self.habits_tips))[:3],
             "diet_tips": self.nutrition_tips,
             "strategy": self.strategy,
+            "alternative_strategy": self.alternative_strategy,
+            "variation_index": self.variation_index,
             "explanation": self.explanation or self.message,
+            "why_this": self.why_this if self.why_this else ["Optimisation de la barrière cutanée", "Régulation du sébum"],
             "brands": "CeraVe, La Roche-Posay, Avène, The Ordinary",
             "disclaimer": "Hermona n'est pas un outil médical. Consultez un dermatologue.",
             "riskScore": self._norm(self.req.get('risk_today', 0.0)),
+            "hygieneScore": self.req.get('hygiene_score', 70),
             "severity": self._norm(self.req.get('severity', 0.0)),
-            "createdAt": datetime.now(timezone.utc).isoformat()
+            "createdAt": datetime.now(timezone.utc).isoformat(),
+            "debug": {
+                "recommendation_reasoning": {
+                    "assigned_level": self.level,
+                    "assigned_strategy": self.strategy,
+                    "actives_chosen": list(final_actives),
+                    "actives_avoided": list(self.avoid_pool),
+                    "zone_focus": self.zone_focus
+                }
+            }
         }
 
     def _generate_routines(self, actives: List[str]) -> Tuple[List[Dict], List[Dict]]:
@@ -317,29 +560,119 @@ class RecommendationEngine:
         
         # Default Cleansers
         m_cleanser = "Gel Nettoyant Purifiant" if is_oily else "Nettoyant Doux Hydratant"
-        e_cleanser = "Gel Nettoyant" if is_oily else "Lait/Baume Nettoyant"
+        e_cleanser = "Gel Nettoyant Purifiant" if is_oily else "Baume Nettoyant"
         
         if self.is_medical_isotretinoin:
-            m_cleanser = "Nettoyant Doux Non-Moussant"
-            e_cleanser = "Baume Nettoyant Ultra-Doux"
+            m_cleanser = "Nettoyant Doux Hydratant"
+            e_cleanser = "Baume Nettoyant"
 
-        m = [{"step": "1", "product": m_cleanser, "instruction": "Matin : Nettoyage doux", "icon": "🧼"}]
-        if "vitamine_c" in actives:
-            m.append({"step": "2", "product": "Sérum Vitamine C", "instruction": "Antioxydant éclat", "icon": "✨"})
-        elif "niacinamide" in actives:
-            m.append({"step": "2", "product": "Sérum Niacinamide", "instruction": "Régulateur sébum/pores", "icon": "🧪"})
+        def get_ex(k): 
+            items = PRODUCT_EXAMPLES.get(normalize(k), [])
+            if items:
+                return self._rng.sample(items, min(2, len(items)))
+            return []
         
-        m.append({"step": "3", "product": "Fluide Hydratant" if is_oily else "Crème Riche", "instruction": "Hydratation", "icon": "💧"})
-        m.append({"step": "4", "product": "Solaire SPF 50+", "instruction": "Protection UV obligatoire", "icon": "☀️"})
+        # Zone Focus Logic
+        zones = self.req.get("zones", [])
+        for z in zones:
+            if z.lower() == "front":
+                self.zone_focus[z] = "Focus on oil control and forehead cleansing"
+            elif z.lower() == "chin" or z.lower() == "menton":
+                self.zone_focus[z] = "Hormonal acne suspected → monitor closely"
+            else:
+                self.zone_focus[z] = "Standard care"
 
-        e = [{"step": "1", "product": "Huile/Baume Démaquillant", "instruction": "Double nettoyage", "icon": "🌙"}]
-        e.append({"step": "2", "product": e_cleanser, "instruction": "Nettoyage en profondeur", "icon": "🧼"})
+        m_instruction = "Lavez votre visage à l'eau tiède avec des mouvements circulaires doux pendant 60 secondes."
+        if self.level == "maintenance":
+            m_instruction = "Light cleansing once per day is enough (or just warm water in the morning)."
+
+        m = [{
+            "step": "1", 
+            "product": m_cleanser, 
+            "instruction": m_instruction, 
+            "icon": "🧼", 
+            "productExamples": get_ex(m_cleanser),
+            "reason": "Élimine les impuretés de la nuit sans agresser le film hydrolipidique."
+        }]
+        if "vitamine_c" in actives:
+            m.append({
+                "step": "2", 
+                "product": "Sérum Vitamine C", 
+                "instruction": "Appliquez 3 gouttes sur peau sèche. Tapotez légèrement.", 
+                "icon": "✨", 
+                "productExamples": get_ex("serum_vitamine_c"),
+                "reason": "Protège des radicaux libres et booste l'éclat."
+            })
+        elif "niacinamide" in actives:
+            m.append({
+                "step": "2", 
+                "product": "Sérum Niacinamide", 
+                "instruction": "Appliquez sur les zones à pores dilatés ou à rougeurs.", 
+                "icon": "🧪", 
+                "productExamples": get_ex("serum_niacinamide"),
+                "reason": "Régule le sébum et apaise les inflammations."
+            })
+        
+        m.append({
+            "step": "3", 
+            "product": "Hydratant Adapté", 
+            "instruction": "Massez du centre vers l'extérieur du visage.", 
+            "icon": "💧", 
+            "productExamples": get_ex("fluide_hydratant" if is_oily else "creme_riche"),
+            "reason": "Maintient la barrière cutanée scellée et évite la déshydratation."
+        })
+        m.append({
+            "step": "4", 
+            "product": "Solaire SPF 50+", 
+            "instruction": "La quantité de deux doigts pour tout le visage.", 
+            "icon": "☀️", 
+            "productExamples": get_ex("solaire_spf_50+"),
+            "reason": "Évite l'oxydation du sébum et les taches post-acné."
+        })
+
+        e = [{
+            "step": "1", 
+            "product": "Baume/Huile Démaquillante", 
+            "instruction": "Massez sur peau sèche pour dissoudre le maquillage et le SPF, puis rincez.", 
+            "icon": "🌙", 
+            "productExamples": get_ex("baume_nettoyant"),
+            "reason": "Le gras dissout le gras (maquillage, sébum oxydé)."
+        }]
+        e.append({
+            "step": "2", 
+            "product": e_cleanser, 
+            "instruction": "Utilisez votre nettoyant à base d'eau pour parfaire le nettoyage.", 
+            "icon": "🧼", 
+            "productExamples": get_ex(e_cleanser),
+            "reason": "Élimine les derniers résidus pour une peau parfaitement propre."
+        })
         
         if "retinol" in actives and "luteale" not in normalize(self.req.get('phase', '')):
-            e.append({"step": "3", "product": "Sérum Rétinol", "instruction": "Soin anti-imperfections", "icon": "🧪"})
+            e.append({
+                "step": "3", 
+                "product": "Sérum Rétinol", 
+                "instruction": "Une noisette sur peau parfaitement sèche. Évitez le contour des yeux.", 
+                "icon": "🧪", 
+                "productExamples": get_ex("serum_retinol"),
+                "reason": "Accélère le renouvellement cellulaire pour traiter l'acné en profondeur."
+            })
         elif "bha" in actives:
-            e.append({"step": "3", "product": "Sérum Acide Salicylique", "instruction": "Exfoliation douce", "icon": "🧪"})
+            e.append({
+                "step": "3", 
+                "product": "Sérum Acide Salicylique", 
+                "instruction": "Appliquez uniquement sur les zones congestionnées.", 
+                "icon": "🧪", 
+                "productExamples": get_ex("serum_acide_salicylique"),
+                "reason": "Débouche les pores et élimine les points noirs."
+            })
             
-        e.append({"step": "4", "product": "Crème de Nuit Réparatrice", "instruction": "Régénération", "icon": "🌙"})
+        e.append({
+            "step": "4", 
+            "product": "Crème de Nuit Réparatrice", 
+            "instruction": "Appliquez généreusement pour aider la peau à se régénérer.", 
+            "icon": "🌙", 
+            "productExamples": get_ex("creme_nuit"),
+            "reason": "Soutient la barrière cutanée pendant le pic de régénération nocturne."
+        })
         
         return m, e

@@ -1,6 +1,6 @@
-﻿import '../../domain/entities/daily_survey.dart';
+import 'package:acneia/features/questionnaire/domain/entities/daily_survey.dart';
 
-import '../../domain/entities/weekly_survey.dart';
+import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
 
 import '../services/questionnaire_service.dart';
 

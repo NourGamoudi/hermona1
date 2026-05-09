@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 // AppException ”“ exceptions typées pour toute l'application
 
@@ -28,7 +28,7 @@ class AppException implements Exception {
 
 class NetworkException extends AppException {
 
-  const NetworkException([String msg = 'Erreur réseau']) : super(msg);
+  const NetworkException([super.msg = 'Erreur réseau']);
 
 }
 
@@ -36,7 +36,7 @@ class NetworkException extends AppException {
 
 class AuthException extends AppException {
 
-  const AuthException(String msg) : super(msg);
+  const AuthException(super.msg);
 
 }
 
@@ -44,9 +44,7 @@ class AuthException extends AppException {
 
 class ApiException extends AppException {
 
-  const ApiException(String msg, {int? statusCode})
-
-      : super(msg, statusCode: statusCode);
+  const ApiException(super.msg, {super.statusCode});
 
 }
 

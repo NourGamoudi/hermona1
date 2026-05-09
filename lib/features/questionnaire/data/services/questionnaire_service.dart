@@ -1,10 +1,10 @@
-﻿import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-import '../../domain/entities/user_profile.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 
-import '../../domain/entities/daily_survey.dart';
+import 'package:acneia/features/questionnaire/domain/entities/daily_survey.dart';
 
-import '../../domain/entities/weekly_survey.dart';
+import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
 
 import 'package:intl/intl.dart';
 

@@ -1,13 +1,12 @@
-import 'dart:ui';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../../../core/localization/app_localizations.dart';
-import '../../data/services/auth_service.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
+import 'package:acneia/features/auth/data/services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -57,7 +56,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         lastName: _lastCtrl.text.trim(),
         pseudonym: _pseudoCtrl.text.trim(),
       );
-      if (mounted) context.go('/onboarding');
+      if (!mounted) return;
+      context.go('/onboarding');
     } catch (e) {
       if (mounted) _snack(e.toString().replaceAll('Exception: ', ''));
     } finally {
@@ -89,7 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             left: -size.width * 0.15,
             child: _Blob(
               size: size.width * 0.9,
-              color: AppColors.secondary.withOpacity(0.08),
+              color: AppColors.secondary.withValues(alpha: 0.08),
             ).animate(onPlay: (c) => c.repeat()).moveX(begin: 0, end: 40, duration: 6.seconds, curve: Curves.easeInOut),
           ),
           Positioned(
@@ -97,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             right: -size.width * 0.1,
             child: _Blob(
               size: size.width * 0.8,
-              color: AppTheme.primary.withOpacity(0.12),
+              color: AppTheme.primary.withValues(alpha: 0.12),
             ).animate(onPlay: (c) => c.repeat()).moveY(begin: 0, end: 30, duration: 4.seconds, curve: Curves.easeInOut),
           ),
 
@@ -173,7 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                           const SizedBox(height: 20),
 
-                          _FieldLabel(label: 'Pseudonyme (anonyme)'),
+                          const _FieldLabel(label: 'Pseudonyme (anonyme)'),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _pseudoCtrl,
@@ -240,7 +240,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 value: _terms,
                                 activeColor: AppTheme.primary,
                                 checkColor: Colors.white,
-                                side: BorderSide(color: AppColors.textSecondaryDark.withOpacity(0.5)),
+                                side: BorderSide(color: AppColors.textSecondaryDark.withValues(alpha: 0.5)),
                                 onChanged: (v) => setState(() => _terms = v ?? false),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
                               ),
@@ -252,7 +252,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       TextSpan(text: l.translate('i_accept')),
                                       TextSpan(
                                         text: l.translate('terms'),
-                                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900),
+                                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900),
                                         recognizer: TapGestureRecognizer()..onTap = () => context.push('/terms'),
                                       ),
                                     ],
@@ -288,7 +288,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onTap: () => context.go('/login'),
                         child: Text(
                           l.translate('login'),
-                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 14),
+                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ),
                     ],
@@ -318,7 +318,7 @@ class _Blob extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         gradient: RadialGradient(
-          colors: [color, color.withOpacity(0)],
+          colors: [color, color.withValues(alpha: 0)],
         ),
       ),
     );
@@ -336,9 +336,9 @@ class _BackButton extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           shape: BoxShape.circle,
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         child: const Icon(Iconsax.arrow_left_1, size: 20),
       ),
@@ -357,7 +357,7 @@ class _FieldLabel extends StatelessWidget {
       style: TextStyle(
         fontSize: 10,
         fontWeight: FontWeight.w900,
-        color: AppColors.textSecondaryDark.withOpacity(0.8),
+        color: AppColors.textSecondaryDark.withValues(alpha: 0.8),
         letterSpacing: 1.5,
       ),
     );

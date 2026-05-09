@@ -1,4 +1,4 @@
-﻿import '../../domain/entities/user_profile.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 
 import '../services/questionnaire_service.dart';
 

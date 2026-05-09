@@ -1,9 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:dio/dio.dart';
-import '../../domain/entities/prediction_result.dart';
-import '../../domain/repositories/prediction_repository.dart';
-import '../../../../core/constants/app_constants.dart';
+import 'package:flutter/foundation.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/features/prediction/domain/repositories/prediction_repository.dart';
+import 'package:acneia/core/constants/app_constants.dart';
 
 class PredictionApiService implements PredictionRepository {
   final Dio _dio;
@@ -27,43 +28,10 @@ class PredictionApiService implements PredictionRepository {
       final profileSnap = await _db.collection(AppConstants.colUsers).doc(uid).get();
       final profile = profileSnap.data() ?? {};
 
-      // 2. Fetch Latest Daily Survey for hygiene context
-      final dailySnap = await _db.collection('daily_surveys')
-          .where('userId', isEqualTo: uid)
-          .get();
-      
-      final List<QueryDocumentSnapshot> dailyDocs = dailySnap.docs.toList();
-      dailyDocs.sort((a, b) {
-        final ta = a.data() as Map<String, dynamic>;
-        final tb = b.data() as Map<String, dynamic>;
-        final da = ta['date'] ?? '';
-        final db = tb['date'] ?? '';
-        return db.compareTo(da);
-      });
-      
-      Map<String, dynamic> daily = {};
-      if (dailyDocs.isNotEmpty) {
-        daily = dailyDocs.first.data() as Map<String, dynamic>;
-      }
-
-      // 3. Calculate Hygiene Score
-      int hygieneScore = 70;
-      if (daily.isNotEmpty) {
-         hygieneScore = 100;
-         if ((daily['sleep_hours'] ?? 8) < 7) hygieneScore -= 15;
-         if ((daily['water_glasses'] ?? 8) < 6) hygieneScore -= 10;
-         if ((daily['stress_level'] ?? 5) > 7) hygieneScore -= 20;
-         final List diet = daily['diet_tags'] ?? [];
-         if (diet.contains('sucre') || diet.contains('produits_laitiers')) hygieneScore -= 15;
-         if (hygieneScore < 0) hygieneScore = 0;
-      }
-
-      // 4. Prepare Payload
+      // 2. Prepare Payload (Simplified - Backend handles the score)
       final payload = {
         'answers': _sanitizeMap({
           ...answers,
-          'hygieneScore': hygieneScore,
-          'hormonal_cycle': daily['cyclePhase'] ?? 'folliculaire',
           'profile': profile,
         })
       };
@@ -76,7 +44,7 @@ class PredictionApiService implements PredictionRepository {
       if (response.data == null) throw Exception('Réponse vide du serveur');
       return PredictionResult.fromJson(response.data!);
     } catch (e) {
-      print('DEBUG ERROR in predict: $e');
+      debugPrint('DEBUG ERROR in predict: $e');
       throw Exception('Erreur de prédiction: $e');
     }
   }

@@ -4,10 +4,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../../../core/localization/app_localizations.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -28,8 +28,8 @@ class NotificationScreen extends StatelessWidget {
               Tab(text: l.translate('messages')),
               Tab(text: l.translate('alerts') == 'alerts' ? 'Alertes' : l.translate('alerts')),
             ],
-            indicatorColor: Color(0xFFF9A8D4), // AppTheme.primary equivalent if not using it directly
-            labelColor: Color(0xFFF9A8D4),
+            indicatorColor: const Color(0xFFF9A8D4), // AppTheme.primary equivalent if not using it directly
+            labelColor: const Color(0xFFF9A8D4),
             unselectedLabelColor: Colors.black,
           ),
         ),
@@ -77,7 +77,7 @@ class NotificationScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Iconsax.notification_status, size: 80, color: AppTheme.primary.withOpacity(0.5)),
+            Icon(Iconsax.notification_status, size: 80, color: AppTheme.primary.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
             Text(emptyTitle, style: const TextStyle(color: Color(0xFF4F4F4F), fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
@@ -152,7 +152,7 @@ class _NotificationCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -171,19 +171,19 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     Text(
                       DateFormat('HH:mm').format(timestamp),
-                      style: TextStyle(color: Colors.black, fontSize: 10),
+                      style: const TextStyle(color: Colors.black, fontSize: 10),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   data['body'] ?? '',
-                  style: TextStyle(color: Colors.black, fontSize: 12),
+                  style: const TextStyle(color: Colors.black, fontSize: 12),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   DateFormat('d MMMM yyyy', AppLocalizations.of(context).locale.languageCode).format(timestamp),
-                  style: TextStyle(color: Colors.black, fontSize: 10),
+                  style: const TextStyle(color: Colors.black, fontSize: 10),
                 ),
               ],
             ),

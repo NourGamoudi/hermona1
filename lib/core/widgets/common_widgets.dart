@@ -37,7 +37,7 @@ class PrimaryButton extends StatelessWidget {
         onPressed: isLoading ? null : onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: brand,
-          shadowColor: brand.withOpacity(0.4),
+          shadowColor: brand.withValues(alpha: 0.4),
           elevation: 12,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
@@ -54,12 +54,17 @@ class PrimaryButton extends StatelessWidget {
                     Icon(icon, size: 20),
                     const SizedBox(width: 10),
                   ],
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
+                  Flexible(
+                    child: Text(
+                      label,
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
                 ],
@@ -104,13 +109,13 @@ class GlassCard extends StatelessWidget {
             padding: padding ?? const EdgeInsets.all(20),
             decoration: BoxDecoration(
               color: isDark 
-                  ? AppColors.surfaceDark.withOpacity(opacity)
-                  : AppColors.surfaceLight.withOpacity(opacity + 0.25), // Stronger pink tint
+                  ? AppColors.surfaceDark.withValues(alpha: opacity)
+                  : AppColors.surfaceLight.withValues(alpha: opacity + 0.25), // Stronger pink tint
               borderRadius: BorderRadius.circular(borderRadius),
               border: Border.all(
                 color: isDark 
-                    ? Colors.white.withOpacity(0.12)
-                    : AppColors.dividerLight.withOpacity(0.8), // Visible pink border
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : AppColors.dividerLight.withValues(alpha: 0.8), // Visible pink border
                 width: 1.5,
               ),
             ),
@@ -238,9 +243,9 @@ class StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3), width: 1),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 1),
       ),
       child: Text(
         text,

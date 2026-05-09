@@ -8,11 +8,11 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../../../main.dart';
-import '../../../questionnaire/domain/entities/user_profile.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/main.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -59,13 +59,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [AppTheme.primary.withOpacity(0.2), AppColors.secondary.withOpacity(0.1)],
+                        colors: [AppTheme.primary.withValues(alpha: 0.2), AppColors.secondary.withValues(alpha: 0.1)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                     ),
                   ),
-                  _Blob(size: 200, color: AppColors.primary.withOpacity(0.1)).animate().moveY(begin: 0, end: 20, duration: 3.seconds, curve: Curves.easeInOut),
+                  _Blob(size: 200, color: AppColors.primary.withValues(alpha: 0.1)).animate().moveY(begin: 0, end: 20, duration: 3.seconds, curve: Curves.easeInOut),
                   
                   Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -77,7 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(colors: [AppTheme.primary, AppColors.primaryDark]),
                           shape: BoxShape.circle,
-                          boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, 10))],
+                          boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 10))],
                         ),
                         child: Center(child: Text(init, style: const TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900))),
                       ).animate().scale(duration: 800.ms, curve: Curves.elasticOut),
@@ -119,7 +119,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 const SizedBox(height: 24),
 
                 _buildSection('Personnalisation', [
-                  _ProfileItem(Iconsax.moon, 'Thème Sombre', 'Activer/Désactiver', null, trailing: const _ThemeSwitch()),
+                  const _ProfileItem(Iconsax.moon, 'Thème Sombre', 'Activer/Désactiver', null, trailing: _ThemeSwitch()),
                   _ProfileItem(Iconsax.colorfilter, 'Couleur de Marque', 'Choisir une teinte', () => _colorPicker()),
                 ]),
 
@@ -171,7 +171,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onTap: e.value.onTap,
                     leading: Container(
                       padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                       child: Icon(e.value.icon, size: 18, color: AppColors.primary),
                     ),
                     title: Text(e.value.title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
@@ -179,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     trailing: e.value.trailing ?? const Icon(Iconsax.arrow_right_3, size: 14, color: AppColors.textSecondaryDark),
                     contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                   ),
-                  if (!isLast) Divider(height: 1, indent: 70, color: Colors.white.withOpacity(0.05)),
+                  if (!isLast) Divider(height: 1, indent: 70, color: Colors.white.withValues(alpha: 0.05)),
                 ],
               );
             }).toList(),
@@ -202,11 +202,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ANNULER')),
           PrimaryButton(label: 'APPLIQUER', width: 120, onTap: () async {
+            final navigator = Navigator.of(ctx);
             AppTheme.setPrimary(current);
             final p = await SharedPreferences.getInstance();
-            await p.setInt(AppConstants.keyPrimaryColor, current.value);
-            if (mounted) setState(() {});
-            Navigator.pop(ctx);
+            await p.setInt(AppConstants.keyPrimaryColor, current.toARGB32());
+            if (mounted) {
+              setState(() {});
+              navigator.pop();
+            }
           }),
         ],
       ),
@@ -223,7 +226,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('RESTER')),
         PrimaryButton(label: 'QUITTER', width: 100, color: AppColors.error, onTap: () async {
           await FirebaseAuth.instance.signOut();
-          if (mounted) context.go('/login');
+          if (mounted) {
+            context.go('/login');
+          }
         }),
       ],
     ),
@@ -266,12 +271,16 @@ class _ThemeSwitchState extends State<_ThemeSwitch> {
   }
   @override
   Widget build(BuildContext context) => Switch.adaptive(
-    value: _dark, activeColor: AppColors.primary,
+    value: _dark,
+    activeThumbColor: AppColors.primary,
     onChanged: (v) async {
       setState(() => _dark = v);
-      HermonaApp.of(context)?.setThemeMode(v ? ThemeMode.dark : ThemeMode.light);
+      final appState = HermonaApp.of(context);
       final p = await SharedPreferences.getInstance();
       await p.setBool(AppConstants.keyThemeMode, v);
+      if (mounted) {
+        appState?.setThemeMode(v ? ThemeMode.dark : ThemeMode.light);
+      }
     },
   );
 }
@@ -286,6 +295,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

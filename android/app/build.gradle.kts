@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.hermona.app"
+    namespace = "com.acneia.acneia"
 
     compileSdk = 36
 
@@ -24,7 +24,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.hermona.app"
+        applicationId = "com.acneia.acneia"
 
         minSdk = 24
         targetSdk = flutter.targetSdkVersion

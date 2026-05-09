@@ -1,10 +1,11 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter/foundation.dart';
 
-import '../../domain/entities/user_entity.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/errors/app_exception.dart';
+import 'package:acneia/features/auth/domain/entities/user_entity.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/core/errors/app_exception.dart';
 
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // DATA â€“ AuthService (Firebase Auth + Firestore)
@@ -67,7 +68,7 @@ class AuthService {
       return entity;
 
     } on FirebaseAuthException catch (e) {
-      print('🔥 Firebase register error: ${e.code} - ${e.message}');
+      debugPrint('🔥 Firebase register error: ${e.code} - ${e.message}');
       throw AuthException(
         '${_mapFirebaseError(e.code)} (code: ${e.code})',
       );
@@ -97,7 +98,7 @@ class AuthService {
       return user;
 
     } on FirebaseAuthException catch (e) {
-      print('🔥 Firebase login error: ${e.code} - ${e.message}');
+      debugPrint('🔥 Firebase login error: ${e.code} - ${e.message}');
       throw AuthException(
         '${_mapFirebaseError(e.code)} (code: ${e.code})',
       );
@@ -156,7 +157,7 @@ class AuthService {
       return entity;
 
     } on FirebaseAuthException catch (e) {
-      print('🔥 Google login error: ${e.code} - ${e.message}');
+      debugPrint('🔥 Google login error: ${e.code} - ${e.message}');
       throw AuthException(
         '${_mapFirebaseError(e.code)} (code: ${e.code})',
       );

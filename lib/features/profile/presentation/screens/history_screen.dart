@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -7,9 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
 
 class HistoryScreen extends StatefulWidget {
   final int initialTab;
@@ -51,9 +50,9 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.05),
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.05)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
             ),
             child: TabBar(
               controller: _tab,
@@ -79,7 +78,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
           Positioned(
             top: -100,
             right: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withOpacity(0.05)),
+            child: _Blob(size: 300, color: AppTheme.primary.withValues(alpha: 0.05)),
           ),
 
           TabBarView(
@@ -131,7 +130,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                     children: [
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(16)),
+                        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
                         child: const Icon(Iconsax.magic_star, color: AppColors.primary, size: 24),
                       ),
                       const SizedBox(width: 20),
@@ -185,7 +184,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               _HistoryList(
                 col: AppConstants.colChatHistory,
                 uid: _uid,
-                extraWhere: {'role': 'user'},
+                extraWhere: const {'role': 'user'},
                 orderField: 'timestamp',
                 emptyTitle: 'Aucun chat',
                 emptySubtitle: 'Vos questions à l\'assistante Hermona.',
@@ -195,7 +194,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                     children: [
                       Container(
                         padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
                         child: const Icon(Iconsax.message_text, color: AppColors.primary, size: 20),
                       ),
                       const SizedBox(width: 16),
@@ -221,10 +220,19 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
   }
 
   String _ago(dynamic ts) {
-    DateTime dt;
-    if (ts is String) dt = DateTime.parse(ts);
-    else if (ts is Timestamp) dt = ts.toDate();
-    else return '';
+    if (ts == null) return '';
+    DateTime? dt;
+    if (ts is String) {
+      dt = DateTime.tryParse(ts);
+    } else if (ts is Timestamp) {
+      dt = ts.toDate();
+    } else {
+      try {
+        dt = (ts as dynamic).toDate();
+      } catch (_) {}
+    }
+    
+    if (dt == null) return '';
     return timeago.format(dt, locale: 'fr');
   }
 }
@@ -246,8 +254,15 @@ class _HistoryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Query q = FirebaseFirestore.instance.collection(col).where('userId', isEqualTo: uid);
-    if (extraWhere != null) extraWhere!.forEach((k, v) => q = q.where(k, isEqualTo: v));
+    Query q = FirebaseFirestore.instance.collection(col)
+        .where('userId', isEqualTo: uid);
+    
+    if (extraWhere != null) {
+      extraWhere!.forEach((k, v) => q = q.where(k, isEqualTo: v));
+    }
+
+    // Optimization: Use Firestore index and limit results
+    q = q.orderBy(orderField, descending: true).limit(20);
 
     return StreamBuilder<QuerySnapshot>(
       stream: q.snapshots(),
@@ -261,24 +276,15 @@ class _HistoryList extends StatelessWidget {
           );
         }
         
-        final docs = snap.data?.docs.toList() ?? [];
-        docs.sort((a, b) {
-           final dataA = a.data() as Map<String, dynamic>;
-           final dataB = b.data() as Map<String, dynamic>;
-           final tA = dataA[orderField];
-           final tB = dataB[orderField];
-           if (tA == null || tB == null) return 0;
-           DateTime dtA = tA is String ? DateTime.parse(tA) : (tA as Timestamp).toDate();
-           DateTime dtB = tB is String ? DateTime.parse(tB) : (tB as Timestamp).toDate();
-           return dtB.compareTo(dtA);
-        });
+        final docs = snap.data?.docs ?? [];
+
 
         if (docs.isEmpty) {
           return Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(emptyIcon, size: 64, color: AppColors.textSecondaryDark.withOpacity(0.2)),
+                Icon(emptyIcon, size: 64, color: AppColors.textSecondaryDark.withValues(alpha: 0.2)),
                 const SizedBox(height: 24),
                 Text(emptyTitle, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
                 const SizedBox(height: 8),
@@ -315,9 +321,9 @@ class _CircularScore extends StatelessWidget {
       width: 56,
       height: 56,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(0.3), width: 2),
+        border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
       ),
       child: Center(
         child: Text('$score$suffix', style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 15)),
@@ -331,6 +337,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

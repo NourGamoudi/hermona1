@@ -6,13 +6,11 @@ import 'package:dio/dio.dart';
 
 
 
-import '../../domain/entities/detection_result.dart';
-
-import '../../domain/repositories/detection_repository.dart';
-
-import '../../../../core/constants/app_constants.dart';
-
-import '../../../../core/errors/app_exception.dart';
+import 'package:flutter/foundation.dart';
+import 'package:acneia/features/detection/domain/entities/detection_result.dart';
+import 'package:acneia/features/detection/domain/repositories/detection_repository.dart';
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/core/errors/app_exception.dart';
 
 
 
@@ -70,13 +68,11 @@ class DetectionApiService implements DetectionRepository {
 
 
 
+      debugPrint('DEBUG: Calling Detection API at: ${AppConstants.apiBaseUrl}/detect');
       final response = await _dio.post<Map<String, dynamic>>(
-
         '/detect',
-
         data: formData,
-
-      );
+      ).timeout(const Duration(seconds: 30));
 
 
 
@@ -120,14 +116,24 @@ class DetectionApiService implements DetectionRepository {
       final snap = await _db
           .collection(AppConstants.colDetections)
           .where('userId', isEqualTo: userId)
-          .orderBy('analyzedAt', descending: true)
-          .get();
+          .limit(50)
+          .get()
+          .timeout(const Duration(seconds: 5));
 
-      return snap.docs
-          .map((d) => DetectionResult.fromJson(d.data()))
+      final List<QueryDocumentSnapshot> docs = snap.docs.toList();
+      docs.sort((a, b) {
+        final ta = a.data() as Map<String, dynamic>;
+        final tb = b.data() as Map<String, dynamic>;
+        final da = ta['analyzedAt'] is Timestamp ? (ta['analyzedAt'] as Timestamp).toDate() : DateTime.tryParse(ta['analyzedAt'].toString()) ?? DateTime(2000);
+        final db = tb['analyzedAt'] is Timestamp ? (tb['analyzedAt'] as Timestamp).toDate() : DateTime.tryParse(tb['analyzedAt'].toString()) ?? DateTime(2000);
+        return db.compareTo(da);
+      });
+
+      return docs
+          .map((d) => DetectionResult.fromJson(d.data() as Map<String, dynamic>))
           .toList();
     } catch (e) {
-      print('Error fetching detection history: $e');
+      debugPrint('Error fetching detection history: $e');
       return [];
     }
   }

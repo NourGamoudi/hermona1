@@ -6,15 +6,14 @@ import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/widgets/common_widgets.dart';
-import '../../data/services/questionnaire_service.dart';
-import '../../domain/entities/weekly_survey.dart';
-import '../../../detection/data/services/detection_api_service.dart';
-import '../../../detection/domain/entities/detection_result.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
+import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
+import 'package:acneia/features/detection/data/services/detection_api_service.dart';
+import 'package:acneia/features/detection/presentation/screens/face_capture_screen.dart';
 
 class WeeklyQuestionnaireScreen extends StatefulWidget {
   final WeeklySurvey? initialSurvey;
@@ -40,9 +39,6 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   String cleansingFrequency = '';
   String routineFollowed = '';
   String spfThisWeek = '';
-  bool autoCorrection = false;
-  bool reminderSent = false;
-  bool spfAlert = false;
 
   @override
   void initState() {
@@ -60,7 +56,16 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   }
 
   Future<void> _pickImage(String key, ImageSource source) async {
-    final xFile = await _picker.pickImage(source: source, imageQuality: 80);
+    if (source == ImageSource.camera && key == 'face') {
+      final path = await Navigator.push<String>(
+        context,
+        MaterialPageRoute(builder: (_) => const FaceCaptureScreen()),
+      );
+      if (path != null) setState(() => photos[key] = path);
+      return;
+    }
+    
+    final xFile = await _picker.pickImage(source: source, imageQuality: 85);
     if (xFile != null) setState(() => photos[key] = xFile.path);
   }
 
@@ -72,16 +77,16 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: Container(
           decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor.withOpacity(0.8),
+            color: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.8),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           ),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(2))),
+              Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), borderRadius: BorderRadius.circular(2))),
               const SizedBox(height: 24),
-              const Text('Source de la photo', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+              const Text('Prendre une photo de face', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
               const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -106,7 +111,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
     }
 
     if (makeupFrequency.isEmpty || cleansingFrequency.isEmpty || routineFollowed.isEmpty || spfThisWeek.isEmpty) {
-      _showError('Veuillez répondre à toutes les questions du bilan.');
+      _showError('Veuillez répondre à toutes les questions.');
       return;
     }
 
@@ -137,20 +142,12 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
       
       await _service.saveWeeklySurvey(survey);
       
-      // TRIGGER AI ANALYSIS AUTOMATICALLY
-      if (photos.containsKey('face')) {
-        final detectionService = DetectionApiService();
-        final detectionResult = await detectionService.analyzeImages([File(photos['face']!)]);
-        await detectionService.saveResult(detectionResult, user.uid);
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Analyse IA terminée ! Découvrez vos résultats.')),
-          );
-          context.go('/detection/result', extra: detectionResult.toJson());
-        }
-      } else {
-        if (mounted) context.go('/home');
+      final detectionService = DetectionApiService();
+      final detectionResult = await detectionService.analyzeImages([File(photos['face']!)]);
+      await detectionService.saveResult(detectionResult, user.uid);
+      
+      if (mounted) {
+        context.go('/detection/result', extra: detectionResult.toJson());
       }
     } catch (e) {
       setState(() => error = e.toString());
@@ -161,80 +158,52 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   }
 
   void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg), 
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      )
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        title: const Text('Bilan Hebdomadaire'),
-        leading: IconButton(
-          icon: const Icon(Iconsax.arrow_left_1),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
-        ),
-      ),
+      appBar: AppBar(title: const Text('Bilan Hebdomadaire')),
       body: Stack(
         children: [
-          // Background
-          Positioned(
-            top: -50,
-            left: -50,
-            child: _Blob(size: 250, color: AppColors.secondary.withOpacity(0.05)),
-          ),
-
+          Positioned(top: -50, left: -50, child: _Blob(size: 250, color: AppColors.secondary.withValues(alpha: 0.05))),
           loading 
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 24), Text('IA : Analyse du risque par zone...', style: TextStyle(fontWeight: FontWeight.bold))]))
           : Form(
               key: _formKey,
               child: ListView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 110, 24, 100),
                 children: [
-                  _HeaderSection(title: 'Audit Cutané', sub: 'Évaluons les progrès et l\'observance de ta routine.'),
+                  const _HeaderSection(title: 'Audit Cutané', sub: 'Évaluons les progrès et l\'observance de ta routine.'),
                   const SizedBox(height: 32),
-
+                  
                   // Photo Section
                   const SectionHeader(title: 'Analyse Visuelle'),
                   const SizedBox(height: 16),
-                  Center(
-                    child: _PhotoUploadBox(
-                      path: photos['face'],
-                      onTap: () => _showPhotoSourceDialog('face'),
-                    ),
-                  ),
+                  Center(child: _PhotoUploadBox(path: photos['face'], onTap: () => _showPhotoSourceDialog('face'))),
                   const SizedBox(height: 32),
 
-                  // Makeup Section
+                  // Questions Restored
                   const SectionHeader(title: 'Maquillage & Nettoyage'),
                   const SizedBox(height: 12),
                   GlassCard(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        _buildDropdown('Fréquence (Semaine)', makeupFrequency, ['tous les jours', '4-6j', '2-3j', '1j', 'jamais'], (v) => setState(() => makeupFrequency = v!)),
+                        _buildDropdown('Fréquence Maquillage', makeupFrequency, ['tous les jours', '4-6j', '2-3j', '1j', 'jamais'], (v) => setState(() => makeupFrequency = v!)),
                         const SizedBox(height: 20),
                         _buildDropdown('Type de Maquillage', makeupType, ['complet', 'modéré', 'léger', 'naturel', 'aucun'], (v) => setState(() => makeupType = v!)),
                         const SizedBox(height: 20),
                         _buildDropdown('Démaquillage', makeupRemoval, ['complet', 'simple', 'partiel', 'rarement'], (v) => setState(() => makeupRemoval = v!)),
                       ],
                     ),
-                  ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
-
+                  ),
+                  
                   const SizedBox(height: 32),
 
-                  // Routine Section
                   const SectionHeader(title: 'Observance Routine'),
                   const SizedBox(height: 12),
                   GlassCard(
@@ -248,20 +217,10 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
                         _buildDropdown('Protection Solaire', spfThisWeek, ['Tous les jours', 'Parfois', 'Jamais'], (v) => setState(() => spfThisWeek = v!)),
                       ],
                     ),
-                  ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
-
-                  if (error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 24),
-                      child: Text(error!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
-                    ),
-
-                  const SizedBox(height: 48),
-
-                  PrimaryButton(
-                    label: 'VALIDER LE BILAN SEMAINE',
-                    onTap: _save,
                   ),
+                  
+                  const SizedBox(height: 48),
+                  PrimaryButton(label: 'VALIDER LE BILAN SEMAINE', onTap: _save),
                 ],
               ),
             ),
@@ -277,36 +236,14 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark, letterSpacing: 1)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value.isEmpty ? null : value,
+          initialValue: value.isEmpty ? null : value,
           dropdownColor: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : Colors.white,
-          decoration: const InputDecoration(
-            border: InputBorder.none, 
-            enabledBorder: InputBorder.none, 
-            focusedBorder: InputBorder.none, 
-            contentPadding: EdgeInsets.zero,
-            fillColor: Colors.transparent, // Let the GlassCard show through or keep it clean
-          ),
-          style: TextStyle(
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-          items: options.map((e) => DropdownMenuItem(
-            value: e, 
-            child: Text(
-              e.toUpperCase(), 
-              style: TextStyle(
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-              ),
-            ),
-          )).toList(),
+          decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
+          style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, fontSize: 13, fontWeight: FontWeight.w600),
+          items: options.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase()))).toList(),
           onChanged: onChanged,
           validator: (v) => v == null ? 'Requis' : null,
-          icon: Icon(
-            Iconsax.arrow_down_1, 
-            size: 16, 
-            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black,
-          ),
+          icon: const Icon(Iconsax.arrow_down_1, size: 16),
         ),
       ],
     );
@@ -318,14 +255,7 @@ class _HeaderSection extends StatelessWidget {
   const _HeaderSection({required this.title, required this.sub});
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: Theme.of(context).textTheme.displaySmall),
-        const SizedBox(height: 8),
-        Text(sub, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)),
-      ],
-    );
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: Theme.of(context).textTheme.displaySmall), const SizedBox(height: 8), Text(sub, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14))]);
   }
 }
 
@@ -333,62 +263,33 @@ class _PhotoUploadBox extends StatelessWidget {
   final String? path;
   final VoidCallback onTap;
   const _PhotoUploadBox({this.path, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 220,
-        height: 280,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(32),
-          border: Border.all(color: Colors.white.withOpacity(0.1), width: 2),
-        ),
+        width: 220, height: 280,
+        decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(32), border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 2)),
         child: path != null 
             ? ClipRRect(borderRadius: BorderRadius.circular(30), child: Image.file(File(path!), fit: BoxFit.cover))
-            : Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), shape: BoxShape.circle),
-                    child: const Icon(Iconsax.camera, color: AppColors.primary, size: 40),
-                  ),
-                  const SizedBox(height: 16),
-                  const Text('FACE FRONTALE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: AppColors.primary)),
-                  const SizedBox(height: 8),
-                  const Text('Cliquez pour capturer', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryDark)),
-                ],
-              ),
+            : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(Iconsax.camera, color: AppTheme.primary, size: 40)),
+                const SizedBox(height: 16),
+                Text('FACE FRONTALE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: AppTheme.primary)),
+                const SizedBox(height: 8),
+                const Text('Cliquez pour capturer', style: TextStyle(fontSize: 12, color: AppColors.textSecondaryDark)),
+              ]),
       ),
-    ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack);
+    ).animate().scale();
   }
 }
 
 class _SourceOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
+  final IconData icon; final String label; final VoidCallback onTap;
   const _SourceOption({required this.icon, required this.label, required this.onTap});
-
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: AppColors.primary.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
-            child: Icon(icon, color: AppColors.primary, size: 32),
-          ),
-          const SizedBox(height: 12),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-        ],
-      ),
-    );
+    return GestureDetector(onTap: onTap, child: Column(children: [Container(padding: const EdgeInsets.all(20), decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)), child: Icon(icon, color: AppTheme.primary, size: 28)), const SizedBox(height: 8), Text(label, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13))]));
   }
 }
 
@@ -397,6 +298,6 @@ class _Blob extends StatelessWidget {
   const _Blob({required this.size, required this.color});
   @override
   Widget build(BuildContext context) {
-    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])));
+    return Container(width: size, height: size, decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])));
   }
 }

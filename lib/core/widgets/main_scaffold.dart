@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import '../theme/app_theme.dart';
-import '../localization/app_localizations.dart';
 
 class MainScaffold extends StatelessWidget {
   final Widget child;
@@ -33,7 +32,7 @@ class MainScaffold extends StatelessWidget {
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: surface,
-          boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
+          boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
         ),
         child: SafeArea(
           child: Padding(

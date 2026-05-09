@@ -69,7 +69,6 @@ class AppTheme {
     final divider = isDark ? AppColors.dividerDark  : AppColors.dividerLight;
 
     return (isDark ? ThemeData.dark() : ThemeData.light()).copyWith(
-      useMaterial3: true,
       colorScheme: ColorScheme(
         brightness  : isDark ? Brightness.dark : Brightness.light,
         primary     : _primary,
@@ -80,8 +79,6 @@ class AppTheme {
         onSurface   : textPri,
         error       : AppColors.error,
         onError     : Colors.white,
-        background  : bg,
-        onBackground: textPri,
       ),
       scaffoldBackgroundColor: bg,
       textTheme: GoogleFonts.outfitTextTheme().copyWith(
@@ -107,7 +104,7 @@ class AppTheme {
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(24),
-          side: BorderSide(color: divider.withOpacity(0.5), width: 1),
+          side: BorderSide(color: divider.withValues(alpha: 0.5), width: 1),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -115,7 +112,7 @@ class AppTheme {
           backgroundColor: _primary, 
           foregroundColor: Colors.white, 
           elevation: 8,
-          shadowColor: _primary.withOpacity(0.3),
+          shadowColor: _primary.withValues(alpha: 0.3),
           padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           textStyle: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w700),
@@ -123,20 +120,20 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true, 
-        fillColor: isDark ? Colors.white.withOpacity(0.03) : Colors.white,
+        fillColor: isDark ? Colors.white.withValues(alpha: 0.03) : Colors.white,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isDark ? divider.withOpacity(0.5) : AppColors.dividerLight, width: 1.5)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: isDark ? divider.withValues(alpha: 0.5) : AppColors.dividerLight, width: 1.5)),
         focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide(color: _primary, width: 2)),
-        hintStyle: GoogleFonts.inter(color: textSec.withOpacity(0.6), fontSize: 14),
+        hintStyle: GoogleFonts.inter(color: textSec.withValues(alpha: 0.6), fontSize: 14),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: isDark ? Colors.white.withOpacity(0.05) : AppColors.surfaceLight,
+        backgroundColor: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.surfaceLight,
         selectedColor: _primary,
         labelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        side: BorderSide(color: isDark ? Colors.white.withOpacity(0.1) : AppColors.dividerLight),
+        side: BorderSide(color: isDark ? Colors.white.withValues(alpha: 0.1) : AppColors.dividerLight),
       ),
     );
   }

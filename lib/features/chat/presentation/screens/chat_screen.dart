@@ -1,7 +1,3 @@
-import 'dart:io';
-import 'dart:math';
-import 'dart:ui';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -9,20 +5,18 @@ import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
 import 'package:record/record.dart';
 import 'package:flutter_tts/flutter_tts.dart'; 
-import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:dio/dio.dart';
 
-import '../../../../core/theme/app_theme.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../data/services/chat_api_service.dart';
-import '../../domain/entities/chat_message.dart';
-import '../../../questionnaire/domain/entities/user_profile.dart';
-import '../../../prediction/domain/entities/prediction_result.dart';
-import '../../../prediction/data/services/prediction_api_service.dart';
-import '../../../questionnaire/data/services/questionnaire_service.dart';
-import '../../../../core/widgets/common_widgets.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/features/chat/data/services/chat_api_service.dart';
+import 'package:acneia/features/chat/domain/entities/chat_message.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
+import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
+import 'package:acneia/core/widgets/common_widgets.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -44,14 +38,9 @@ class _ChatScreenState extends State<ChatScreen> {
   bool _typing = false;
   CancelToken? _cancelToken;
   bool _isTranscribing = false;
-  String? _lastSpokenText;
-  bool _isPaused = false;
-  int _currentSpeakPosition = 0;
-
   final _audioRecorder = AudioRecorder();
   final _tts = FlutterTts();
   bool _isRecording = false;
-  bool _autoSpeak = false;
   bool _isSpeaking = false;
   bool _ttsReady = false;
 
@@ -162,9 +151,18 @@ class _ChatScreenState extends State<ChatScreen> {
       setState(() => _isTranscribing = true);
       try {
         final text = await _chatSvc.transcribeAudio(path);
-        if (text.trim().isNotEmpty) _send(text, isVoice: true);
+        if (!mounted) {
+          return;
+        }
+        if (text.trim().isNotEmpty) {
+          _send(text, isVoice: true);
+        }
       } finally {
-        setState(() => _isTranscribing = false);
+        if (mounted) {
+          setState(() {
+            _isTranscribing = false;
+          });
+        }
       }
     }
   }
@@ -181,7 +179,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
     try {
       _cancelToken = CancelToken();
-      // Send history WITHOUT the last user message (it's sent separately as 'message')
       final historyToSend = _msgs.take(_msgs.length - 1).toList();
       
       final response = await _chatSvc.getChatResponse(
@@ -191,18 +188,29 @@ class _ChatScreenState extends State<ChatScreen> {
         cancelToken: _cancelToken,
         history: historyToSend,
       );
+      if (!mounted) {
+        return;
+      }
       final botMsg = ChatMessage(id: _uuid.v4(), role: 'assistant', content: response, timestamp: DateTime.now());
-      if (mounted) {
-        setState(() { _msgs.add(botMsg); _loading = false; _typing = false; });
-        if (uid != null) await _chatSvc.saveMessage(botMsg, uid);
+      setState(() {
+        _msgs.add(botMsg);
+        _loading = false;
+        _typing = false;
+      });
+      if (uid != null) {
+        await _chatSvc.saveMessage(botMsg, uid);
       }
     } catch (e) {
-      if (mounted) {
-        setState(() { _loading = false; _typing = false; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Erreur : Impossible de joindre l'assistant. Vérifiez votre connexion.")),
-        );
+      if (!mounted) {
+        return;
       }
+      setState(() {
+        _loading = false;
+        _typing = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Erreur : Impossible de joindre l'assistant. Vérifiez votre connexion.")),
+      );
     }
     _scrollBottom();
   }
@@ -217,7 +225,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -239,12 +246,12 @@ class _ChatScreenState extends State<ChatScreen> {
           Positioned(
             top: -50,
             left: -50,
-            child: _Blob(size: 200, color: AppTheme.primary.withOpacity(0.05)),
+            child: _Blob(size: 200, color: AppTheme.primary.withValues(alpha: 0.05)),
           ),
           Positioned(
             bottom: 200,
             right: -50,
-            child: _Blob(size: 250, color: AppColors.secondary.withOpacity(0.05)),
+            child: _Blob(size: 250, color: AppColors.secondary.withValues(alpha: 0.05)),
           ),
 
           Column(
@@ -310,11 +317,11 @@ class _ChatScreenState extends State<ChatScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: _isRecording ? AppColors.error : AppColors.primary.withOpacity(0.2), // Increased opacity
+                color: _isRecording ? AppColors.error : AppColors.primary.withValues(alpha: 0.2), // Increased opacity
                 borderRadius: BorderRadius.circular(18),
                 boxShadow: [
                   BoxShadow(
-                    color: (_isRecording ? AppColors.error : AppColors.primary).withOpacity(0.2), 
+                    color: (_isRecording ? AppColors.error : AppColors.primary).withValues(alpha: 0.2), 
                     blurRadius: 10, 
                     offset: const Offset(0, 4)
                   )
@@ -363,7 +370,7 @@ class _ChatScreenState extends State<ChatScreen> {
               decoration: BoxDecoration(
                 color: AppTheme.primary,
                 borderRadius: BorderRadius.circular(18),
-                boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: _loading 
                   ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
@@ -413,7 +420,7 @@ class _ChatBubble extends StatelessWidget {
                         bottomLeft: Radius.circular(22),
                         bottomRight: Radius.circular(4),
                       ),
-                      boxShadow: [BoxShadow(color: AppTheme.primary.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                      boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
                     child: Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.5, fontWeight: FontWeight.w500)),
                   )
@@ -439,7 +446,7 @@ class _ChatBubble extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppTheme.primary.withOpacity(0.08),
+                              color: AppTheme.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
@@ -507,7 +514,7 @@ class _Blob extends StatelessWidget {
     return Container(
       width: size,
       height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withOpacity(0)])),
+      decoration: BoxDecoration(shape: BoxShape.circle, gradient: RadialGradient(colors: [color, color.withValues(alpha: 0)])),
     );
   }
 }

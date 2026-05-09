@@ -1,6 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../data/services/auth_service.dart';
-import '../../domain/entities/user_entity.dart';
+import 'package:acneia/features/auth/data/services/auth_service.dart';
+import 'package:acneia/features/auth/domain/entities/user_entity.dart';
 
 abstract class AuthState {}
 

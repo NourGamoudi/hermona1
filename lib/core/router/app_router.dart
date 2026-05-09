@@ -3,56 +3,36 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 
 
-import '../../features/auth/presentation/screens/login_screen.dart';
-
-import '../../features/auth/presentation/screens/register_screen.dart';
-
-import '../../features/auth/presentation/screens/terms_screen.dart';
-
-import '../../features/auth/presentation/screens/welcome_screen.dart';
-
-import '../../features/home/presentation/screens/home_screen.dart';
-
-import '../../features/detection/presentation/screens/detection_result_screen.dart';
-
-import '../../features/recommendation/presentation/screens/recommendation_screen.dart';
-
-import '../../features/recommendation/presentation/screens/my_routine_screen.dart';
-
-import '../../features/chat/presentation/screens/chat_screen.dart';
-
-import '../../features/prediction/presentation/screens/prediction_screen.dart';
-
-import '../../features/profile/presentation/screens/profile_screen.dart';
-
-import '../../features/profile/presentation/screens/history_screen.dart';
-
-import '../../features/forum/presentation/screens/forum_screen.dart';
-
-import '../../features/forum/presentation/screens/forum_detail_screen.dart';
-
-import '../../features/forum/presentation/screens/create_post_screen.dart';
-
-import '../../features/messaging/presentation/screens/conversations_screen.dart';
-
-import '../../features/messaging/presentation/screens/chat_private_screen.dart';
-
-import '../../features/questionnaire/presentation/screens/profile_questionnaire_screen.dart';
-
-import '../../features/questionnaire/presentation/screens/daily_questionnaire_screen.dart';
-
-import '../../features/questionnaire/presentation/screens/weekly_questionnaire_screen.dart';
-
-import '../../features/notification/presentation/screens/notification_screen.dart';
-
-import '../../features/questionnaire/domain/entities/user_profile.dart';
-
-import '../../features/prediction/domain/entities/prediction_result.dart';
-
-import '../widgets/main_scaffold.dart';
+import 'package:acneia/features/auth/presentation/screens/login_screen.dart';
+import 'package:acneia/features/auth/presentation/screens/register_screen.dart';
+import 'package:acneia/features/auth/presentation/screens/terms_screen.dart';
+import 'package:acneia/features/auth/presentation/screens/welcome_screen.dart';
+import 'package:acneia/features/home/presentation/screens/home_screen.dart';
+import 'package:acneia/features/detection/presentation/screens/detection_result_screen.dart';
+import 'package:acneia/features/recommendation/presentation/screens/recommendation_screen.dart';
+import 'package:acneia/features/recommendation/presentation/screens/my_routine_screen.dart';
+import 'package:acneia/features/chat/presentation/screens/chat_screen.dart';
+import 'package:acneia/features/prediction/presentation/screens/prediction_screen.dart';
+import 'package:acneia/features/profile/presentation/screens/profile_screen.dart';
+import 'package:acneia/features/profile/presentation/screens/history_screen.dart';
+import 'package:acneia/features/forum/presentation/screens/forum_screen.dart';
+import 'package:acneia/features/forum/presentation/screens/forum_detail_screen.dart';
+import 'package:acneia/features/forum/presentation/screens/create_post_screen.dart';
+import 'package:acneia/features/forum/presentation/cubit/forum_cubit.dart';
+import 'package:acneia/features/forum/data/services/forum_service.dart';
+import 'package:acneia/features/messaging/presentation/screens/conversations_screen.dart';
+import 'package:acneia/features/messaging/presentation/screens/chat_private_screen.dart';
+import 'package:acneia/features/questionnaire/presentation/screens/profile_questionnaire_screen.dart';
+import 'package:acneia/features/questionnaire/presentation/screens/daily_questionnaire_screen.dart';
+import 'package:acneia/features/questionnaire/presentation/screens/weekly_questionnaire_screen.dart';
+import 'package:acneia/features/notification/presentation/screens/notification_screen.dart';
+import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/core/widgets/main_scaffold.dart';
 
 
 
@@ -146,7 +126,7 @@ final appRouter = GoRouter(
 
           builder: (_, state) => DetectionResultScreen(
 
-            data: state.extra as Map<String, dynamic>,
+            detectionData: state.extra as Map<String, dynamic>,
 
           ),
 
@@ -188,7 +168,13 @@ final appRouter = GoRouter(
       }
     ),
 
-    GoRoute(path: '/forum',         builder: (_, __) => const ForumScreen()),
+    GoRoute(
+      path: '/forum', 
+      builder: (_, __) => BlocProvider(
+        create: (context) => ForumCubit(ForumService())..loadPosts(),
+        child: const ForumScreen(),
+      ),
+    ),
 
     GoRoute(
 

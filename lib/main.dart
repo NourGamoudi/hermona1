@@ -37,14 +37,14 @@ class HermonaApp extends StatefulWidget {
   final bool initialDark;
   const HermonaApp({super.key, required this.initialDark});
 
-  static _HermonaAppState? of(BuildContext context) =>
-      context.findAncestorStateOfType<_HermonaAppState>();
+  static HermonaAppState? of(BuildContext context) =>
+      context.findAncestorStateOfType<HermonaAppState>();
 
   @override
-  State<HermonaApp> createState() => _HermonaAppState();
+  State<HermonaApp> createState() => HermonaAppState();
 }
 
-class _HermonaAppState extends State<HermonaApp> {
+class HermonaAppState extends State<HermonaApp> {
   late ThemeMode _mode;
   Locale? _locale;
 
@@ -59,7 +59,7 @@ class _HermonaAppState extends State<HermonaApp> {
 
   @override
   Widget build(BuildContext context) {
-    print('build: HermonaApp');
+    debugPrint('build: HermonaApp');
     return MaterialApp.router(
       title: 'HERMONA',
       debugShowCheckedModeBanner: false,
