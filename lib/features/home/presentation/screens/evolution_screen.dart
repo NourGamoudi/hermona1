@@ -76,19 +76,27 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
           .get(const GetOptions(source: Source.serverAndCache));
 
       // DATA INTEGRITY: Strict mapping & chronological sorting (Left -> Right)
-      final sPoints = detSnap.docs.map((d) {
-        final data = d.data();
-        final date = _parseDate(data['analyzedAt']);
-        final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
-        return _SeverityPoint(date: date, score: score, docId: d.id);
-      }).toList()..sort((a, b) => a.date.compareTo(b.date));
+      final sPoints = detSnap.docs
+          .where((d) => d.data()['analyzedAt'] != null)
+          .map((d) {
+            final data = d.data();
+            final date = _parseDate(data['analyzedAt']);
+            final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
+            return _SeverityPoint(date: date, score: score, docId: d.id);
+          })
+          .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
-      final rPoints = predSnap.docs.map((d) {
-        final data = d.data();
-        final date = _parseDate(data['predictedAt']);
-        final score = (data['riskScore'] as num?)?.toDouble() ?? 0.0;
-        return _RiskPoint(date: date, score: score);
-      }).toList()..sort((a, b) => a.date.compareTo(b.date));
+      final rPoints = predSnap.docs
+          .where((d) => d.data()['predictedAt'] != null)
+          .map((d) {
+            final data = d.data();
+            final date = _parseDate(data['predictedAt']);
+            final score = (data['riskScore'] as num?)?.toDouble() ?? 0.0;
+            return _RiskPoint(date: date, score: score);
+          })
+          .toList()
+          ..sort((a, b) => a.date.compareTo(b.date));
 
       if (mounted) {
         setState(() {
@@ -398,6 +406,26 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                       ),
                       const SizedBox(height: 28),
 
+                      // ── Combined Comparison Chart ──────────────────────────
+                      if (_severityPoints.isNotEmpty && _riskPoints.isNotEmpty)
+                        PremiumFadeIn(
+                          delay: 50,
+                          child: _ChartSection(
+                            title: 'Comparaison Croisée',
+                            subtitle: 'Analyse vs Risque (Moyenne temporelle)',
+                            icon: Iconsax.status_up,
+                            color: Colors.purple,
+                            isEmpty: false,
+                            emptyMessage: '',
+                            chart: SizedBox(
+                              height: 200,
+                              child: _buildCombinedChart(),
+                            ),
+                          ),
+                        ),
+                      
+                      const SizedBox(height: 24),
+
                       // ── Sévérité Chart ─────────────────────────────────────
                       PremiumFadeIn(
                         delay: 100,
@@ -584,6 +612,50 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCombinedChart() {
+    return LineChart(
+      LineChartData(
+        minY: 0,
+        maxY: 100,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          getDrawingHorizontalLine: (v) => FlLine(
+            color: Colors.grey.withValues(alpha: 0.1),
+            strokeWidth: 1,
+          ),
+        ),
+        borderData: FlBorderData(show: false),
+        titlesData: const FlTitlesData(
+          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30)),
+          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        lineBarsData: [
+          // Severity Line
+          LineChartBarData(
+            spots: _severitySpots(),
+            isCurved: true,
+            color: AppColors.primary,
+            barWidth: 3,
+            dotData: const FlDotData(show: true),
+            belowBarData: BarAreaData(show: false),
+          ),
+          // Risk Line
+          LineChartBarData(
+            spots: _riskSpots(),
+            isCurved: true,
+            color: AppColors.error,
+            barWidth: 3,
+            dotData: const FlDotData(show: true),
+            belowBarData: BarAreaData(show: false),
+          ),
+        ],
+      ),
     );
   }
 }

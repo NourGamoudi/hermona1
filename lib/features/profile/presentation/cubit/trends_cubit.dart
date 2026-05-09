@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,8 +34,7 @@ class TrendsCubit extends Cubit<TrendsState> {
 
     try {
       // 1. SEVERITY SOURCE: Weekly analysis history (colDetections)
-      // Field: severityScore, Date: analyzedAt
-      // We fetch latest 20 for chronological evolution preview.
+      // Query Rule: Recent history first, limit to 20 to prevent memory pressure.
       final detSnap = await FirebaseFirestore.instance
           .collection('detections')
           .where('userId', isEqualTo: uid)
@@ -43,7 +43,7 @@ class TrendsCubit extends Cubit<TrendsState> {
           .get(const GetOptions(source: Source.serverAndCache));
 
       // 2. RISK SOURCE: Daily questionnaire predictions (colPredictions)
-      // Field: riskScore, Date: predictedAt
+      // Query Rule: Recent history first, limit to 20.
       final predSnap = await FirebaseFirestore.instance
           .collection('predictions')
           .where('userId', isEqualTo: uid)
@@ -51,12 +51,12 @@ class TrendsCubit extends Cubit<TrendsState> {
           .limit(20)
           .get(const GetOptions(source: Source.serverAndCache));
 
-      // DATA INTEGRITY: Sort chronologically (ascending) for the chart
-      final detections = detSnap.docs.toList();
-      detections.sort((a, b) => (a['analyzedAt'] as String).compareTo(b['analyzedAt'] as String));
+      // DATA INTEGRITY: Strict historical mapping. Skip invalid docs.
+      final detections = detSnap.docs.where((d) => d.data()['analyzedAt'] != null).toList()
+        ..sort((a, b) => (a['analyzedAt'] as String).compareTo(b['analyzedAt'] as String));
 
-      final predictions = predSnap.docs.toList();
-      predictions.sort((a, b) => (a['predictedAt'] as String).compareTo(b['predictedAt'] as String));
+      final predictions = predSnap.docs.where((d) => d.data()['predictedAt'] != null).toList()
+        ..sort((a, b) => (a['predictedAt'] as String).compareTo(b['predictedAt'] as String));
 
       if (!isClosed) {
         emit(TrendsLoaded(
@@ -65,7 +65,8 @@ class TrendsCubit extends Cubit<TrendsState> {
         ));
       }
     } catch (e) {
-      if (!isClosed) emit(TrendsError("Erreur historique: $e"));
+      debugPrint("Trends Load Error: $e");
+      if (!isClosed) emit(TrendsError("Erreur d'historique réel: $e"));
     }
   }
 }

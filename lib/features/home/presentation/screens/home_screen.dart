@@ -88,12 +88,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SectionHeader(title: 'Explorer'),
                   const SizedBox(height: 12),
                   _buildExplorerSection(context),
-                  const SizedBox(height: 32),
-
-                  // 4. EVOLUTION SECTION
-                  const SectionHeader(title: 'Mon Évolution'),
-                  const SizedBox(height: 12),
-                  _buildEvolutionPreview(uid),
                   
                   const SizedBox(height: 100),
                 ],
