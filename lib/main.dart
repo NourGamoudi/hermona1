@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -20,6 +21,9 @@ void main() async {
     await Firebase.initializeApp();
   }
 
+  // FORCE CLEAR CACHE - TO FIX CursorWindow NO_MEMORY
+  await FirebaseFirestore.instance.clearPersistence();
+
   await initializeDateFormatting('fr', null);
 
   // Restore saved primary colour
@@ -32,7 +36,6 @@ void main() async {
   ));
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 class HermonaApp extends StatefulWidget {
   final bool initialDark;
   const HermonaApp({super.key, required this.initialDark});
@@ -59,7 +62,6 @@ class HermonaAppState extends State<HermonaApp> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('build: HermonaApp');
     return MaterialApp.router(
       title: 'HERMONA',
       debugShowCheckedModeBanner: false,
@@ -81,4 +83,3 @@ class HermonaAppState extends State<HermonaApp> {
     );
   }
 }
-

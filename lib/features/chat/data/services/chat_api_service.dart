@@ -109,18 +109,14 @@ class ChatApiService implements ChatRepository {
     try {
 
       final snap = await _db
-
           .collection(AppConstants.colChatHistory)
-
           .where('userId', isEqualTo: userId)
+          .orderBy('timestamp', descending: true)
+          .limit(15)
+          .get(const GetOptions(source: Source.server));
 
-          .orderBy('timestamp')
-
-          .limit(60)
-
-          .get();
-
-      return snap.docs.map((d) => ChatMessage.fromJson(d.data())).toList();
+      final msgs = snap.docs.map((d) => ChatMessage.fromJson(d.data())).toList();
+      return msgs.reversed.toList();
 
     } catch (e) {
 

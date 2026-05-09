@@ -8,6 +8,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 import 'package:dio/dio.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/features/chat/data/services/chat_api_service.dart';
@@ -115,6 +116,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
 
     final hist = await _chatSvc.loadHistory(uid);
+    if (!mounted) return;
+    
     if (hist.isEmpty) {
       _addWelcome();
     } else {
@@ -122,9 +125,11 @@ class _ChatScreenState extends State<ChatScreen> {
       _scrollBottom();
     }
 
-    _questionnaireSvc.fetchUserProfile(uid).then((p) => setState(() => _profile = p));
+    _questionnaireSvc.fetchUserProfile(uid).then((p) {
+      if (mounted) setState(() => _profile = p);
+    });
     _predictionSvc.getHistory(uid).then((preds) {
-      if (preds.isNotEmpty) setState(() => _prediction = preds.first);
+      if (mounted && preds.isNotEmpty) setState(() => _prediction = preds.first);
     });
   }
 
@@ -234,7 +239,13 @@ class _ChatScreenState extends State<ChatScreen> {
         leading: Padding(
           padding: const EdgeInsets.all(8.0),
           child: GestureDetector(
-            onTap: () => Navigator.of(context).pop(),
+            onTap: () {
+              if (Navigator.of(context).canPop()) {
+                Navigator.of(context).pop();
+              } else {
+                GoRouter.of(context).go('/home');
+              }
+            },
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.15),
