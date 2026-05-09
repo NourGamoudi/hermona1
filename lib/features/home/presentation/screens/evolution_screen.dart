@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -175,25 +176,38 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Info: images live only in the active session
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Iconsax.info_circle, size: 16, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        const Expanded(
-                          child: Text(
-                            'Photo visible uniquement en session active',
-                            style: TextStyle(fontSize: 11, color: AppColors.primary),
-                          ),
-                        ),
-                      ],
-                    ),
+                  // Image Loader
+                  FutureBuilder<DocumentSnapshot>(
+                    future: FirebaseFirestore.instance
+                        .collection(AppConstants.colDetections)
+                        .doc(point.docId)
+                        .collection('media')
+                        .doc('images')
+                        .get(),
+                    builder: (context, snap) {
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        return Container(
+                          height: 140,
+                          decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(18)),
+                          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                        );
+                      }
+                      final data = snap.data?.data() as Map<String, dynamic>?;
+                      final urls = data?['imageUrls'] as List?;
+                      
+                      if (urls == null || urls.isEmpty) {
+                        return Container(
+                          height: 140,
+                          decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(18)),
+                          child: const Center(child: Text('Photo non disponible', style: TextStyle(color: Colors.grey, fontSize: 12))),
+                        );
+                      }
+
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: _buildImage(urls[0]), // Show first zone image
+                      );
+                    },
                   ),
 
                   const SizedBox(height: 20),
@@ -280,6 +294,23 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
     );
   }
 
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // IMAGE HELPER
+  // ──────────────────────────────────────────────────────────────────────────
+  Widget _buildImage(String src) {
+    if (src.startsWith('data:image')) {
+      final comma = src.indexOf(',');
+      if (comma != -1) {
+        try {
+          final bytes = base64Decode(src.substring(comma + 1));
+          return Image.memory(bytes, height: 180, width: double.infinity, fit: BoxFit.cover);
+        } catch (_) {}
+      }
+    }
+    return Image.network(src, height: 180, width: double.infinity, fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const SizedBox(height: 180, child: Center(child: Icon(Icons.broken_image, color: Colors.grey))));
+  }
 
   // ──────────────────────────────────────────────────────────────────────────
   // CHART HELPERS
@@ -371,8 +402,8 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                       PremiumFadeIn(
                         delay: 100,
                         child: _ChartSection(
-                          title: 'Sévérité Cutanée',
-                          subtitle: 'Basé sur vos analyses IA',
+                          title: 'Sévérité (Bilan Hebdo)',
+                          subtitle: 'Analyse photo hebdomadaire',
                           icon: Iconsax.scan,
                           color: AppColors.primary,
                           isEmpty: _severityPoints.isEmpty,
@@ -402,8 +433,8 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                       PremiumFadeIn(
                         delay: 200,
                         child: _ChartSection(
-                          title: 'Score de Risque',
-                          subtitle: 'Évolution selon vos données quotidiennes',
+                          title: 'Risque (Suivi Quotidien)',
+                          subtitle: 'Évolution selon vos réponses quotidiennes',
                           icon: Iconsax.status_up,
                           color: AppColors.error,
                           isEmpty: _riskPoints.isEmpty,
@@ -440,7 +471,7 @@ class _EvolutionScreenState extends State<EvolutionScreen> {
                               const SizedBox(width: 12),
                               const Expanded(
                                 child: Text(
-                                  'Appuyez sur un point de la courbe pour voir la date et la photo de l\'analyse.',
+                                  'Appuyez sur un point pour voir la date, le score et la photo de l\'analyse.',
                                   style: TextStyle(fontSize: 12, height: 1.5),
                                 ),
                               ),

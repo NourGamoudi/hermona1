@@ -144,29 +144,36 @@ class DetectionApiService implements DetectionRepository {
   // ——————————————————————————————————————————————————————————————————————————————
 
   @override
-
   Future<void> saveResult(DetectionResult result, String userId) async {
-
-    // ⚠️ MEMORY FIX: Never store base64 imageUrls in Firestore.
-    // Each detection contains 5 PNG images (~100KB each = ~500KB per document).
-    // Storing them causes CursorWindow NO_MEMORY on Android (SQLite local cache overflow).
-    // Images live only in-memory for the current session (DetectionResultScreen).
-    final lightweightJson = {
+    // ⚠️ MEMORY FIX: Store heavy images in a sub-collection to prevent CursorWindow overflow
+    // The main document remains lightweight (< 2KB) for fast listing.
+    final metadata = {
       'id': result.id,
       'severityScore': result.severityScore,
       'severityLevel': result.severityLevel.name,
       'classifications': result.classifications.map((c) => c.toJson()).toList(),
       'analyzedAt': result.analyzedAt.toIso8601String(),
-      'imageUrls': <String>[],   // intentionally empty — never store base64 in Firestore
+      'imageUrls': <String>[], // empty in main doc
+      'hasImages': result.imageUrls.isNotEmpty,
       'zoneCounts': result.zoneCounts,
       'zoneRisks': result.zoneRisks,
       'userId': userId,
     };
 
-    await _db
-        .collection(AppConstants.colDetections)
-        .doc(result.id)
-        .set(lightweightJson);
+    final batch = _db.batch();
+    
+    // Main metadata doc
+    batch.set(_db.collection(AppConstants.colDetections).doc(result.id), metadata);
+
+    // Heavy images doc (sub-collection) - only fetched on demand (click)
+    if (result.imageUrls.isNotEmpty) {
+      batch.set(
+        _db.collection(AppConstants.colDetections).doc(result.id).collection('media').doc('images'),
+        {'imageUrls': result.imageUrls},
+      );
+    }
+
+    await batch.commit();
   }
 
 }
