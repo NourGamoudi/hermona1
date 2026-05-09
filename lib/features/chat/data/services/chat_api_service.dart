@@ -45,53 +45,29 @@ class ChatApiService implements ChatRepository {
       // Préparer le payload attendu par le backend FastAPI
 
       final payload = {
-
         "message": userMessage,
-
         "profile": {
-
           "age": profile?.age ?? 25,
-
           "pcos": profile?.sopk == true ? 1 : 0,
-
           "type_peau": profile?.skinType ?? "mixte",
-
-          "imc": 22.0, // Valeurs par défaut si non dispos
-
+          "imc": profile?.imc ?? 22.0,
         },
-
         "daily": {
-
-          "stress": 5.0,
-
-          "sommeil": 7.0,
-
-          "hydratation_verres": 6,
-
+          "stress": (prediction?.shapFactors['Stress'] ?? 0.5) * 10,
+          "sommeil": (prediction?.shapFactors['Sommeil'] ?? 0.7) * 10,
+          "hydratation_verres": 6, 
         },
-
         "hormonal": {
-
-          "jour_cycle": 14,
-
-          "phase": "folliculaire",
-
+          "jour_cycle": prediction?.cycleDay ?? 14,
+          "phase": prediction?.cyclePhase ?? "folliculaire",
         },
-
         "history": history
-
             .takeLast(6)
-
             .map((m) => {
-
                   "role": m.role,
-
                   "content": m.content,
-
                 })
-
             .toList(),
-
       };
 
 

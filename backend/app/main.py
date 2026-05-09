@@ -79,6 +79,115 @@ class RecommendationRequest(BaseModel):
     class Config:
         populate_by_name = True
 
+# --- CHAT ---
+from groq import Groq
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+
+class ChatPayload(BaseModel):
+    message: str
+    profile: Optional[Dict[str, Any]] = None
+    daily: Optional[Dict[str, Any]] = None
+    hormonal: Optional[Dict[str, Any]] = None
+    history: List[Dict[str, str]] = []
+
+@app.post("/chat")
+async def chat(body: ChatPayload, _ = Depends(verify_api_key)):
+    try:
+        # 1. Construction du contexte personnalisé
+        p = body.profile or {}
+        d = body.daily or {}
+        h = body.hormonal or {}
+        
+        system_prompt = f"""Tu es Hermona, l'assistante IA experte en dermatologie et cycles hormonaux.
+Ton but est d'aider l'utilisatrice à comprendre sa peau en fonction de ses données.
+
+DONNÉES DE L'UTILISATRICE :
+- Âge : {p.get('age', 'non précisé')} ans
+- Type de peau : {p.get('type_peau', 'non précisé')}
+- SOPK : {'Oui' if p.get('pcos') else 'Non'}
+- Stress : {d.get('stress', 'normal')}/10
+- Sommeil : {d.get('sommeil', 'normal')}h
+- Jour du cycle : {h.get('jour_cycle', 'non précisé')}
+- Phase : {h.get('phase', 'non précisée')}
+
+CONSIGNES :
+1. Sois empathique, professionnelle et concise.
+2. Basse TES RÉPONSES sur ces données spécifiques. Ne donne pas de conseils génériques si les données permettent de personnaliser.
+3. Si l'utilisatrice est en phase lutéale, mentionne l'impact de la progestérone sur le sébum.
+4. CLAUSE DE NON-RESPONSABILITÉ : Rappelle occasionnellement que tu es une IA et non un dermatologue.
+"""
+        
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Ajout de l'historique (limité aux 6 derniers pour le contexte)
+        for msg in body.history[-6:]:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+            
+        # Message actuel
+        messages.append({"role": "user", "content": body.message})
+
+        chat_completion = groq_client.chat.completions.create(
+            messages=messages,
+            model="llama-3.3-70b-versatile",
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        return {"response": chat_completion.choices[0].message.content}
+    except Exception as e:
+        logger.error(f"Erreur Chat: {e}")
+        return {"response": "Désolée, je rencontre une petite difficulté technique. Peux-tu reformuler ?"}
+
+# --- TRANSCRIPTION (Microphone) ---
+import tempfile
+
+@app.post("/transcribe")
+async def transcribe_audio(file: UploadFile = File(...), _ = Depends(verify_api_key)):
+    """
+    Transcrit un fichier audio (m4a, mp3, wav, webm, ogg, mp4) en texte
+    en utilisant le modèle Whisper de Groq.
+    """
+    try:
+        # Lire le contenu du fichier audio
+        audio_bytes = await file.read()
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="Fichier audio vide")
+
+        # Déterminer l'extension à partir du nom de fichier ou du content-type
+        original_filename = file.filename or "audio.m4a"
+        suffix = os.path.splitext(original_filename)[-1].lower()
+        if suffix not in [".m4a", ".mp3", ".wav", ".webm", ".ogg", ".mp4", ".flac"]:
+            suffix = ".m4a"  # fallback sûr pour les enregistrements mobiles
+
+        # Écrire dans un fichier temporaire (requis par le client Groq)
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+            tmp.write(audio_bytes)
+            tmp_path = tmp.name
+
+        try:
+            with open(tmp_path, "rb") as audio_file:
+                transcription = groq_client.audio.transcriptions.create(
+                    model="whisper-large-v3-turbo",
+                    file=(os.path.basename(tmp_path), audio_file, "audio/m4a"),
+                    language="fr",
+                    response_format="text"
+                )
+            text = transcription if isinstance(transcription, str) else getattr(transcription, "text", "")
+            logger.info(f"✅ Transcription réussie : '{text[:60]}...'")
+            return {"text": text}
+        finally:
+            # Nettoyage du fichier temporaire
+            try:
+                os.remove(tmp_path)
+            except Exception:
+                pass
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Erreur de transcription : {e}")
+        raise HTTPException(status_code=500, detail=f"Erreur de transcription : {str(e)}")
+
 # --- ENDPOINTS ---
 
 # --- V7.1 & V8 DATA CONTRACTS ---
