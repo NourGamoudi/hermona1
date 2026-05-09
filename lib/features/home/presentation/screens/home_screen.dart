@@ -413,6 +413,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _ExplorerCard(icon: Iconsax.chart, title: 'Historique', color: AppColors.info, onTap: () => context.push('/history')),
         _ExplorerCard(icon: Iconsax.people, title: 'Forum', color: AppColors.secondary, onTap: () => context.push('/forum')),
         _ExplorerCard(icon: Iconsax.message_text, title: 'Messagerie', color: AppColors.accent, onTap: () => context.push('/messages')),
+        _ExplorerCard(icon: Iconsax.chart_21, title: 'Évolution', color: const Color(0xFF9C27B0), onTap: () => context.push('/evolution')),
       ],
     );
   }

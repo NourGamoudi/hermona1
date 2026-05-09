@@ -16,6 +16,7 @@ import 'package:acneia/features/detection/presentation/screens/detection_result_
 import 'package:acneia/features/recommendation/presentation/screens/recommendation_screen.dart';
 import 'package:acneia/features/recommendation/presentation/screens/my_routine_screen.dart';
 import 'package:acneia/features/chat/presentation/screens/chat_screen.dart';
+import 'package:acneia/features/home/presentation/screens/evolution_screen.dart';
 import 'package:acneia/features/prediction/presentation/screens/prediction_screen.dart';
 import 'package:acneia/features/profile/presentation/screens/profile_screen.dart';
 import 'package:acneia/features/profile/presentation/screens/history_screen.dart';
@@ -147,6 +148,8 @@ final appRouter = GoRouter(
         ),
 
         GoRoute(path: '/my-routine', builder: (_, __) => const MyRoutineScreen()),
+
+        GoRoute(path: '/evolution', builder: (_, __) => const EvolutionScreen()),
 
       ],
 
