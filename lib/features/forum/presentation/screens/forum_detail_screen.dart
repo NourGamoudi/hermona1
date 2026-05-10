@@ -91,30 +91,27 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
               PremiumFadeIn(child: GlassCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
                 Row(children: [
-
-                  Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-
-                    decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(50)),
-
-                    child: Text(post['category'] ?? '', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600))),
-                  const SizedBox(width: 8),
-                  FutureBuilder<DocumentSnapshot>(
-                    future: _svc.getAuthorProfile(post['authorId']),
-                    builder: (ctx, uSnap) {
-                      final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                      final pseudo = uData?['pseudonym'] ?? 'Anonyme';
-                      return Text('par $pseudo', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic));
-                    },
+                  Flexible(
+                    child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(50)),
+                      child: Text(post['category'] ?? '', style: TextStyle(color: AppTheme.primary, fontSize: 11, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
                   ),
-
-                  const Spacer(),
-
+                  const SizedBox(width: 8),
+                  Flexible(
+                    flex: 2,
+                    child: FutureBuilder<DocumentSnapshot>(
+                      future: _svc.getAuthorProfile(post['authorId']),
+                      builder: (ctx, uSnap) {
+                        final uData = uSnap.data?.data() as Map<String, dynamic>?;
+                        final pseudo = uData?['pseudonym'] ?? 'Anonyme';
+                        return Text('par $pseudo', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic), overflow: TextOverflow.ellipsis);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   if (post['createdAt'] is Timestamp)
-
                     Text(timeago.format((post['createdAt'] as Timestamp).toDate(), locale: 'fr'),
-
                         style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontSize: 11)),
-
                 ]),
 
                 const SizedBox(height: 10),
@@ -218,31 +215,41 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
         ),
 
         Container(
-
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
-
-          child: Row(children: [
-
-            Expanded(child: TextField(controller: _replyCtrl, maxLines: 3, minLines: 1,
-
-                decoration: const InputDecoration(hintText: 'Votre réponse (anonyme)...'))),
-
-            const SizedBox(width: 12),
-
-            GestureDetector(onTap: _sending ? null : _sendReply,
-
-              child: Container(padding: const EdgeInsets.all(14),
-
-                decoration: BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
-
-                child: _sending
-
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-
-                    : const Icon(Iconsax.send_1, color: Colors.white, size: 20))),
-
-          ]),
-
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: GlassCard(
+                  padding: EdgeInsets.zero,
+                  borderRadius: 12,
+                  child: TextField(
+                    controller: _replyCtrl,
+                    maxLines: 4,
+                    minLines: 1,
+                    decoration: const InputDecoration(
+                      hintText: 'Votre réponse...',
+                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      border: InputBorder.none,
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              GestureDetector(
+                onTap: _sending ? null : _sendReply,
+                child: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(color: AppTheme.primary, shape: BoxShape.circle),
+                  child: _sending
+                      ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+                      : const Icon(Iconsax.send_1, color: Colors.white, size: 20),
+                ),
+              ),
+            ],
+          ),
         ),
 
       ]),
@@ -346,13 +353,15 @@ class _ReplyCardState extends State<_ReplyCard> {
 
             const SizedBox(width: 8),
 
-            FutureBuilder<DocumentSnapshot>(
-              future: widget.svc.getAuthorProfile(d['authorId']),
-              builder: (ctx, uSnap) {
-                final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                final pseudo = uData?['pseudonym'] ?? 'Anonyme';
-                return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600));
-              },
+            Flexible(
+              child: FutureBuilder<DocumentSnapshot>(
+                future: widget.svc.getAuthorProfile(d['authorId']),
+                builder: (ctx, uSnap) {
+                  final uData = uSnap.data?.data() as Map<String, dynamic>?;
+                  final pseudo = uData?['pseudonym'] ?? 'Anonyme';
+                  return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis);
+                },
+              ),
             ),
 
             const Spacer(),

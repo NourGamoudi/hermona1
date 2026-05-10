@@ -51,14 +51,17 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
       appBar: AppBar(
         title: Row(
           children: [
-            _AnonymAvatar(seed: widget.conversationId),
-            const SizedBox(width: 14),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Membre Hermona', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
-                Text('Anonyme • En ligne', style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700)),
-              ],
+            _AnonymAvatar(seed: widget.conversationId, size: 36),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Membre Hermona', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14), overflow: TextOverflow.ellipsis),
+                  Text('Anonyme • En ligne', style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+                ],
+              ),
             ),
           ],
         ),
@@ -84,7 +87,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                   children: [
                     Icon(Iconsax.shield_tick, size: 14, color: AppColors.warning),
                     SizedBox(width: 10),
-                    Text('Données personnelles interdites.', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.bold)),
+                    Expanded(child: Text('Données personnelles interdites.', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.bold))),
                   ],
                 ),
               ),
@@ -132,30 +135,34 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
 
               // Input
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
                 child: GlassCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
                   borderRadius: 24,
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Expanded(
                         child: TextField(
                           controller: _msgCtrl,
                           maxLines: 4,
                           minLines: 1,
-                          decoration: const InputDecoration(hintText: 'Écrire un message...', border: InputBorder.none, enabledBorder: InputBorder.none, focusedBorder: InputBorder.none),
+                          style: const TextStyle(fontSize: 14),
+                          decoration: const InputDecoration(hintText: 'Votre message...', border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 12)),
                           onSubmitted: (_) => _send(),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 8),
                       GestureDetector(
                         onTap: _send,
                         child: Container(
-                          padding: const EdgeInsets.all(12),
+                          width: 44,
+                          height: 44,
+                          margin: const EdgeInsets.only(bottom: 2),
                           decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                           child: _sending 
-                              ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Icon(Iconsax.send_1, color: Colors.white, size: 20),
+                              ? const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
+                              : const Icon(Iconsax.send_1, color: Colors.white, size: 18),
                         ),
                       ),
                     ],

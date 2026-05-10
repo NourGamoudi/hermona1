@@ -118,14 +118,13 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    // 🔥 REAL-TIME STREAM
+    // 🔥 REAL-TIME STREAM (Stable Sync)
     _msgSub = _chatSvc.getMessagesStream(uid).listen((hist) {
-      if (mounted) {
+      if (mounted && hist.isNotEmpty) {
         setState(() {
-          _msgs.clear();
-          if (hist.isEmpty) {
-            _addWelcome();
-          } else {
+          // We only replace if the content is actually different to avoid UI jumps
+          if (hist.length != _msgs.where((m) => m.role != 'system').length) {
+            _msgs.clear();
             _msgs.addAll(hist);
           }
         });
@@ -189,14 +188,21 @@ class _ChatScreenState extends State<ChatScreen> {
 
     final userMsg = ChatMessage(id: _uuid.v4(), role: 'user', content: text, timestamp: DateTime.now(), isVoice: isVoice);
     
-    // 🔥 NO MANUAL ADD (Firestore stream will catch it)
-    setState(() { _loading = true; _typing = true; });
-    await _chatSvc.saveMessage(userMsg, uid);
+    // 🔥 INSTANT DISPLAY (Optimistic UI)
+    setState(() { 
+      _msgs.add(userMsg);
+      _loading = true; 
+      _typing = true; 
+    });
     _scrollBottom();
+
+    // Background save
+    _chatSvc.saveMessage(userMsg, uid);
 
     try {
       _cancelToken = CancelToken();
-      final historyToSend = _msgs.take(_msgs.length - 1).toList();
+      // Take history from current state
+      final historyToSend = List<ChatMessage>.from(_msgs);
       
       final response = await _chatSvc.getChatResponse(
         userMessage: text,
@@ -205,28 +211,26 @@ class _ChatScreenState extends State<ChatScreen> {
         cancelToken: _cancelToken,
         history: historyToSend,
       );
-      if (!mounted) {
-        return;
-      }
+
+      if (!mounted) return;
+
       final botMsg = ChatMessage(id: _uuid.v4(), role: 'assistant', content: response, timestamp: DateTime.now());
+      
+      // Save bot response in background
+      _chatSvc.saveMessage(botMsg, uid);
+
       setState(() {
-        _msgs.add(botMsg);
         _loading = false;
         _typing = false;
       });
-      if (uid != null) {
-        await _chatSvc.saveMessage(botMsg, uid);
-      }
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       setState(() {
         _loading = false;
         _typing = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Erreur : Impossible de joindre l'assistant. Vérifiez votre connexion.")),
+        SnackBar(content: Text("Assistant indisponible : $e")),
       );
     }
     _scrollBottom();
@@ -247,9 +251,10 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Assistant Hermona'),
+        title: const FittedBox(fit: BoxFit.scaleDown, child: Text('Assistant Hermona')),
+        leadingWidth: 52,
         leading: Padding(
-          padding: const EdgeInsets.all(8.0),
+          padding: const EdgeInsets.all(10.0),
           child: GestureDetector(
             onTap: () {
               if (Navigator.of(context).canPop()) {
@@ -261,7 +266,7 @@ class _ChatScreenState extends State<ChatScreen> {
             child: Container(
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: AppColors.primary.withValues(alpha: 0.25),
                   width: 1,
@@ -270,7 +275,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: const Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: AppColors.primary,
-                size: 18,
+                size: 16,
               ),
             ),
           ),
@@ -327,8 +332,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildSuggestions() {
     return Container(
-      height: 44,
-      margin: const EdgeInsets.only(bottom: 12),
+      height: 48,
+      margin: const EdgeInsets.only(bottom: 8),
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -349,8 +354,9 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Widget _buildInput(Size size) {
     return Container(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, MediaQuery.of(context).padding.bottom + 20),
+      padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 20),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           // Mic Button
           GestureDetector(
@@ -361,24 +367,19 @@ class _ChatScreenState extends State<ChatScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: _isRecording ? AppColors.error : AppColors.primary.withValues(alpha: 0.2), // Increased opacity
-                borderRadius: BorderRadius.circular(18),
+                color: _isRecording ? AppColors.error : AppColors.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(20),
                 boxShadow: [
-                  BoxShadow(
-                    color: (_isRecording ? AppColors.error : AppColors.primary).withValues(alpha: 0.2), 
-                    blurRadius: 10, 
-                    offset: const Offset(0, 4)
-                  )
+                  if (_isRecording) BoxShadow(color: AppColors.error.withValues(alpha: 0.3), blurRadius: 15, spreadRadius: 2)
                 ],
               ),
               child: Icon(
                 _isRecording ? Icons.stop_rounded : Iconsax.microphone_2,
                 color: _isRecording ? Colors.white : AppColors.primary,
-                size: 24,
+                size: 26,
               ),
             ),
-          ).animate(onPlay: (c) => _isRecording ? c.repeat(reverse: true) : c.stop())
-           .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1), duration: 800.ms),
+          ),
           
           const SizedBox(width: 12),
 
@@ -386,18 +387,18 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: GlassCard(
               padding: EdgeInsets.zero,
-              borderRadius: 18,
+              borderRadius: 20,
               child: TextField(
                 controller: _textCtrl,
-                maxLines: 4,
+                maxLines: 5,
                 minLines: 1,
-                style: const TextStyle(fontSize: 14),
-                decoration: const InputDecoration(
-                  hintText: 'Posez une question...',
-                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
+                decoration: InputDecoration(
+                  hintText: 'Écrivez à Hermona...',
+                  hintStyle: TextStyle(color: AppColors.textSecondaryDark.withValues(alpha: 0.5)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
+                  isDense: true,
                 ),
               ),
             ),
@@ -412,13 +413,15 @@ class _ChatScreenState extends State<ChatScreen> {
               width: 56,
               height: 56,
               decoration: BoxDecoration(
-                color: AppTheme.primary,
-                borderRadius: BorderRadius.circular(18),
-                boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 4))],
+                gradient: LinearGradient(colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)]),
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 6))
+                ],
               ),
               child: _loading 
-                  ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
-                  : const Icon(Icons.send_rounded, color: Colors.white, size: 22),
+                  ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5)))
+                  : const Icon(Icons.send_rounded, color: Colors.white, size: 24),
             ),
           ),
         ],

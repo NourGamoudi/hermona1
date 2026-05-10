@@ -121,7 +121,10 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Text('MEMBRE HERMONA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
+                                          const Flexible(
+                                            child: Text('MEMBRE HERMONA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5), overflow: TextOverflow.ellipsis),
+                                          ),
+                                          const SizedBox(width: 8),
                                           Text(timeago.format(date, locale: 'fr'), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
                                         ],
                                       ),
