@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
@@ -162,6 +163,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                   final level = data['riskLevel'] as String? ?? 'low';
                   final color = level == 'low' ? AppColors.success : level == 'medium' ? AppColors.warning : AppColors.error;
                   return GlassCard(
+                    onTap: () => ctx.push('/prediction', extra: PredictionResult.fromJson(data)),
                     child: Row(
                       children: [
                         _CircularScore(score: (risk * 100).toInt(), color: color, suffix: '%'),
@@ -176,6 +178,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                             ],
                           ),
                         ),
+                        const Icon(Iconsax.arrow_right_3, size: 16, color: AppColors.textSecondaryDark),
                       ],
                     ),
                   );
@@ -190,6 +193,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 emptySubtitle: 'Vos questions à l\'assistante Hermona.',
                 emptyIcon: Iconsax.message,
                 itemBuilder: (ctx, data, id) => GlassCard(
+                  onTap: () => ctx.push('/chat'),
                   child: Row(
                     children: [
                       Container(
@@ -208,6 +212,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                           ],
                         ),
                       ),
+                      const Icon(Iconsax.arrow_right_3, size: 16, color: AppColors.textSecondaryDark),
                     ],
                   ),
                 ),
