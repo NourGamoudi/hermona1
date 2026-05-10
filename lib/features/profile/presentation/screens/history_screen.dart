@@ -92,7 +92,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 emptySubtitle: 'Lancer un scan pour voir vos résultats.',
                 emptyIcon: Iconsax.scan,
                 itemBuilder: (ctx, data, id) {
-                  final score = data['severityScore'] as int? ?? 0;
+                  final score = (data['severityScore'] as num?)?.toInt() ?? 0;
                   final level = data['severityLevel'] as String? ?? 'normal';
                   final color = level == 'normal' ? AppColors.success : level == 'moderate' ? AppColors.warning : AppColors.error;
                   return GlassCard(

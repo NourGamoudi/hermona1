@@ -255,8 +255,8 @@ class _ForumCardState extends State<_ForumCard> {
   Widget build(BuildContext context) {
     final d = widget.data;
     final isOwn = d['authorId'] == _uid;
-    final likes = d['likesCount'] as int? ?? 0;
-    final replies = d['repliesCount'] as int? ?? 0;
+    final likes = (d['likesCount'] as num?)?.toInt() ?? 0;
+    final replies = (d['repliesCount'] as num?)?.toInt() ?? 0;
     final date = d['createdAt'] is Timestamp ? (d['createdAt'] as Timestamp).toDate() : DateTime.now();
 
     return PremiumFadeIn(

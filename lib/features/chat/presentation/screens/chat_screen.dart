@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
@@ -35,6 +36,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final _uuid = const Uuid();
 
   final List<ChatMessage> _msgs = [];
+  StreamSubscription<List<ChatMessage>>? _msgSub;
   bool _loading = false;
   bool _typing = false;
   CancelToken? _cancelToken;
@@ -75,6 +77,7 @@ class _ChatScreenState extends State<ChatScreen> {
     _textCtrl.dispose();
     _audioRecorder.dispose();
     _tts.stop();
+    _msgSub?.cancel(); // 🔥 CANCEL STREAM
     super.dispose();
   }
 
@@ -115,15 +118,20 @@ class _ChatScreenState extends State<ChatScreen> {
       return;
     }
 
-    final hist = await _chatSvc.loadHistory(uid);
-    if (!mounted) return;
-    
-    if (hist.isEmpty) {
-      _addWelcome();
-    } else {
-      setState(() => _msgs.addAll(hist));
-      _scrollBottom();
-    }
+    // 🔥 REAL-TIME STREAM
+    _msgSub = _chatSvc.getMessagesStream(uid).listen((hist) {
+      if (mounted) {
+        setState(() {
+          _msgs.clear();
+          if (hist.isEmpty) {
+            _addWelcome();
+          } else {
+            _msgs.addAll(hist);
+          }
+        });
+        _scrollBottom();
+      }
+    });
 
     _questionnaireSvc.fetchUserProfile(uid).then((p) {
       if (mounted) setState(() => _profile = p);
@@ -175,12 +183,16 @@ class _ChatScreenState extends State<ChatScreen> {
   Future<void> _send(String text, {bool isVoice = false}) async {
     if (text.trim().isEmpty || _loading) return;
     _textCtrl.clear();
-    final userMsg = ChatMessage(id: _uuid.v4(), role: 'user', content: text, timestamp: DateTime.now(), isVoice: isVoice);
-    setState(() { _msgs.add(userMsg); _loading = true; _typing = true; });
-    _scrollBottom();
-
+    
     final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid != null) await _chatSvc.saveMessage(userMsg, uid);
+    if (uid == null) return;
+
+    final userMsg = ChatMessage(id: _uuid.v4(), role: 'user', content: text, timestamp: DateTime.now(), isVoice: isVoice);
+    
+    // 🔥 NO MANUAL ADD (Firestore stream will catch it)
+    setState(() { _loading = true; _typing = true; });
+    await _chatSvc.saveMessage(userMsg, uid);
+    _scrollBottom();
 
     try {
       _cancelToken = CancelToken();

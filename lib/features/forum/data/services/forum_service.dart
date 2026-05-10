@@ -274,7 +274,7 @@ class ForumService {
 
       final snap  = await tx.get(_db.collection(col).doc(targetId));
 
-      final count = ((snap.data()?['reportsCount'] as int?) ?? 0) + 1;
+      final count = ((snap.data()?['reportsCount'] as num?)?.toInt() ?? 0) + 1;
 
       tx.update(_db.collection(col).doc(targetId), {
 

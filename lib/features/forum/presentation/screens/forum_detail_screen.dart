@@ -127,7 +127,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
                 const SizedBox(height: 14),
 
-                _LikeRow(postId: widget.postId, likes: post['likesCount'] as int? ?? 0, svc: _svc),
+                _LikeRow(postId: widget.postId, likes: (post['likesCount'] as num?)?.toInt() ?? 0, svc: _svc),
 
               ]))),
 
@@ -257,8 +257,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
 class _LikeRow extends StatefulWidget {
 
-  final String postId; final int likes; final ForumService svc;
-
+  final String postId; final num likes; final ForumService svc;
   const _LikeRow({required this.postId, required this.likes, required this.svc});
 
   @override State<_LikeRow> createState() => _LikeRowState();
@@ -289,7 +288,7 @@ class _LikeRowState extends State<_LikeRow> {
 
       const SizedBox(width: 6),
 
-      Text('${widget.likes}', style: Theme.of(context).textTheme.bodySmall),
+      Text('${widget.likes.toInt()}', style: Theme.of(context).textTheme.bodySmall),
 
     ]),
 

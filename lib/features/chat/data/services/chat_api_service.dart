@@ -102,30 +102,34 @@ class ChatApiService implements ChatRepository {
 
 
 
+  Stream<List<ChatMessage>> getMessagesStream(String userId) {
+    return _db.collection(AppConstants.colChatHistory)
+        .where('userId', isEqualTo: userId)
+        .orderBy('timestamp', descending: true)
+        .limit(20)
+        .snapshots()
+        .map((snap) => snap.docs
+            .map((d) => ChatMessage.fromJson(d.data()))
+            .toList()
+            .reversed
+            .toList());
+  }
+
   @override
-
   Future<List<ChatMessage>> loadHistory(String userId) async {
-
     try {
-
-      final snap = await _db
-          .collection(AppConstants.colChatHistory)
+      final snap = await _db.collection(AppConstants.colChatHistory)
           .where('userId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(15)
-          .get(const GetOptions(source: Source.server));
-
+          .get(const GetOptions(source: Source.serverAndCache)); // 🔥 USE CACHE FIRST
+      
       final msgs = snap.docs.map((d) => ChatMessage.fromJson(d.data())).toList();
       return msgs.reversed.toList();
-
     } catch (e) {
-
       debugPrint('Chat history load failed: $e');
-
       return [];
-
     }
-
   }
 
 

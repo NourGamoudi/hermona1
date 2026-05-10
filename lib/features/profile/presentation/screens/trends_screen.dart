@@ -182,7 +182,7 @@ class _TrendsScreenState extends State<TrendsScreen> {
                   date: latest['__dt'] as DateTime,
                   value: avg,
                   weekLabel: key,
-                  x: latest['__relWeek'] as double,
+                  x: (latest['__relWeek'] as num).toDouble(),
                   fullData: latest,
                 ));
               });

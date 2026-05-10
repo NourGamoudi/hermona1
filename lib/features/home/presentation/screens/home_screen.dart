@@ -155,7 +155,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   return db.compareTo(da);
                 });
                 final data = docs.first.data() as Map<String, dynamic>;
-                score = data['hygieneScore'] as int?;
+                score = (data['hygieneScore'] as num?)?.toInt();
               }
               return _SquareScoreCard(
                 title: 'Hygiène',
@@ -210,7 +210,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           
           // Calculate average cycle
-          final lastCycles = (data['lastCyclesDuration'] as List<dynamic>?)?.map((e) => e as int).toList() ?? [28, 28, 28];
+          final lastCycles = (data['lastCyclesDuration'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ?? [28, 28, 28];
           if (lastCycles.isNotEmpty) {
             avgCycle = (lastCycles.reduce((a, b) => a + b) / lastCycles.length).round();
           }
@@ -316,7 +316,8 @@ class _HomeScreenState extends State<HomeScreen> {
           .where('userId', isEqualTo: uid)
           .orderBy('analyzedAt', descending: true)
           .limit(10)
-          .snapshots(),
+          .get(const GetOptions(source: Source.server))
+          .asStream(),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
         
@@ -337,7 +338,7 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(width: 45, height: 45, decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(Iconsax.scan, color: AppTheme.primary, size: 20)),
               const SizedBox(width: 16),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Sévérité : ${data['severityScore']}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('Sévérité : ${(data['severityScore'] as num?)?.toInt() ?? 0}%', style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Text('Dernière analyse effectuée.', style: TextStyle(fontSize: 11, color: Colors.grey)),
               ])),
               const Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey),

@@ -63,7 +63,7 @@ class DetectionResult extends Equatable {
     imageUrls     : List<String>.from(j['imageUrls'] ?? []),
     zoneCounts    : j['zoneCounts'] != null 
         ? (j['zoneCounts'] as Map<String, dynamic>).map(
-            (k, v) => MapEntry(k, (v as Map<String, dynamic>).cast<String, int>()),
+            (k, v) => MapEntry(k, (v as Map<String, dynamic>).map((ik, iv) => MapEntry(ik, (iv as num).toInt()))),
           )
         : null,
     zoneRisks     : j['zoneRisks'] != null
