@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +14,8 @@ import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
 import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
 import 'package:acneia/features/detection/data/services/detection_api_service.dart';
+import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
+import 'package:acneia/features/recommendation/data/services/recommendation_api_service.dart';
 import 'package:acneia/features/detection/presentation/screens/face_capture_screen.dart';
 
 class WeeklyQuestionnaireScreen extends StatefulWidget {
@@ -142,9 +145,53 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
       
       await _service.saveWeeklySurvey(survey);
       
+      // 1. Detection (IA Photo)
       final detectionService = DetectionApiService();
       final detectionResult = await detectionService.analyzeImages([File(photos['face']!)]);
       await detectionService.saveResult(detectionResult, user.uid);
+
+      // 2. Prediction (Risque & Hygiène)
+      final predictService = PredictionApiService();
+      Map<String, dynamic> answers = {
+        'spf_used': spfThisWeek != 'Jamais',
+        'cleansing': cleansingFrequency,
+        'makeup': makeupFrequency,
+        'routine_followed': routineFollowed,
+      };
+
+      try {
+        // On récupère aussi les dernières données quotidiennes pour le sommeil/stress
+        final dailySnap = await FirebaseFirestore.instance
+            .collection('daily_surveys')
+            .where('userId', isEqualTo: user.uid)
+            .get();
+
+        if (dailySnap.docs.isNotEmpty) {
+          final docs = dailySnap.docs.toList();
+          docs.sort((a, b) => (b.data()['date'] as Timestamp).compareTo(a.data()['date'] as Timestamp));
+          final d = docs.first.data();
+          answers.addAll({
+            'stress': d['stress'],
+            'sleep': d['sleepDuration'],
+            'sleep_quality': d['sleepQuality'],
+            'hydration': d['hydration'],
+            'diet': d['food'],
+          });
+        }
+
+        final predictionResult = await predictService.predict(answers);
+        await predictService.saveResult(predictionResult, user.uid);
+
+        // 3. Recommendation (Routine)
+        final recommendService = RecommendationApiService();
+        final recommendation = await recommendService.getRecommendations(
+          detection: detectionResult,
+          userId: user.uid,
+        );
+        await recommendService.saveResult(recommendation, user.uid);
+      } catch (e) {
+        debugPrint('Erreur lors de la prédiction/recommandation: $e');
+      }
       
       if (mounted) {
         context.go('/detection/result', extra: detectionResult.toJson());

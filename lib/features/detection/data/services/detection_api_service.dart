@@ -28,7 +28,7 @@ class DetectionApiService implements DetectionRepository {
       : _dio = Dio(BaseOptions(
           baseUrl        : AppConstants.apiBaseUrl,
           headers        : {'X-API-Key': AppConstants.apiKey},
-          connectTimeout : const Duration(seconds: 30),
+          connectTimeout : const Duration(seconds: 60),
           receiveTimeout : const Duration(seconds: 60),
         ));
 
@@ -72,7 +72,7 @@ class DetectionApiService implements DetectionRepository {
       final response = await _dio.post<Map<String, dynamic>>(
         '/detect',
         data: formData,
-      ).timeout(const Duration(seconds: 30));
+      ).timeout(const Duration(seconds: 90));
 
 
 
@@ -145,35 +145,22 @@ class DetectionApiService implements DetectionRepository {
 
   @override
   Future<void> saveResult(DetectionResult result, String userId) async {
-    // ⚠️ MEMORY FIX: Store heavy images in a sub-collection to prevent CursorWindow overflow
-    // The main document remains lightweight (< 2KB) for fast listing.
+    // We store everything in a single document to comply with the user's Firestore rules
+    // (which only allow writes to /detections/{id} and not sub-collections).
     final metadata = {
       'id': result.id,
       'severityScore': result.severityScore,
       'severityLevel': result.severityLevel.name,
       'classifications': result.classifications.map((c) => c.toJson()).toList(),
       'analyzedAt': result.analyzedAt.toIso8601String(),
-      'imageUrls': <String>[], // empty in main doc
+      'imageUrls': result.imageUrls,
       'hasImages': result.imageUrls.isNotEmpty,
       'zoneCounts': result.zoneCounts,
       'zoneRisks': result.zoneRisks,
       'userId': userId,
     };
 
-    final batch = _db.batch();
-    
-    // Main metadata doc
-    batch.set(_db.collection(AppConstants.colDetections).doc(result.id), metadata);
-
-    // Heavy images doc (sub-collection) - only fetched on demand (click)
-    if (result.imageUrls.isNotEmpty) {
-      batch.set(
-        _db.collection(AppConstants.colDetections).doc(result.id).collection('media').doc('images'),
-        {'imageUrls': result.imageUrls},
-      );
-    }
-
-    await batch.commit();
+    await _db.collection(AppConstants.colDetections).doc(result.id).set(metadata);
   }
 
 }

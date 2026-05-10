@@ -20,7 +20,7 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
   late TabController _tab;
 
   RecommendationResult? _result;
-  Map<String, dynamic>? _predictionData; // Latest prediction scores
+  Map<String, dynamic>? _predictionData;
   bool _loading = true;
   String? _error;
 

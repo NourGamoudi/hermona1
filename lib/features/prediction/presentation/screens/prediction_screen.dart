@@ -11,6 +11,10 @@ import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/features/recommendation/domain/entities/recommendation_result.dart';
+import 'package:acneia/features/recommendation/data/services/recommendation_api_service.dart';
+import 'package:acneia/features/detection/domain/entities/detection_result.dart';
+import 'package:acneia/features/detection/data/services/detection_api_service.dart';
 
 class PredictionScreen extends StatefulWidget {
   final PredictionResult? initialResult;
@@ -23,7 +27,11 @@ class PredictionScreen extends StatefulWidget {
 class _PredictionScreenState extends State<PredictionScreen> {
   bool _loading = false;
   PredictionResult? _result;
-  final _svc = PredictionApiService();
+  RecommendationResult? _recommendation;
+  
+  final _predictSvc = PredictionApiService();
+  final _recommendSvc = RecommendationApiService();
+  final _detectionSvc = DetectionApiService();
 
   @override
   void initState() {
@@ -34,36 +42,102 @@ class _PredictionScreenState extends State<PredictionScreen> {
   }
 
   Future<void> _predict() async {
-    setState(() { _loading = true; _result = null; });
+    setState(() { _loading = true; _result = null; _recommendation = null; });
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('Utilisateur non connecté');
 
-      // Optimization: Fetch only the most recent daily survey using index
-      final dailySnap = await FirebaseFirestore.instance
-          .collection('daily_surveys')
+      Map<String, dynamic> answers = {};
+
+      try {
+        // 1. Fetch Latest Daily Survey (Optimized with index)
+        final dailySnap = await FirebaseFirestore.instance
+            .collection('daily_surveys')
+            .where('userId', isEqualTo: uid)
+            .orderBy('date', descending: true)
+            .limit(1)
+            .get();
+
+        if (dailySnap.docs.isNotEmpty) {
+          final d = dailySnap.docs.first.data();
+          answers.addAll({
+            'stress': d['stress'],
+            'sleep': d['sleepDuration'],
+            'sleep_quality': d['sleepQuality'],
+            'hydration': d['hydration'],
+            'diet': d['food'],
+            'cycle_day': d['cycleDay'],
+            'cycle_phase': d['cyclePhase'],
+          });
+          debugPrint('DEBUG: Daily data found via index: ${dailySnap.docs.first.id}');
+        }
+
+        // 2. Fetch Latest Weekly Survey (Optimized with index)
+        final weeklySnap = await FirebaseFirestore.instance
+            .collection('weekly_surveys')
+            .where('userId', isEqualTo: uid)
+            .orderBy('year', descending: true)
+            .orderBy('weekNumber', descending: true)
+            .limit(1)
+            .get();
+
+        if (weeklySnap.docs.isNotEmpty) {
+          final w = weeklySnap.docs.first.data();
+          answers.addAll({
+            'cleansing': w['cleansingFrequency'],
+            'spf_used': w['spfThisWeek'] != 'Jamais',
+            'makeup_frequency': w['makeupFrequency'],
+            'routine_followed': w['routineFollowed'],
+          });
+          debugPrint('DEBUG: Weekly data found via index: ${weeklySnap.docs.first.id}');
+        }
+      } catch (e) {
+        debugPrint('DEBUG: Survey fetch error (wait for index build): $e');
+      }
+
+      debugPrint('DEBUG: Final payload to API: $answers');
+
+      // 3. Fetch Prediction (Risk & Hygiene)
+      final res = await _predictSvc.predict(answers); 
+      await _predictSvc.saveResult(res, uid);
+
+      // 3. Fetch Latest Detection Result
+      final detSnap = await FirebaseFirestore.instance
+          .collection('detections')
           .where('userId', isEqualTo: uid)
-          .orderBy('date', descending: true)
+          .orderBy('analyzedAt', descending: true)
           .limit(1)
           .get();
 
-      Map<String, dynamic> answers = {};
-      if (dailySnap.docs.isNotEmpty) {
-        final d = dailySnap.docs.first.data();
-        answers = {
-          'stress': (d['stress'] ?? 0) > 7 ? 'high' : (d['stress'] ?? 0) > 4 ? 'medium' : 'low',
-          'sleep': (d['sleepDuration'] ?? 0) < 6 ? 'poor' : 'good',
-          'diet': (d['food'] is List && (d['food'] as List).contains('sucre')) ? 'bad' : 'good',
-          'hormonal_cycle': d['cyclePhase'],
-          'hygieneScore': d['lifestyleScore'],
-          'spf_used': d['spfUsed'] ?? false,
-        };
+      DetectionResult latestDetection;
+      if (detSnap.docs.isNotEmpty) {
+        latestDetection = DetectionResult.fromJson(detSnap.docs.first.data());
+      } else {
+        // Fallback if no detection found
+        latestDetection = DetectionResult(
+          id: 'fallback',
+          severityScore: 0.5,
+          severityLevel: SeverityLevel.moderate,
+          classifications: [],
+          analyzedAt: DateTime.now(),
+          imageUrls: [],
+          zoneCounts: {},
+          zoneRisks: {},
+        );
       }
 
-      final res = await _svc.predict(answers); 
-      await _svc.saveResult(res, uid);
+      // 4. Fetch Recommendations based on real detection + answers
+      final rec = await _recommendSvc.getRecommendations(
+        detection: latestDetection, 
+        userId: uid
+      );
+      await _recommendSvc.saveResult(rec, uid);
 
-      if (mounted) setState(() { _result = res; _loading = false; });
+      if (mounted) setState(() { 
+        _result = res; 
+        _recommendation = rec;
+        _loading = false; 
+      });
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
@@ -76,7 +150,13 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_result != null) return _ResultView(result: _result!, onRetry: () => setState(() => _result = null));
+    if (_result != null) {
+      return _ResultView(
+        result: _result!, 
+        recommendation: _recommendation,
+        onRetry: () => setState(() { _result = null; _recommendation = null; })
+      );
+    }
 
     return Scaffold(
       extendBodyBehindAppBar: true,
@@ -129,8 +209,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
 class _ResultView extends StatelessWidget {
   final PredictionResult result;
+  final RecommendationResult? recommendation;
   final VoidCallback onRetry;
-  const _ResultView({required this.result, required this.onRetry});
+  const _ResultView({required this.result, this.recommendation, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -178,8 +259,8 @@ class _ResultView extends StatelessWidget {
         body: TabBarView(
           children: [
             _AnalysisTab(result: result, color: color),
-            _RoutineTab(result: result),
-            _LifestyleTab(result: result),
+            _RoutineTab(recommendation: recommendation),
+            _LifestyleTab(recommendation: recommendation),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
@@ -271,48 +352,87 @@ class _AnalysisTab extends StatelessWidget {
 }
 
 class _RoutineTab extends StatelessWidget {
-  final PredictionResult result;
-  const _RoutineTab({required this.result});
+  final RecommendationResult? recommendation;
+  const _RoutineTab({this.recommendation});
 
   @override
   Widget build(BuildContext context) {
+    if (recommendation == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
       children: [
-        const SectionHeader(title: 'Votre Routine sur-mesure'),
-        const SizedBox(height: 12),
-        ...result.routine.asMap().entries.map((e) => PremiumFadeIn(
-          delay: e.key * 100,
-          child: _TipCard(text: e.value, icon: Iconsax.magic_star, color: AppColors.primary),
-        )),
+        if (recommendation!.morningRoutine.isNotEmpty) ...[
+          const SectionHeader(title: 'Routine Matin'),
+          const SizedBox(height: 12),
+          ...recommendation!.morningRoutine.asMap().entries.map((e) => PremiumFadeIn(
+            delay: e.key * 100,
+            child: _TipCard(
+              text: '${e.value.product}: ${e.value.instruction}', 
+              icon: Iconsax.sun_1, 
+              color: AppColors.primary
+            ),
+          )),
+        ],
         const SizedBox(height: 24),
-        const SectionHeader(title: 'À Éviter'),
-        ...result.toAvoid.asMap().entries.map((e) => PremiumFadeIn(
-          delay: (e.key + 5) * 100,
-          child: _TipCard(text: e.value, icon: Iconsax.close_circle, color: AppColors.error),
-        )),
+        if (recommendation!.eveningRoutine.isNotEmpty) ...[
+          const SectionHeader(title: 'Routine Soir'),
+          const SizedBox(height: 12),
+          ...recommendation!.eveningRoutine.asMap().entries.map((e) => PremiumFadeIn(
+            delay: (e.key + 5) * 100,
+            child: _TipCard(
+              text: '${e.value.product}: ${e.value.instruction}', 
+              icon: Iconsax.moon, 
+              color: const Color(0xFF6366F1)
+            ),
+          )),
+        ],
+        const SizedBox(height: 24),
+        if (recommendation!.avoid.isNotEmpty) ...[
+          const SectionHeader(title: 'À Éviter'),
+          const SizedBox(height: 12),
+          ...recommendation!.avoid.asMap().entries.map((e) => PremiumFadeIn(
+            delay: (e.key + 10) * 100,
+            child: _TipCard(text: e.value, icon: Iconsax.close_circle, color: AppColors.error),
+          )),
+        ],
       ],
     );
   }
 }
 
 class _LifestyleTab extends StatelessWidget {
-  final PredictionResult result;
-  const _LifestyleTab({required this.result});
+  final RecommendationResult? recommendation;
+  const _LifestyleTab({this.recommendation});
 
   @override
   Widget build(BuildContext context) {
+    if (recommendation == null) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final combinedLifestyle = [
+      ...recommendation!.lifestyle,
+      ...recommendation!.habits,
+      ...recommendation!.nutrition,
+    ];
+
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
       children: [
         const SectionHeader(title: 'Habitudes & Hygiène'),
         const SizedBox(height: 12),
-        ...result.lifestyle.asMap().entries.map((e) => PremiumFadeIn(
-          delay: e.key * 100,
-          child: _TipCard(text: e.value, icon: Iconsax.heart5, color: AppColors.info),
-        )),
+        if (combinedLifestyle.isEmpty)
+          const _TipCard(text: "Suivez votre routine habituelle.", icon: Iconsax.info_circle, color: AppColors.info)
+        else
+          ...combinedLifestyle.asMap().entries.map((e) => PremiumFadeIn(
+            delay: e.key * 100,
+            child: _TipCard(text: e.value, icon: Iconsax.heart5, color: AppColors.info),
+          )),
       ],
     );
   }

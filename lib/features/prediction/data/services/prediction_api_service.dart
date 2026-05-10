@@ -14,8 +14,8 @@ class PredictionApiService implements PredictionRepository {
       : _dio = Dio(BaseOptions(
           baseUrl: AppConstants.apiBaseUrl,
           headers: {'X-API-Key': AppConstants.apiKey},
-          connectTimeout: const Duration(seconds: 30),
-          receiveTimeout: const Duration(seconds: 30),
+          connectTimeout: const Duration(seconds: 60),
+          receiveTimeout: const Duration(seconds: 60),
         ));
 
   @override

@@ -12,11 +12,10 @@ class PredictionResult extends Equatable {
   final TrendDirection trend;
   final Map<String, double> shapFactors;
   final int hygieneScore;
+  final String? hygieneLevel;
+  final Map<String, num>? hygieneBreakdown;
   final int cycleDay;
   final String cyclePhase;
-  final List<String> routine;
-  final List<String> toAvoid;
-  final List<String> lifestyle;
   final DateTime predictedAt;
 
   const PredictionResult({
@@ -27,29 +26,36 @@ class PredictionResult extends Equatable {
     required this.trend,
     required this.shapFactors,
     required this.hygieneScore,
+    this.hygieneLevel,
+    this.hygieneBreakdown,
     required this.cycleDay,
     required this.cyclePhase,
-    required this.routine,
-    required this.toAvoid,
-    required this.lifestyle,
     required this.predictedAt,
   });
 
-  factory PredictionResult.fromJson(Map<String, dynamic> j) => PredictionResult(
-    id: j['id'] as String,
-    riskScore: (j['riskScore'] as num).toDouble(),
-    riskJ3: (j['riskJ3'] ?? (j['riskScore'] as num).toDouble()).toDouble(),
-    riskLevel: RiskLevel.values.firstWhere((e) => e.name == j['riskLevel'], orElse: () => RiskLevel.low),
-    trend: TrendDirection.values.firstWhere((e) => e.name == (j['trend'] ?? 'stable'), orElse: () => TrendDirection.stable),
-    shapFactors: j['shapFactors'] != null ? Map<String, double>.from(j['shapFactors']) : {},
-    hygieneScore: (j['hygieneScore'] as num?)?.toInt() ?? 0,
-    cycleDay: (j['cycleDay'] as num?)?.toInt() ?? 0,
-    cyclePhase: j['cyclePhase'] ?? '',
-    routine: List<String>.from(j['routine'] ?? []),
-    toAvoid: List<String>.from(j['toAvoid'] ?? []),
-    lifestyle: List<String>.from(j['lifestyle'] ?? []),
-    predictedAt: j['predictedAt'] is String ? DateTime.parse(j['predictedAt']) : (j['predictedAt'] as Timestamp).toDate(),
-  );
+  factory PredictionResult.fromJson(Map<String, dynamic> j) {
+    final scoreData = j['score'] as Map<String, dynamic>?;
+    
+    return PredictionResult(
+      id: j['id'] as String,
+      riskScore: (j['riskScore'] as num).toDouble(),
+      riskJ3: (j['riskJ3'] ?? (j['riskScore'] as num).toDouble()).toDouble(),
+      riskLevel: RiskLevel.values.firstWhere((e) => e.name == j['riskLevel'], orElse: () => RiskLevel.low),
+      trend: TrendDirection.values.firstWhere((e) => e.name == (j['trend'] ?? 'stable'), orElse: () => TrendDirection.stable),
+      shapFactors: j['shapFactors'] != null 
+          ? (j['shapFactors'] as Map).map((k, v) => MapEntry(k.toString(), (v as num).toDouble()))
+          : {},
+      // Root mapping for robustness
+      hygieneScore: (j['hygieneScore'] as num?)?.toInt() ?? (scoreData?['value'] as num?)?.toInt() ?? 0,
+      hygieneLevel: scoreData?['level'] as String?,
+      hygieneBreakdown: scoreData?['breakdown'] != null 
+          ? Map<String, num>.from(scoreData!['breakdown']) 
+          : null,
+      cycleDay: (j['cycleDay'] as num?)?.toInt() ?? 0,
+      cyclePhase: j['cyclePhase'] ?? '',
+      predictedAt: j['predictedAt'] is String ? DateTime.parse(j['predictedAt']) : (j['predictedAt'] as Timestamp).toDate(),
+    );
+  }
 
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -59,14 +65,15 @@ class PredictionResult extends Equatable {
     'trend': trend.name,
     'shapFactors': shapFactors,
     'hygieneScore': hygieneScore,
+    'hygieneLevel': hygieneLevel,
+    'hygieneBreakdown': hygieneBreakdown,
     'cycleDay': cycleDay,
     'cyclePhase': cyclePhase,
-    'routine': routine,
-    'toAvoid': toAvoid,
-    'lifestyle': lifestyle,
     'predictedAt': Timestamp.fromDate(predictedAt),
   };
 
   @override
-  List<Object?> get props => [id, riskScore];
+  List<Object?> get props => [
+    id, riskScore, hygieneScore, predictedAt
+  ];
 }
