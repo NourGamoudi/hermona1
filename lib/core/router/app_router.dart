@@ -103,7 +103,12 @@ final appRouter = GoRouter(
 
         GoRoute(path: '/home',       builder: (_, __) => const HomeScreen()),
 
-        GoRoute(path: '/chat',       builder: (_, __) => const ChatScreen()),
+        GoRoute(
+          path: '/chat', 
+          builder: (_, state) => ChatScreen(
+            targetMessageId: state.uri.queryParameters['targetId'],
+          ),
+        ),
 
         GoRoute(
 

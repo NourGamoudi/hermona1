@@ -193,7 +193,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 emptySubtitle: 'Vos questions à l\'assistante Hermona.',
                 emptyIcon: Iconsax.message,
                 itemBuilder: (ctx, data, id) => GlassCard(
-                  onTap: () => ctx.push('/chat'),
+                  onTap: () => ctx.push('/chat?targetId=$id'),
                   child: Row(
                     children: [
                       Container(

@@ -21,7 +21,8 @@ import 'package:acneia/features/questionnaire/data/services/questionnaire_servic
 import 'package:acneia/core/widgets/common_widgets.dart';
 
 class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+  final String? targetMessageId;
+  const ChatScreen({super.key, this.targetMessageId});
 
   @override
   State<ChatScreen> createState() => _ChatScreenState();
@@ -35,6 +36,9 @@ class _ChatScreenState extends State<ChatScreen> {
   final _predictionSvc = PredictionApiService();
   final _uuid = const Uuid();
 
+  bool _scrolledToTarget = false;
+  final _targetKey = GlobalKey();
+  
   final List<ChatMessage> _msgs = [];
   StreamSubscription<List<ChatMessage>>? _msgSub;
   bool _loading = false;
@@ -122,13 +126,17 @@ class _ChatScreenState extends State<ChatScreen> {
     _msgSub = _chatSvc.getMessagesStream(uid).listen((hist) {
       if (mounted && hist.isNotEmpty) {
         setState(() {
-          // We only replace if the content is actually different to avoid UI jumps
           if (hist.length != _msgs.where((m) => m.role != 'system').length) {
             _msgs.clear();
             _msgs.addAll(hist);
           }
         });
-        _scrollBottom();
+
+        if (widget.targetMessageId != null && !_scrolledToTarget) {
+          _scrollToTarget();
+        } else {
+          _scrollBottom();
+        }
       }
     });
 
@@ -236,6 +244,20 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollBottom();
   }
 
+  void _scrollToTarget() {
+    Future.delayed(200.ms, () {
+      if (mounted && _targetKey.currentContext != null) {
+        _scrolledToTarget = true;
+        Scrollable.ensureVisible(
+          _targetKey.currentContext!,
+          duration: 800.ms,
+          curve: Curves.easeInOutQuart,
+          alignment: 0.5, // Center the message
+        );
+      }
+    });
+  }
+
   void _scrollBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollCtrl.hasClients) {
@@ -309,11 +331,19 @@ class _ChatScreenState extends State<ChatScreen> {
                 child: ListView.builder(
                   controller: _scrollCtrl,
                   physics: const BouncingScrollPhysics(),
+                  cacheExtent: 5000, // Force pre-building of items to make GlobalKey available
                   padding: const EdgeInsets.fromLTRB(20, 100, 20, 20),
                   itemCount: _msgs.length + (_typing || _isTranscribing ? 1 : 0),
                   itemBuilder: (context, index) {
                     if (index == _msgs.length) return const _TypingIndicator();
-                    return _ChatBubble(msg: _msgs[index], onSpeak: () => _handleSpeak(_msgs[index].content));
+                    final m = _msgs[index];
+                    final isTarget = m.id == widget.targetMessageId;
+                    return _ChatBubble(
+                      key: isTarget ? _targetKey : null,
+                      msg: m, 
+                      isTarget: isTarget,
+                      onSpeak: () => _handleSpeak(m.content),
+                    );
                   },
                 ),
               ),
@@ -433,7 +463,8 @@ class _ChatScreenState extends State<ChatScreen> {
 class _ChatBubble extends StatelessWidget {
   final ChatMessage msg;
   final VoidCallback onSpeak;
-  const _ChatBubble({required this.msg, required this.onSpeak});
+  final bool isTarget;
+  const _ChatBubble({super.key, required this.msg, required this.onSpeak, this.isTarget = false});
 
   @override
   Widget build(BuildContext context) {
@@ -453,21 +484,27 @@ class _ChatBubble extends StatelessWidget {
             const SizedBox(width: 10),
           ],
           Flexible(
-            child: Column(
-              crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                if (isUser)
-                  Container(
+            child: Container(
+              decoration: isTarget ? BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.5), width: 2),
+                boxShadow: [BoxShadow(color: Colors.amber.withValues(alpha: 0.1), blurRadius: 10)],
+              ) : null,
+              child: Column(
+                crossAxisAlignment: isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  if (isUser)
+                    Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [AppTheme.primary, AppColors.primaryDark]),
+                      gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(22),
                         topRight: Radius.circular(22),
                         bottomLeft: Radius.circular(22),
                         bottomRight: Radius.circular(4),
                       ),
-                      boxShadow: [BoxShadow(color: AppTheme.primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
+                      boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 10, offset: const Offset(0, 4))],
                     ),
                     child: Text(msg.content, style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.5, fontWeight: FontWeight.w500)),
                   )
@@ -493,15 +530,15 @@ class _ChatBubble extends StatelessWidget {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
-                              color: AppTheme.primary.withValues(alpha: 0.08),
+                              color: AppColors.primary.withValues(alpha: 0.08),
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.volume_up_rounded, size: 14, color: AppTheme.primary),
+                                Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary),
                                 const SizedBox(width: 8),
-                                Text('ÉCOUTER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 1)),
+                                Text('ÉCOUTER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 1)),
                               ],
                             ),
                           ),
@@ -517,6 +554,7 @@ class _ChatBubble extends StatelessWidget {
               ],
             ),
           ),
+        ),
           if (isUser) const SizedBox(width: 12),
         ],
       ),
