@@ -15,28 +15,28 @@ class WelcomeScreen extends StatelessWidget {
     final size = MediaQuery.of(context).size;
     
     // The exact vibrant pink from the screenshot
-    const brandPink = Color(0xFFE85886);
+    const brandPink = Color(0xFFFF5D8F);
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // 1. Background image — top 55%
+          // 1. Background image — Reversion temporaire pour éviter l'erreur
           Positioned(
             top: 0, left: 0, right: 0,
-            height: size.height * 0.55,
+            height: size.height * 0.75,
             child: Image.asset(
-              'assets/images/hermona_bg.jpg',
+              'assets/images/hermona_bg.jpg', // On utilise l'image qui existe déjà
               fit: BoxFit.cover,
               alignment: Alignment.topCenter,
             ),
           ),
 
-          // 2. Gradient: image fades to white
+          // 2. Gradient: image fades to white more smoothly
           Positioned(
-            top: size.height * 0.35,
+            top: size.height * 0.45,
             left: 0, right: 0,
-            height: size.height * 0.22,
+            height: size.height * 0.35,
             child: Container(
               decoration: const BoxDecoration(
                 gradient: LinearGradient(
@@ -48,14 +48,7 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
 
-          // 3. White background from 55% down
-          Positioned(
-            top: size.height * 0.55,
-            left: 0, right: 0, bottom: 0,
-            child: Container(color: Colors.white),
-          ),
-
-          // 4. Content overlay
+          // 3. Content overlay
           SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -76,8 +69,8 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ).animate().fadeIn(duration: 600.ms),
 
-                // Push title exactly to match screenshot (middle of face)
-                const Spacer(flex: 3),
+                // Push title to match screenshot
+                const Spacer(flex: 5),
 
                 // Title — "Reveal Your Skin's Glow"
                 Padding(
@@ -86,30 +79,31 @@ class WelcomeScreen extends StatelessWidget {
                     isFr ? 'Révèle l\'Éclat\nde ta Peau' : 'Reveal Your\nSkin\'s Glow',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.playfairDisplay(
-                      fontSize: 46,
+                      fontSize: 48,
                       fontWeight: FontWeight.w900,
-                      color: brandPink,
-                      height: 1.05,
-                      letterSpacing: -1.0,
+                      color: const Color(0xFFFF5D8F), // Ton code précis #ff5d8f
+                      height: 1.0,
+                      letterSpacing: -1.5,
                     ),
                   ),
-                ).animate().fadeIn(delay: 200.ms),
+                ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
 
                 const SizedBox(height: 24),
 
                 // Subtitle
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
                     isFr
                         ? 'Analyse faciale 5 zones, suivi du cycle, et routines expertes personnalisées.'
                         : '5-zone facial analysis, cycle tracking, and personalized expert routines.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey[600],
-                      height: 1.6,
-                      letterSpacing: 0.2,
+                      fontSize: 22, // Encore plus grand pour le style
+                      color: const Color(0xFFDD2D4A), // Ton code précis #dd2d4a
+                      height: 1.3,
+                      fontWeight: FontWeight.w400,
+                      letterSpacing: 0.1,
                     ),
                   ),
                 ).animate().fadeIn(delay: 400.ms),
@@ -118,7 +112,7 @@ class WelcomeScreen extends StatelessWidget {
 
                 // Buttons
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Column(
                     children: [
                       _OutlinedPillButton(
@@ -138,27 +132,27 @@ class WelcomeScreen extends StatelessWidget {
                   ),
                 ),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 32),
 
                 // Security text
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Iconsax.shield_tick, size: 12, color: Colors.grey[400]),
+                    Icon(Iconsax.shield_tick, size: 10, color: Colors.grey[400]),
                     const SizedBox(width: 6),
                     Text(
                       'SCIENCE-DRIVEN • ANONYMOUS • SECURE',
                       style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.w700,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
                         color: Colors.grey[400],
-                        letterSpacing: 1.8,
+                        letterSpacing: 1.5,
                       ),
                     ),
                   ],
                 ).animate().fadeIn(delay: 900.ms),
 
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
               ],
             ),
           ),

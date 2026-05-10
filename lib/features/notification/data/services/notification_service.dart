@@ -214,25 +214,33 @@ class NotificationService {
       return;
     }
 
-    debugPrint('🔄 Synchronisation des alertes automatiques (FORCÉE)...');
+    debugPrint('🔄 Synchronisation des alertes automatiques...');
 
     try {
-      // 1. Check Daily Survey Reminder - FORCÉ POUR TEST
-      debugPrint('🔔 Envoi alerte Quotidienne automatique...');
-      await sendAlert(
-        title: 'Bilan Quotidien',
-        body: 'N\'oubliez pas de remplir votre bilan de peau ce soir ! ✨',
-        type: 'SURVEY_DAILY',
-      );
+      // 1. Check Daily Survey Reminder
+      final hasDaily = await _hasAlertToday(uid, 'SURVEY_DAILY');
+      if (!hasDaily) {
+        debugPrint('🔔 Envoi alerte Quotidienne automatique...');
+        await sendAlert(
+          title: 'Bilan Quotidien',
+          body: 'N\'oubliez pas de remplir votre bilan de peau ce soir ! ✨',
+          type: 'SURVEY_DAILY',
+        );
+      } else {
+        debugPrint('✅ Alerte Quotidienne déjà envoyée aujourd\'hui.');
+      }
 
       // 2. Check Weekly Reminder (Only on Sundays)
       if (DateTime.now().weekday == DateTime.sunday) {
-        debugPrint('🔔 Envoi alerte Hebdomadaire automatique...');
-        await sendAlert(
-          title: 'Analyse Hebdomadaire',
-          body: 'C\'est le moment de prendre vos photos pour l\'analyse IA ! 📸',
-          type: 'SURVEY_WEEKLY',
-        );
+        final hasWeekly = await _hasAlertToday(uid, 'SURVEY_WEEKLY');
+        if (!hasWeekly) {
+          debugPrint('🔔 Envoi alerte Hebdomadaire automatique...');
+          await sendAlert(
+            title: 'Analyse Hebdomadaire',
+            body: 'C\'est le moment de prendre vos photos pour l\'analyse IA ! 📸',
+            type: 'SURVEY_WEEKLY',
+          );
+        }
       }
     } catch (e) {
       debugPrint('❌ Erreur générale syncAutomaticAlerts: $e');
