@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 
@@ -59,6 +60,8 @@ class MessagingService {
   }) async {
     final msgId = _uuid.v4();
     final batch = _db.batch();
+    
+    // 1. Préparation du message
     batch.set(_db.collection(AppConstants.colMessages).doc(msgId), {
       'id': msgId,
       'conversationId': convId,
@@ -67,14 +70,51 @@ class MessagingService {
       'createdAt': FieldValue.serverTimestamp(),
       'visible': true,
     });
-    final preview = content.length > 50
-        ? '${content.substring(0, 50)}...'
-        : content;
+
+    final preview = content.length > 50 ? '${content.substring(0, 50)}...' : content;
+    
     batch.update(_db.collection(AppConstants.colConversations).doc(convId), {
       'lastMessage': preview,
       'lastMessageAt': FieldValue.serverTimestamp(),
     });
+
+    // 2. Envoi immédiat du message (pour la rapidité)
     await batch.commit();
+    debugPrint('✅ Message envoyé avec succès: $msgId');
+
+    // 3. Création de la notification en arrière-plan (ne bloque plus l'UI)
+    _createNotification(convId, preview);
+  }
+
+  void _createNotification(String convId, String preview) async {
+    try {
+      final convDoc = await _db.collection(AppConstants.colConversations).doc(convId).get();
+      final participants = List<String>.from(convDoc.data()?['participants'] ?? []);
+      final recipientId = participants.firstWhere((id) => id != _uid, orElse: () => '');
+
+      if (recipientId.isNotEmpty) {
+        debugPrint('🔔 Création notification pour: $recipientId');
+        final notifId = _uuid.v4();
+        await _db.collection(AppConstants.colNotifications).doc(notifId).set({
+          'id': notifId,
+          'userId': recipientId,
+          'type': 'MESSAGE',
+          'title': 'Nouveau message',
+          'body': preview,
+          'timestamp': FieldValue.serverTimestamp(),
+          'read': false,
+          'metadata': {
+            'conversationId': convId,
+            'senderId': _uid,
+          }
+        });
+        debugPrint('🚀 Notification Firestore créée: $notifId');
+      } else {
+        debugPrint('⚠️ Aucun destinataire trouvé (test sur le même compte ?)');
+      }
+    } catch (e) {
+      debugPrint('❌ Erreur création notification: $e');
+    }
   }
 
   Future<void> deleteMessage(String msgId) async {

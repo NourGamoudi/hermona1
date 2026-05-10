@@ -39,25 +39,15 @@ class NotificationScreen extends StatelessWidget {
               stream: FirebaseFirestore.instance
                   .collection(AppConstants.colNotifications)
                   .where('userId', isEqualTo: uid)
+                  .orderBy('timestamp', descending: true) // Utilise ton index n°1
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) return Center(child: Text('Erreur: ${snapshot.error}'));
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
   
                 final docs = snapshot.data?.docs ?? [];
-  
-                // Sort in Dart
-                final sortedDocs = docs.toList()
-                  ..sort((a, b) {
-                    final aTime = (a.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                    final bTime = (b.data() as Map<String, dynamic>)['timestamp'] as Timestamp?;
-                    if (aTime == null) return 1;
-                    if (bTime == null) return -1;
-                    return bTime.compareTo(aTime);
-                  });
-
-                final messageDocs = sortedDocs.where((d) => (d.data() as Map)['type'] == 'MESSAGE').toList();
-                final alertDocs   = sortedDocs.where((d) => (d.data() as Map)['type'] != 'MESSAGE').toList();
+                final messageDocs = docs.where((d) => (d.data() as Map)['type'] == 'MESSAGE').toList();
+                final alertDocs   = docs.where((d) => (d.data() as Map)['type'] != 'MESSAGE').toList();
   
                 return TabBarView(
                   children: [
@@ -122,6 +112,11 @@ class _NotificationCard extends StatelessWidget {
         icon = Iconsax.calendar_1;
         color = AppColors.accent;
         break;
+      case 'SURVEY_DAILY':
+      case 'SURVEY_WEEKLY':
+        icon = Iconsax.task;
+        color = AppTheme.primary;
+        break;
       case 'MESSAGE':
         icon = Iconsax.message_text;
         color = AppTheme.primary;
@@ -142,8 +137,12 @@ class _NotificationCard extends StatelessWidget {
           context.push('/messages/${meta['conversationId']}');
         } else if (type == 'FORUM' && meta != null && meta['postId'] != null) {
           context.push('/forum/${meta['postId']}');
+        } else if (type == 'SURVEY_DAILY') {
+          context.push('/daily-survey');
+        } else if (type == 'SURVEY_WEEKLY') {
+          context.push('/weekly-survey');
         } else if (type == 'RISK') {
-          context.go('/recommendation'); // Example redirect for risk alerts
+          context.go('/recommendation');
         }
       },
       child: Row(

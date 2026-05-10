@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:acneia/features/notification/data/services/notification_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -29,6 +30,9 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadUser();
+    final notifSvc = NotificationService();
+    notifSvc.listenToNotifications();
+    notifSvc.syncAutomaticAlerts(); // Proactive check
   }
 
   void _loadUser() {
@@ -39,8 +43,31 @@ class _HomeScreenState extends State<HomeScreen> {
         .then((d) { 
           if (d.exists && mounted) {
             setState(() => _firstName = d.data()?['firstName'] as String?);
+            _checkPhaseAlert(d.data() as Map<String, dynamic>);
           }
         });
+  }
+
+  void _checkPhaseAlert(Map<String, dynamic> data) {
+    if (data['lastPeriodsDate'] == null) {
+      debugPrint('ℹ️ Cycle Alert: Date des dernières règles absente.');
+      return;
+    }
+    
+    final lastDate = _parseDate(data['lastPeriodsDate']);
+    final avgCycle = 28; // Valeur par défaut simplifiée
+    final day = (DateTime.now().difference(lastDate).inDays % avgCycle) + 1;
+
+    debugPrint('ℹ️ Cycle Check: Jour $day / $avgCycle');
+
+    if (day >= 21) { // Lutéale phase
+      debugPrint('🔔 Phase Lutéale détectée !');
+      NotificationService().sendAlert(
+        title: 'Phase Lutéale',
+        body: 'Votre peau peut devenir plus grasse. N\'oubliez pas votre nettoyage soir !',
+        type: 'CYCLE',
+      );
+    }
   }
 
   @override
@@ -311,31 +338,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildLatestAnalysis(String? uid) {
     if (uid == null) return const SizedBox();
-    return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(AppConstants.colDetections)
+    return FutureBuilder<QuerySnapshot>(
+      future: FirebaseFirestore.instance.collection(AppConstants.colDetections)
           .where('userId', isEqualTo: uid)
           .orderBy('analyzedAt', descending: true)
-          .limit(10)
-          .get(const GetOptions(source: Source.server))
-          .asStream(),
+          .limit(1)
+          .get(const GetOptions(source: Source.server)),
       builder: (context, snapshot) {
         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox();
         
-        final docs = snapshot.data!.docs.toList();
-        docs.sort((a, b) {
-          final ta = a.data() as Map<String, dynamic>;
-          final tb = b.data() as Map<String, dynamic>;
-          final da = ta['analyzedAt'] is Timestamp ? (ta['analyzedAt'] as Timestamp).toDate() : DateTime.tryParse(ta['analyzedAt'].toString()) ?? DateTime(2000);
-          final db = tb['analyzedAt'] is Timestamp ? (tb['analyzedAt'] as Timestamp).toDate() : DateTime.tryParse(tb['analyzedAt'].toString()) ?? DateTime(2000);
-          return db.compareTo(da);
-        });
-
-        final data = docs.first.data() as Map<String, dynamic>;
+        final data = snapshot.data!.docs.first.data() as Map<String, dynamic>;
         return GlassCard(
           onTap: () => context.push('/detection/result', extra: data),
           child: Row(
             children: [
-              Container(width: 45, height: 45, decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle), child: Icon(Iconsax.scan, color: AppTheme.primary, size: 20)),
+              Container(
+                width: 45, 
+                height: 45, 
+                decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), shape: BoxShape.circle), 
+                child: Icon(Iconsax.scan, color: AppTheme.primary, size: 20)
+              ),
               const SizedBox(width: 16),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Sévérité : ${(data['severityScore'] as num?)?.toInt() ?? 0}%', style: const TextStyle(fontWeight: FontWeight.bold)),

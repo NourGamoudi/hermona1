@@ -11,9 +11,16 @@ import 'core/router/app_router.dart';
 import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/localization/app_localizations.dart';
+import 'features/notification/data/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Init Notifications
+  final notifSvc = NotificationService();
+  await notifSvc.init();
+  await notifSvc.scheduleDailyReminder();
+  await notifSvc.scheduleWeeklyReminder();
 
   if (kIsWeb) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.web);
