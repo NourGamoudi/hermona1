@@ -87,7 +87,7 @@ class EvolutionScreen extends StatelessWidget {
               final rPoints = state.predictions.map((d) {
                 final data = d.data() as Map<String, dynamic>;
                 final date = _parseDate(data['predictedAt']);
-                final score = (data['riskScore'] as num?)?.toDouble() ?? 0.0;
+                final score = (data['riskJ3'] as num?)?.toDouble() ?? 0.0;
                 return _RiskPoint(date: date, score: score);
               }).toList();
 
@@ -295,7 +295,7 @@ class _EvolutionBody extends StatelessWidget {
   }
 
   void _showRiskDetail(BuildContext context, _RiskPoint point) {
-    final color = point.score > 0.6 ? AppColors.error : (point.score > 0.35 ? AppColors.warning : AppColors.success);
+    final color = point.score > 0.61 ? AppColors.error : (point.score > 0.48 ? AppColors.warning : AppColors.success);
     showDialog(
       context: context,
       builder: (_) => Dialog(

@@ -231,14 +231,12 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
               const SizedBox(width: 16),
               Expanded(
                 child: _ScoreCard(
-                  label: "Risque",
-                  value: (_predictionData?['riskLevel'] as String? ?? (
-                    _result!.riskScore > 0.7 ? 'high' : (_result!.riskScore > 0.35 ? 'medium' : 'low')
-                  )) == 'high' ? 'Haut' : ((_predictionData?['riskLevel'] ?? 'medium') == 'medium' ? 'Moyen' : 'Bas'),
+                  label: "Risque J+3",
+                  value: (_predictionData?['riskLevel'] as String? ?? 'low') == 'high' ? 'Haut' : ((_predictionData?['riskLevel'] ?? 'medium') == 'medium' ? 'Moyen' : 'Bas'),
                   icon: Icons.warning_amber_rounded,
-                  color: (_predictionData?['riskScore'] as num? ?? _result!.riskScore) > 0.7 
+                  color: (_predictionData?['riskLevel'] ?? 'low') == 'high' 
                       ? AppColors.error 
-                      : (_result!.riskScore > 0.35 ? AppColors.warning : AppColors.success),
+                      : ((_predictionData?['riskLevel'] ?? 'low') == 'medium' ? AppColors.warning : AppColors.success),
                 ),
               ),
             ],

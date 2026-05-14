@@ -6,7 +6,6 @@ enum TrendDirection { increasing, stable, decreasing }
 
 class PredictionResult extends Equatable {
   final String id;
-  final double riskScore;
   final double riskJ3;
   final RiskLevel riskLevel;
   final TrendDirection trend;
@@ -20,7 +19,6 @@ class PredictionResult extends Equatable {
 
   const PredictionResult({
     required this.id,
-    required this.riskScore,
     required this.riskJ3,
     required this.riskLevel,
     required this.trend,
@@ -34,22 +32,18 @@ class PredictionResult extends Equatable {
   });
 
   factory PredictionResult.fromJson(Map<String, dynamic> j) {
-    final scoreData = j['score'] as Map<String, dynamic>?;
-    
     return PredictionResult(
       id: j['id'] as String,
-      riskScore: (j['riskScore'] as num).toDouble(),
-      riskJ3: (j['riskJ3'] ?? (j['riskScore'] as num).toDouble()).toDouble(),
+      riskJ3: (j['riskJ3'] as num? ?? 0.0).toDouble(),
       riskLevel: RiskLevel.values.firstWhere((e) => e.name == j['riskLevel'], orElse: () => RiskLevel.low),
       trend: TrendDirection.values.firstWhere((e) => e.name == (j['trend'] ?? 'stable'), orElse: () => TrendDirection.stable),
       shapFactors: j['shapFactors'] != null 
           ? (j['shapFactors'] as Map).map((k, v) => MapEntry(k.toString(), (v as num).toDouble()))
           : {},
-      // Root mapping for robustness
-      hygieneScore: (j['hygieneScore'] as num?)?.toInt() ?? (scoreData?['value'] as num?)?.toInt() ?? 0,
-      hygieneLevel: scoreData?['level'] as String?,
-      hygieneBreakdown: scoreData?['breakdown'] != null 
-          ? Map<String, num>.from(scoreData!['breakdown']) 
+      hygieneScore: (j['hygieneScore'] as num?)?.toInt() ?? 0,
+      hygieneLevel: j['hygieneLevel'] as String?,
+      hygieneBreakdown: j['hygieneBreakdown'] != null 
+          ? Map<String, num>.from(j['hygieneBreakdown']) 
           : null,
       cycleDay: (j['cycleDay'] as num?)?.toInt() ?? 0,
       cyclePhase: j['cyclePhase'] ?? '',
@@ -59,7 +53,6 @@ class PredictionResult extends Equatable {
 
   Map<String, dynamic> toJson() => {
     'id': id,
-    'riskScore': riskScore,
     'riskJ3': riskJ3,
     'riskLevel': riskLevel.name,
     'trend': trend.name,
@@ -74,6 +67,6 @@ class PredictionResult extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, riskScore, hygieneScore, predictedAt
+    id, riskJ3, hygieneScore, predictedAt
   ];
 }

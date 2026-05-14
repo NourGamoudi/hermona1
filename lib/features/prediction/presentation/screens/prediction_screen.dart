@@ -15,6 +15,8 @@ import 'package:acneia/features/recommendation/domain/entities/recommendation_re
 import 'package:acneia/features/recommendation/data/services/recommendation_api_service.dart';
 import 'package:acneia/features/detection/domain/entities/detection_result.dart';
 import 'package:acneia/features/detection/data/services/detection_api_service.dart';
+import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
+import 'package:acneia/core/services/smart_notification_manager.dart';
 
 class PredictionScreen extends StatefulWidget {
   final PredictionResult? initialResult;
@@ -28,6 +30,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
   bool _loading = false;
   PredictionResult? _result;
   RecommendationResult? _recommendation;
+  WeeklySurvey? _weeklySurvey;
   
   final _predictSvc = PredictionApiService();
   final _recommendSvc = RecommendationApiService();
@@ -89,6 +92,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
             'makeup_frequency': w['makeupFrequency'],
             'routine_followed': w['routineFollowed'],
           });
+          _weeklySurvey = WeeklySurvey.fromJson(w, weeklySnap.docs.first.id);
           debugPrint('DEBUG: Weekly data found via index: ${weeklySnap.docs.first.id}');
         }
       } catch (e) {
@@ -100,6 +104,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
       // 3. Fetch Prediction (Risk & Hygiene)
       final res = await _predictSvc.predict(answers); 
       await _predictSvc.saveResult(res, uid);
+
+      // Trigger Smart Notification check immediately after new prediction
+      await SmartNotificationManager().checkAndNotify(latestPrediction: res);
 
       // 3. Fetch Latest Detection Result
       final detSnap = await FirebaseFirestore.instance
@@ -154,7 +161,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
       return _ResultView(
         result: _result!, 
         recommendation: _recommendation,
-        onRetry: () => setState(() { _result = null; _recommendation = null; })
+        weeklySurvey: _weeklySurvey,
+        onRetry: () => setState(() { _result = null; _recommendation = null; _weeklySurvey = null; })
       );
     }
 
@@ -210,8 +218,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
 class _ResultView extends StatelessWidget {
   final PredictionResult result;
   final RecommendationResult? recommendation;
+  final WeeklySurvey? weeklySurvey;
   final VoidCallback onRetry;
-  const _ResultView({required this.result, this.recommendation, required this.onRetry});
+  const _ResultView({required this.result, this.recommendation, this.weeklySurvey, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -258,7 +267,7 @@ class _ResultView extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _AnalysisTab(result: result, color: color),
+            _AnalysisTab(result: result, color: color, weeklySurvey: weeklySurvey),
             _RoutineTab(recommendation: recommendation),
             _LifestyleTab(recommendation: recommendation),
           ],
@@ -279,7 +288,8 @@ class _ResultView extends StatelessWidget {
 class _AnalysisTab extends StatelessWidget {
   final PredictionResult result;
   final Color color;
-  const _AnalysisTab({required this.result, required this.color});
+  final WeeklySurvey? weeklySurvey;
+  const _AnalysisTab({required this.result, required this.color, this.weeklySurvey});
 
   @override
   Widget build(BuildContext context) {
@@ -306,12 +316,12 @@ class _AnalysisTab extends StatelessWidget {
               CircularPercentIndicator(
                 radius: 80.0,
                 lineWidth: 14.0,
-                percent: result.riskScore,
+                percent: result.riskJ3,
                 center: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('${(result.riskScore * 100).toInt()}%', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: color)),
-                    const Text('INDICE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    Text('${(result.riskJ3 * 100).toInt()}%', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: color)),
+                    const Text('RISQUE J+3', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
                   ],
                 ),
                 progressColor: color,
@@ -334,6 +344,53 @@ class _AnalysisTab extends StatelessWidget {
             ],
           ),
         ).animate().fadeIn().scale(begin: const Offset(0.95, 0.95)),
+
+        // Weekly Alerts & Clinical Priority
+        if ((weeklySurvey != null && (weeklySurvey!.spfAlert || weeklySurvey!.autoCorrection || weeklySurvey!.routineFollowed == 'Non')) || 
+            (result.riskLevel == RiskLevel.high)) ...[
+          const SizedBox(height: 32),
+          const SectionHeader(title: 'Alertes & Vigilance'),
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                // 1. High Priority: Risk J+3 Breakout Prediction
+                if (result.riskLevel == RiskLevel.high)
+                  const _AlertItem(
+                    title: "Vigilance : Poussée à J+3",
+                    body: "Une hausse du risque est prévue d'ici 3 jours. Anticipez avec votre routine.",
+                    icon: Iconsax.warning_2,
+                    color: AppColors.error,
+                  ),
+                // 2. Priority: SPF absence
+                if (weeklySurvey?.spfAlert ?? false)
+                  const _AlertItem(
+                    title: "Protection Solaire Manquante",
+                    body: "L'absence de SPF aggrave l'inflammation et les marques résiduelles.",
+                    icon: Iconsax.sun_1,
+                    color: AppColors.error,
+                  ),
+                // 3. Priority: Routine observance
+                if (weeklySurvey?.routineFollowed == 'Non')
+                  const _AlertItem(
+                    title: "Observance de Routine",
+                    body: "La régularité est indispensable pour stabiliser votre peau.",
+                    icon: Iconsax.task_square,
+                    color: AppColors.primary,
+                  ),
+                // 4. Priority: Cleansing frequency
+                if (weeklySurvey?.autoCorrection ?? false)
+                  const _AlertItem(
+                    title: "Nettoyage Cutané",
+                    body: "Un nettoyage trop rare favorise l'obstruction des pores par le sébum.",
+                    icon: Iconsax.brush_1,
+                    color: AppColors.warning,
+                  ),
+              ],
+            ),
+          ).animate().fadeIn(delay: 100.ms),
+        ],
 
         const SizedBox(height: 32),
 
@@ -553,6 +610,41 @@ class _TipCard extends StatelessWidget {
             Expanded(child: Text(text, style: const TextStyle(fontSize: 14, height: 1.4, fontWeight: FontWeight.w600))),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AlertItem extends StatelessWidget {
+  final String title, body;
+  final IconData icon;
+  final Color color;
+  const _AlertItem({required this.title, required this.body, required this.icon, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: color.withAlpha(25), borderRadius: BorderRadius.circular(8)),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: color)),
+                const SizedBox(height: 4),
+                Text(body, style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryDark, height: 1.3)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

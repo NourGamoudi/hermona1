@@ -159,7 +159,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 emptySubtitle: 'Anticipez les poussées avec l\'IA.',
                 emptyIcon: Iconsax.chart_2,
                 itemBuilder: (ctx, data, id) {
-                  final risk = (data['riskScore'] as num?)?.toDouble() ?? 0;
+                  final risk = (data['riskJ3'] as num?)?.toDouble() ?? 0.0;
                   final level = data['riskLevel'] as String? ?? 'low';
                   final color = level == 'low' ? AppColors.success : level == 'medium' ? AppColors.warning : AppColors.error;
                   return GlassCard(

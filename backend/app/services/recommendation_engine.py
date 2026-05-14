@@ -187,7 +187,7 @@ class RecommendationEngine:
 
     def _check_risk_strategy(self):
         try:
-            risk = float(self.req.get('risk_today', 0.0))
+            risk = float(self.req.get('risk_j3', 0.0))
         except (TypeError, ValueError):
             risk = 0.0
         try:
@@ -333,7 +333,7 @@ class RecommendationEngine:
         if self.strategy == STRATEGY_PROTECTION: return
         
         phase = normalize(self.req.get('phase', ''))
-        risk = self._norm(self.req.get('risk_today', 0.0))
+        risk = self._norm(self.req.get('risk_j3', 0.0))
 
         if "folliculaire" in phase:
             self.actives_pool.update({"retinol", "vitamine_c", "aha"})
@@ -464,7 +464,7 @@ class RecommendationEngine:
             client = Groq(api_key=key)
             
             # Prepare context for AI
-            risk = self._norm(self.req.get('risk_today', 0.0))
+            risk = self._norm(self.req.get('risk_j3', 0.0))
             severity = self._norm(self.req.get('severity', 0.0))
             shaps = self.req.get('top3_shap', [])
             lifestyle = f"Stress: {self.req.get('stress')}, Sommeil: {self.req.get('sleep')}h, Hydratation: {self.req.get('hydration')} verres"
@@ -538,7 +538,7 @@ class RecommendationEngine:
             "why_this": self.why_this if self.why_this else ["Optimisation de la barrière cutanée", "Régulation du sébum"],
             "brands": "CeraVe, La Roche-Posay, Avène, The Ordinary",
             "disclaimer": "Hermona n'est pas un outil médical. Consultez un dermatologue.",
-            "riskScore": self._norm(self.req.get('risk_today', 0.0)),
+            "riskJ3": self._norm(self.req.get('risk_j3', 0.0)),
             "hygieneScore": self.req.get('hygiene_score', 70),
             "severity": self._norm(self.req.get('severity', 0.0)),
             "createdAt": datetime.now(timezone.utc).isoformat(),

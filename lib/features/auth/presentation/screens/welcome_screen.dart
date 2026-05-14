@@ -15,7 +15,7 @@ class WelcomeScreen extends StatelessWidget {
     final size = MediaQuery.of(context).size;
     
     // The exact vibrant pink from the screenshot
-    const brandPink = Color(0xFFFF5D8F);
+    const brandPink = Color(0xFFFFC0CB);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -81,7 +81,7 @@ class WelcomeScreen extends StatelessWidget {
                     style: GoogleFonts.playfairDisplay(
                       fontSize: 48,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFFFF5D8F), // Ton code précis #ff5d8f
+                      color: const Color(0xFFf5f3f5ff), // Ton code précis #f5f3f5ff
                       height: 1.0,
                       letterSpacing: -1.5,
                     ),
@@ -100,7 +100,7 @@ class WelcomeScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22, // Encore plus grand pour le style
-                      color: const Color(0xFFDD2D4A), // Ton code précis #dd2d4a
+                      color: const Color(0XFF48cae4), // Ton code précis #f51f98dd
                       height: 1.3,
                       fontWeight: FontWeight.w400,
                       letterSpacing: 0.1,

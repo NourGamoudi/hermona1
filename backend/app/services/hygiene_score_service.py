@@ -5,6 +5,11 @@ class HygieneScoreService:
     def calculate(data: dict) -> dict:
         """
         Calculates a heuristic hygiene score based on expert rules.
+        
+        SCIENTIFIC NOTE (PFE): This metric is behavioral and independent of the 
+        LightGBM risk model. It provides feedback on lifestyle habits 
+        (Source: Dermatological Best Practices) but is NOT used as an input 
+        for the predictive riskJ3 output to avoid circular reasoning.
         """
         if not data:
             data = {}

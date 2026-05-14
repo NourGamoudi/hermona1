@@ -32,7 +32,6 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadUser();
     final notifSvc = NotificationService();
     notifSvc.listenToNotifications();
-    notifSvc.syncAutomaticAlerts(); // Proactive check
   }
 
   void _loadUser() {
@@ -62,7 +61,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (day >= 21) { // Lutéale phase
       debugPrint('🔔 Phase Lutéale détectée !');
-      NotificationService().sendAlert(
+      NotificationService().sendNotification(
         title: 'Phase Lutéale',
         body: 'Votre peau peut devenir plus grasse. N\'oubliez pas votre nettoyage soir !',
         type: 'CYCLE',
@@ -212,7 +211,7 @@ class _HomeScreenState extends State<HomeScreen> {
               }
               return _SquareScoreCard(
                 title: 'Risque',
-                value: result != null ? '${(result.riskScore * 100).toInt()}%' : '--',
+                value: result != null ? '${(result.riskJ3 * 100).toInt()}%' : '--',
                 subtitle: result?.riskLevel.name.toUpperCase() ?? 'Inconnu',
                 icon: Iconsax.status_up,
                 color: result?.riskLevel == RiskLevel.low ? AppColors.success : (result?.riskLevel == RiskLevel.medium ? AppColors.warning : AppColors.error),
@@ -485,7 +484,7 @@ class _HomeScreenState extends State<HomeScreen> {
             final rPoints = state.predictions.map((d) {
               final data = d.data() as Map<String, dynamic>;
               final date = _parseDate(data['predictedAt']);
-              final score = (data['riskScore'] as num?)?.toDouble() ?? 0.0;
+              final score = (data['riskJ3'] as num?)?.toDouble() ?? 0.0;
               return _RiskPoint(date: date, score: score);
             }).toList();
             rPoints.sort((a, b) => a.date.compareTo(b.date));

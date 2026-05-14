@@ -72,7 +72,7 @@ class _TrendsScreenState extends State<TrendsScreen> {
                                   subtitle: l.translate('risk_evolution_sub'),
                                   docs: state.predictions,
                                   dateField: 'predictedAt',
-                                  valueField: 'riskScore',
+                                  valueField: 'riskJ3',
                                   color: AppTheme.primary,
                                   icon: Iconsax.chart_2,
                                   isPercentage: true,

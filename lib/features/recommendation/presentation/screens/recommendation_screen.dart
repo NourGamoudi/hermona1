@@ -123,9 +123,9 @@ class _RecommendationScreenState extends State<RecommendationScreen>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _box("Sévérité", "${r.severity}%"),
-                  _box("Risque", "${r.riskScore}%"),
-                  _box("Hygiène", "${r.hygieneScore}%"),
+                  _box("Sévérité", "${r.severity.toInt()}%"),
+                  _box("Risque J+3", "${(r.riskJ3 * 100).toInt()}%"),
+                  _box("Hygiène", "${r.hygieneScore.toInt()}%"),
                 ],
               ),
             ],

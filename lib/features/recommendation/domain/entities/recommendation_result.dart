@@ -54,7 +54,7 @@ class RecommendationResult extends Equatable {
   final String strategy;
   final String alternativeStrategy;
   final int variationIndex;
-  final double riskScore;
+  final double riskJ3;
   final double hygieneScore;
   final double severity;
   final String brands;
@@ -78,7 +78,7 @@ class RecommendationResult extends Equatable {
     required this.strategy,
     required this.alternativeStrategy,
     required this.variationIndex,
-    required this.riskScore,
+    required this.riskJ3,
     required this.hygieneScore,
     required this.severity,
     required this.brands,
@@ -107,7 +107,7 @@ class RecommendationResult extends Equatable {
     strategy: j['strategy'] as String? ?? '',
     alternativeStrategy: j['alternative_strategy'] as String? ?? j['alternativeStrategy'] as String? ?? '',
     variationIndex: (j['variation_index'] as num? ?? j['variationIndex'] as num? ?? 0).toInt(),
-    riskScore: (j['riskScore'] as num? ?? 0.0).toDouble(),
+    riskJ3: (j['riskJ3'] as num? ?? 0.0).toDouble(),
     hygieneScore: (j['hygieneScore'] as num? ?? 70.0).toDouble(),
     severity: (j['severity'] as num? ?? 0.0).toDouble(),
     brands: j['brands'] as String? ?? 'CeraVe, La Roche-Posay',
@@ -134,7 +134,7 @@ class RecommendationResult extends Equatable {
     'strategy': strategy,
     'alternative_strategy': alternativeStrategy,
     'variation_index': variationIndex,
-    'riskScore': riskScore,
+    'riskJ3': riskJ3,
     'hygieneScore': hygieneScore,
     'severity': severity,
     'brands': brands,
@@ -145,5 +145,5 @@ class RecommendationResult extends Equatable {
   };
 
   @override
-  List<Object?> get props => [id, strategy, alternativeStrategy, variationIndex, riskScore];
+  List<Object?> get props => [id, strategy, alternativeStrategy, variationIndex, riskJ3];
 }

@@ -56,9 +56,11 @@ class RecommendationApiService implements RecommendationRepository {
 
       final dailyDocs = dailySnap.docs.map((e) => e.data()).toList()
         ..sort((a, b) {
-          final da = (a['date'] ?? '') as String;
-          final db = (b['date'] ?? '') as String;
-          return db.compareTo(da);
+          final da = a['date'];
+          final db = b['date'];
+          final DateTime dateA = da is Timestamp ? da.toDate() : DateTime.tryParse(da.toString()) ?? DateTime(2000);
+          final DateTime dateB = db is Timestamp ? db.toDate() : DateTime.tryParse(db.toString()) ?? DateTime(2000);
+          return dateB.compareTo(dateA);
         });
 
       final daily = dailyDocs.isNotEmpty ? dailyDocs.first : {};
@@ -79,8 +81,7 @@ class RecommendationApiService implements RecommendationRepository {
         'detectionId': detection.id,
         'severity': detection.severityScore.toDouble(),
         'zones': detection.zoneCounts?.keys.toList() ?? [],
-        'risk_today': (prediction['riskScore'] ?? 0).toDouble(),
-        'risk_j3': (prediction['riskJ3'] ?? prediction['riskScoreJ3'] ?? 0).toDouble(),
+        'riskJ3': (prediction['riskJ3'] ?? 0).toDouble(),
         'top3_shap': (prediction['shapFactors'] as Map?)
                 ?.keys
                 .toList() ??
@@ -140,7 +141,7 @@ class RecommendationApiService implements RecommendationRepository {
           'Mode secours activé. Routine générique appliquée.$errorMsg',
       brands: 'CeraVe, La Roche-Posay',
       disclaimer: 'Fallback system',
-      riskScore: 0.5,
+      riskJ3: 0.5,
       hygieneScore: 70,
       severity: 0.5,
       createdAt: DateTime.now(),

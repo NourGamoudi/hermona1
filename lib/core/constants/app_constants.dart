@@ -4,7 +4,7 @@ class AppConstants {
   // ——————————————————————————————————————————————————————————————————————————————————————
   static const String apiBaseUrl = kReleaseMode 
       ? 'https://hermona-api.onrender.com' // PROD
-      : 'http://10.255.170.131:8000'; // DEV (Auto-detected IP)
+      : 'http://10.179.75.131:8000'; // DEV (Auto-detected IP)
   static const String apiKey     = 'hermona_secret_2026';
 
 
