@@ -42,10 +42,24 @@ def encode_cleansing(cleansing_str: str) -> dict:
     else: mapping['lavage_2x/jour'] = 1
     return mapping
 
-def calculate_hormonal_phase(day: int) -> dict:
+def encode_hormonal_phase(phase_name: str) -> dict:
+    """
+    ML CONTEXTUAL PREDICTOR LAYER - TRANSFORMATION ONLY.
+    
+    Responsibility: Pure string-to-vector mapping.
+    Restriction: No clinical logic, no biological assumptions, no recalculation.
+    Consumes features pre-calculated by the Deterministic Clinical Engine.
+    """
+    phase = str(phase_name or "").lower()
     mapping = {'phase_folliculaire': 0, 'phase_luteale': 0, 'phase_menstruelle': 0, 'phase_ovulatoire': 0}
-    if 1 <= day <= 5: mapping['phase_menstruelle'] = 1
-    elif 6 <= day <= 13: mapping['phase_folliculaire'] = 1
-    elif 14 <= day <= 16: mapping['phase_ovulatoire'] = 1
-    else: mapping['phase_luteale'] = 1
+    
+    if 'menstrual' in phase or 'menstruelle' in phase:
+        mapping['phase_menstruelle'] = 1
+    elif 'follicular' in phase or 'folliculaire' in phase:
+        mapping['phase_folliculaire'] = 1
+    elif 'ovulatory' in phase or 'ovulation' in phase or 'ovulatoire' in phase:
+        mapping['phase_ovulatoire'] = 1
+    elif 'luteal' in phase or 'luteale' in phase:
+        mapping['phase_luteale'] = 1
+        
     return mapping

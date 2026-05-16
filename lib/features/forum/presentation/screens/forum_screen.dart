@@ -11,6 +11,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/forum/data/services/forum_service.dart';
 import 'package:acneia/features/messaging/data/services/messaging_service.dart';
 import '../cubit/forum_cubit.dart';
@@ -22,14 +23,17 @@ class ForumScreen extends StatefulWidget {
 }
 
 class _ForumScreenState extends State<ForumScreen> {
-  String _category = 'Tous', _sort = 'date', _search = '';
+  String _category = 'ALL', _sort = 'date', _search = '';
   final _searchCtrl = TextEditingController();
   final _svc = ForumService();
 
   @override
   void initState() { 
     super.initState(); 
-    timeago.setLocaleMessages('fr', timeago.FrMessages()); 
+    // timeago is initialized in build or via a listener if needed, 
+    // but we can set defaults here.
+    timeago.setLocaleMessages('fr', timeago.FrMessages());
+    timeago.setLocaleMessages('en', timeago.EnMessages());
   }
   
   @override 
@@ -40,12 +44,23 @@ class _ForumScreenState extends State<ForumScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cats = ['Tous', ...AppConstants.forumCategories];
+    final l = AppLocalizations.of(context);
+    // Use (key, displayLabel) pairs so category state is language-neutral
+    final catKeys = [
+      ('ALL', l.translate('all_label')),
+      ('Général', l.translate('cat_general')),
+      ('Routine', l.translate('cat_routine')),
+      ('Alimentation', l.translate('cat_diet')),
+      ('Hormones', l.translate('cat_hormones')),
+      ('Traitements', l.translate('cat_treatments')),
+      ('Témoignages', l.translate('cat_stories')),
+      ('Questions', l.translate('cat_questions')),
+    ];
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Communauté Hermona'),
+        title: Text(l.translate('hermona_community')),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_1),
           onPressed: () => context.pop(),
@@ -64,7 +79,7 @@ class _ForumScreenState extends State<ForumScreen> {
         elevation: 10,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         icon: const Icon(Iconsax.add, color: Colors.white),
-        label: const Text('EXPRIMER', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1)),
+        label: Text(l.translate('express_label'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, letterSpacing: 1)),
       ),
       body: Stack(
         children: [
@@ -90,9 +105,9 @@ class _ForumScreenState extends State<ForumScreen> {
                       child: TextField(
                         controller: _searchCtrl,
                         onChanged: (v) => setState(() => _search = v),
-                        decoration: const InputDecoration(
-                          hintText: 'Rechercher un sujet...',
-                          prefixIcon: Icon(Iconsax.search_normal, size: 20),
+                        decoration: InputDecoration(
+                          hintText: l.translate('search_subject_hint'),
+                          prefixIcon: const Icon(Iconsax.search_normal, size: 20),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -103,14 +118,14 @@ class _ForumScreenState extends State<ForumScreen> {
                     const SizedBox(height: 16),
                     Row(
                       children: [
-                        _SortChip(label: 'RÉCENT', icon: Iconsax.clock, active: _sort == 'date', onTap: () {
+                        _SortChip(label: l.translate('recent_label'), icon: Iconsax.clock, active: _sort == 'date', onTap: () {
                           setState(() => _sort = 'date');
-                          context.read<ForumCubit>().loadPosts(category: _category == 'Tous' ? null : _category, sort: 'date');
+                          context.read<ForumCubit>().loadPosts(category: _category == 'ALL' ? null : _category, sort: 'date');
                         }),
                         const SizedBox(width: 10),
-                        _SortChip(label: 'POPULAIRE', icon: Iconsax.trend_up, active: _sort == 'popular', onTap: () {
+                        _SortChip(label: l.translate('popular_label'), icon: Iconsax.trend_up, active: _sort == 'popular', onTap: () {
                           setState(() => _sort = 'popular');
-                          context.read<ForumCubit>().loadPosts(category: _category == 'Tous' ? null : _category, sort: 'popular');
+                          context.read<ForumCubit>().loadPosts(category: _category == 'ALL' ? null : _category, sort: 'popular');
                         }),
                       ],
                     ),
@@ -126,15 +141,16 @@ class _ForumScreenState extends State<ForumScreen> {
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
-                  itemCount: cats.length,
+                  itemCount: catKeys.length,
                   separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemBuilder: (_, i) {
-                    final c = cats[i];
-                    final sel = _category == c;
+                    final key = catKeys[i].$1;
+                    final label = catKeys[i].$2;
+                    final sel = _category == key;
                     return GestureDetector(
                       onTap: () {
-                        setState(() => _category = c);
-                        context.read<ForumCubit>().loadPosts(category: c == 'Tous' ? null : c, sort: _sort);
+                        setState(() => _category = key);
+                        context.read<ForumCubit>().loadPosts(category: key == 'ALL' ? null : key, sort: _sort);
                       },
                       child: AnimatedContainer(
                         duration: 300.ms,
@@ -152,7 +168,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         ),
                         child: Center(
                           child: Text(
-                            c.toUpperCase(),
+                            label.toUpperCase(),
                             style: TextStyle(
                               color: sel ? Colors.white : AppColors.textSecondaryDark,
                               fontSize: 11,
@@ -192,7 +208,7 @@ class _ForumScreenState extends State<ForumScreen> {
                         }).toList();
                       }
                       if (docs.isEmpty) {
-                        return const Center(child: Text('Aucun résultat trouvé.', style: TextStyle(color: AppColors.textSecondaryDark)));
+                        return Center(child: Text(l.translate('no_results_found'), style: const TextStyle(color: AppColors.textSecondaryDark)));
                       }
                       return ListView.separated(
                         physics: const BouncingScrollPhysics(),
@@ -218,16 +234,19 @@ class _ForumScreenState extends State<ForumScreen> {
     );
   }
 
-  void _safetyNotice() => showDialog(context: context, builder: (ctx) => BackdropFilter(
+  void _safetyNotice() {
+    final l = AppLocalizations.of(context);
+    showDialog(context: context, builder: (ctx) => BackdropFilter(
     filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
     child: AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-      title: Row(children: [Icon(Iconsax.shield_tick, color: AppTheme.primary), const SizedBox(width: 12), const Text('Espace Sécurisé')]),
-      content: const Text('🔒 Forum 100% anonyme.\n\n⚠️ Ne partagez JAMAIS :\n• Votre nom réel\n• Votre adresse\n• Votre téléphone\n\n🚨 Signalez tout contenu suspect.', style: TextStyle(height: 1.6, fontSize: 14)),
+      title: Row(children: [Icon(Iconsax.shield_tick, color: AppTheme.primary), const SizedBox(width: 12), Text(l.translate('secure_space'))]),
+      content: Text(l.translate('safety_notice_desc'), style: const TextStyle(height: 1.6, fontSize: 14)),
       actionsPadding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      actions: [PrimaryButton(label: 'COMPRIS !', onTap: () => Navigator.pop(ctx))],
+      actions: [PrimaryButton(label: l.translate('got_it'), onTap: () => Navigator.pop(ctx))],
     ),
   ));
+  }
 }
 
 class _ForumCard extends StatefulWidget {
@@ -271,7 +290,7 @@ class _ForumCardState extends State<_ForumCard> {
               children: [
                 _AuthorBadge(authorId: d['authorId'], svc: widget.svc),
                 const Spacer(),
-                Text(timeago.format(date, locale: 'fr'), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
+                Text(timeago.format(date, locale: AppLocalizations.of(context).locale.languageCode), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
                 if (isOwn) ...[
                   const SizedBox(width: 10),
                   GestureDetector(
@@ -317,11 +336,11 @@ class _ForumCardState extends State<_ForumCard> {
                         context.push('/messages/$convId');
                       }
                     },
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Iconsax.send_1, size: 16, color: AppColors.primary),
-                        SizedBox(width: 6),
-                        Text('DIRECT', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                        const Icon(Iconsax.send_1, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 6),
+                        Text(AppLocalizations.of(context).translate('direct_label').toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary)),
                       ],
                     ),
                   ),
@@ -339,33 +358,42 @@ class _ForumCardState extends State<_ForumCard> {
     );
   }
 
-  void _confirmDelete() => showDialog(context: context, builder: (ctx) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-    title: const Text('Supprimer ?'),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ANNULER')),
-      ElevatedButton(onPressed: () async {
-        final messenger = ScaffoldMessenger.of(ctx);
-        final nav = Navigator.of(ctx);
-        await widget.svc.deletePost(widget.postId);
-        nav.pop();
-        messenger.showSnackBar(const SnackBar(content: Text('Post supprimé.')));
-      }, child: const Text('OUI')),
-    ],
-  ));
+  void _confirmDelete() {
+    final l = AppLocalizations.of(context);
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: Text(l.translate('delete_confirm_title')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.translate('cancel_caps'))),
+        ElevatedButton(onPressed: () async {
+          final messenger = ScaffoldMessenger.of(ctx);
+          final nav = Navigator.of(ctx);
+          await widget.svc.deletePost(widget.postId);
+          nav.pop();
+          messenger.showSnackBar(SnackBar(content: Text(l.translate('post_deleted'))));
+        }, child: Text(l.translate('yes_caps'))),
+      ],
+    ));
+  }
 
   void _reportDialog() {
+    final l = AppLocalizations.of(context);
     String? reason;
     showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setSt) => AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: const Text('Signaler ce contenu'),
+      title: Text(l.translate('report_content_title')),
       content: RadioGroup<String>(
         groupValue: reason,
         onChanged: (v) => setSt(() => reason = v),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            ...['Spam', 'Harcèlement', 'Contenu médical dangereux', 'Haineux'].map((r) =>
+            ...[
+              l.translate('spam_label'),
+              l.translate('harassment_label'),
+              l.translate('dangerous_medical_label'),
+              l.translate('hateful_label')
+            ].map((r) =>
               RadioListTile.adaptive(
                 activeColor: AppColors.primary, 
                 title: Text(r, style: const TextStyle(fontSize: 14)), 
@@ -376,13 +404,13 @@ class _ForumCardState extends State<_ForumCard> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ANNULER')),
-        PrimaryButton(label: 'SIGNALER', width: 120, onTap: reason == null ? null : () async {
+        TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.translate('cancel_caps'))),
+        PrimaryButton(label: l.translate('report_caps'), width: 120, onTap: reason == null ? null : () async {
           final messenger = ScaffoldMessenger.of(context);
           final nav = Navigator.of(ctx);
           await widget.svc.reportContent(targetId: widget.postId, targetType: 'post', reason: reason!);
           nav.pop();
-          messenger.showSnackBar(const SnackBar(content: Text('Merci pour votre signalement.')));
+          messenger.showSnackBar(SnackBar(content: Text(l.translate('report_thanks'))));
         }),
       ],
     )));
@@ -413,7 +441,7 @@ class _AuthorBadgeState extends State<_AuthorBadge> {
       future: _profileFuture,
       builder: (ctx, snap) {
         final data = snap.data?.data() as Map<String, dynamic>?;
-        final pseudo = data?['pseudonym'] ?? 'Anonyme';
+        final pseudo = data?['pseudonym'] ?? AppLocalizations.of(context).translate('anonymous');
         final aIdx = data?['avatarIndex'] ?? 0;
         final avatars = ['🦋', '✨', '🌸', '💖', '🌙', '🌈'];
         final avatar = (aIdx >= 0 && aIdx < avatars.length) ? avatars[aIdx] : '🌸';

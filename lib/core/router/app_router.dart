@@ -226,9 +226,19 @@ final appRouter = GoRouter(
 
     ),
 
-    GoRoute(path: '/daily-survey',  builder: (_, __) => const DailyQuestionnaireScreen()),
+    GoRoute(
+      path: '/daily-survey', 
+      builder: (_, state) => DailyQuestionnaireScreen(
+        isOnboarding: state.uri.queryParameters['onboarding'] == 'true',
+      ),
+    ),
 
-    GoRoute(path: '/weekly-survey', builder: (_, __) => const WeeklyQuestionnaireScreen()),
+    GoRoute(
+      path: '/weekly-survey', 
+      builder: (_, state) => WeeklyQuestionnaireScreen(
+        isOnboarding: state.uri.queryParameters['onboarding'] == 'true',
+      ),
+    ),
 
 
   ],

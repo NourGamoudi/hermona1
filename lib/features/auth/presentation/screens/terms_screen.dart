@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 
 class TermsScreen extends StatelessWidget {
   const TermsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Conditions d\'utilisation'),
+        title: Text(l.translate('terms_title_appbar')),
         leading: IconButton(icon: const Icon(Icons.close), onPressed: () => context.pop()),
       ),
       body: SingleChildScrollView(
@@ -24,18 +26,18 @@ class TermsScreen extends StatelessWidget {
             child: Row(children: [
               Icon(Iconsax.shield_tick, color: AppTheme.primary, size: 28),
               const SizedBox(width: 12),
-              Expanded(child: Text('Hermona -- Conditions Générales',
+              Expanded(child: Text(l.translate('terms_header'),
                 style: Theme.of(context).textTheme.titleLarge)),
             ]),
           ),
           const SizedBox(height: 24),
-          _s(context, '1. Objet', 'Hermona est une application d\'aide à la détection d\'acné et de recommandation de soins. Elle ne remplace en aucun cas un avis médical professionnel.'),
-          _s(context, '2. Données personnelles', 'Vos images sont collectées uniquement pour l\'analyse IA, stockées de manière sécurisée et ne sont jamais partagées avec des tiers sans votre consentement.'),
-          _s(context, '3. Intelligence Artificielle', 'Les résultats fournis par l\'IA sont indicatifs. Pour tout problème dermatologique sérieux, consultez un médecin ou dermatologue.'),
-          _s(context, '4. Forum anonyme', 'Le forum est anonyme. Vous êtes responsable des contenus publiés. Tout contenu inapproprié peut être signalé et supprimé.'),
-          _s(context, '5. Messagerie privée', 'La messagerie est anonyme. Ne partagez jamais vos informations personnelles (nom, adresse, téléphone).'),
-          _s(context, '6. Signalements', 'Tout contenu signalé 3 fois est automatiquement masqué en attente de modération.'),
-          _s(context, '7. Modifications', 'Nous nous réservons le droit de modifier ces conditions à tout moment avec notification préalable.'),
+          _s(context, l.translate('terms_section_1_title'), l.translate('terms_section_1_content')),
+          _s(context, l.translate('terms_section_2_title'), l.translate('terms_section_2_content')),
+          _s(context, l.translate('terms_section_3_title'), l.translate('terms_section_3_content')),
+          _s(context, l.translate('terms_section_4_title'), l.translate('terms_section_4_content')),
+          _s(context, l.translate('terms_section_5_title'), l.translate('terms_section_5_content')),
+          _s(context, l.translate('terms_section_6_title'), l.translate('terms_section_6_content')),
+          _s(context, l.translate('terms_section_7_title'), l.translate('terms_section_7_content')),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(14),
@@ -44,7 +46,7 @@ class TermsScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.info.withValues(alpha: 0.3))),
             child: Text(
-              'REMARQUE : Hermona ne fournit pas de diagnostics médicaux. Consultez toujours un professionnel de santé pour des problèmes dermatologiques.',
+              l.translate('terms_medical_note'),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.info)),
           ),
           const SizedBox(height: 40),

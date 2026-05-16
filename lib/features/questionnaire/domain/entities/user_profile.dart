@@ -18,6 +18,7 @@ class UserProfile {
   final List<String> routineSoir;
   final DateTime lastPeriodsDate;
   final List<int> lastCyclesDuration;
+  final int menstruationDuration;
   final Map<String, String> initialPhotos;
   final String? pseudonym;
 
@@ -39,6 +40,7 @@ class UserProfile {
     required this.routineSoir,
     required this.lastPeriodsDate,
     required this.lastCyclesDuration,
+    required this.menstruationDuration,
     required this.initialPhotos,
     this.pseudonym,
   });
@@ -66,6 +68,7 @@ class UserProfile {
               ? (json['lastPeriodsDate'] as dynamic).toDate()
               : DateTime.now()),
       lastCyclesDuration: List<int>.from(json['lastCyclesDuration'] ?? []),
+      menstruationDuration: json['menstruationDuration'] ?? 5,
       initialPhotos: json['initialPhotos'] != null
           ? Map<String, String>.from(json['initialPhotos'])
           : <String, String>{},
@@ -91,9 +94,9 @@ class UserProfile {
       'routineSoir': routineSoir,
       'lastPeriodsDate': Timestamp.fromDate(lastPeriodsDate),
       'lastCyclesDuration': lastCyclesDuration,
+      'menstruationDuration': menstruationDuration,
       'initialPhotos': initialPhotos,
       'pseudonym': pseudonym,
     };
   }
 }
-

@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:acneia/core/services/language_service.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/main.dart';
 
 class WelcomeScreen extends StatelessWidget {
@@ -11,7 +12,8 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isFr = Localizations.localeOf(context).languageCode == 'fr';
+    final l = AppLocalizations.of(context);
+    final isFr = l.locale.languageCode == 'fr';
     final size = MediaQuery.of(context).size;
     
     // The exact vibrant pink from the screenshot
@@ -76,7 +78,7 @@ class WelcomeScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
-                    isFr ? 'Révèle l\'Éclat\nde ta Peau' : 'Reveal Your\nSkin\'s Glow',
+                    l.translate('welcome_title'),
                     textAlign: TextAlign.center,
                     style: GoogleFonts.playfairDisplay(
                       fontSize: 48,
@@ -94,9 +96,7 @@ class WelcomeScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Text(
-                    isFr
-                        ? 'Analyse faciale 5 zones, suivi du cycle, et routines expertes personnalisées.'
-                        : '5-zone facial analysis, cycle tracking, and personalized expert routines.',
+                    l.translate('welcome_subtitle'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 22, // Encore plus grand pour le style
@@ -116,7 +116,7 @@ class WelcomeScreen extends StatelessWidget {
                   child: Column(
                     children: [
                       _OutlinedPillButton(
-                        label: isFr ? 'Se connecter' : 'Log In',
+                        label: l.translate('login_button'),
                         brandColor: brandPink,
                         onTap: () => context.push('/login'),
                       ).animate().fadeIn(delay: 600.ms),
@@ -124,7 +124,7 @@ class WelcomeScreen extends StatelessWidget {
                       const SizedBox(height: 16),
 
                       _OutlinedPillButton(
-                        label: isFr ? 'Créer un compte' : 'Create Account',
+                        label: l.translate('create_account_button'),
                         brandColor: brandPink,
                         onTap: () => context.push('/register'),
                       ).animate().fadeIn(delay: 750.ms),
@@ -141,7 +141,7 @@ class WelcomeScreen extends StatelessWidget {
                     Icon(Iconsax.shield_tick, size: 10, color: Colors.grey[400]),
                     const SizedBox(width: 6),
                     Text(
-                      'SCIENCE-DRIVEN • ANONYMOUS • SECURE',
+                      l.translate('welcome_footer'),
                       style: TextStyle(
                         fontSize: 8,
                         fontWeight: FontWeight.bold,

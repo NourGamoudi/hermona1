@@ -97,8 +97,15 @@ class HygieneScoreService:
                 diet_tags = []
                 
             diet_impact = 0
-            negatives = {"fast-food": -15, "sucre": -10, "laitages": -5, "alcool": -10}
-            positives = {"fruits": 5, "legumes": 5, "equilibree": 10}
+            # Normalized keys
+            negatives = {
+                "diet_fastfood": -15, "diet_sugar": -10, "diet_dairy": -5, "alcohol": -10,
+                "fast-food": -15, "sucre": -10, "laitages": -5, "alcool": -10 # Legacy
+            }
+            positives = {
+                "diet_fruits": 5, "diet_balanced": 10,
+                "fruits": 5, "equilibree": 10 # Legacy
+            }
 
             for tag in diet_tags:
                 if not tag: continue
@@ -113,12 +120,14 @@ class HygieneScoreService:
             # --- 5. SOINS (SPF & Nettoyage) ---
             care_impact = 0
             spf = data.get('spf_used', True)
-            if spf is False or str(spf).lower() == 'false': 
+            if spf is False or str(spf).lower() == 'false' or str(spf).lower() == 'spf_never': 
                 care_impact -= 10
             
-            cleansing = str(data.get('cleansing', '2x/jour')).lower()
-            if 'rarement' in cleansing: care_impact -= 15
-            elif '1x' in cleansing: care_impact -= 5
+            cleansing = str(data.get('cleansing', '')).lower()
+            if 'rarement' in cleansing or 'cleans_rarely' in cleansing or 'freq_never' in cleansing: 
+                care_impact -= 15
+            elif '1x' in cleansing or 'cleans_once' in cleansing: 
+                care_impact -= 5
 
             score += care_impact
             breakdown["care"] = care_impact
@@ -134,6 +143,7 @@ class HygieneScoreService:
         return {
             "score": int(final_score),
             "status": "Excellent" if final_score > 85 else ("Bon" if final_score > 65 else ("Moyen" if final_score > 40 else "Critique")),
+            "status_key": "hygiene_excellent" if final_score > 85 else ("hygiene_good" if final_score > 65 else ("hygiene_medium" if final_score > 40 else "hygiene_critical")),
             "breakdown": breakdown,
             "message": "Continuez vos efforts !" if final_score > 70 else "Des ajustements sont nécessaires."
         }

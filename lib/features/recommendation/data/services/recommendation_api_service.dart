@@ -22,6 +22,7 @@ class RecommendationApiService implements RecommendationRepository {
   Future<RecommendationResult> getRecommendations({
     required DetectionResult detection,
     required String userId,
+    String? lang,
   }) async {
     try {
       debugPrint('DEBUG: getRecommendations for $userId');
@@ -99,7 +100,9 @@ class RecommendationApiService implements RecommendationRepository {
         'diet': diet,
         'symptoms': (daily['symptoms'] as List?)?.cast<String>() ?? [],
         'hygiene_score': hygieneScore,
+        'lang': lang ?? 'fr',
       };
+      debugPrint('DEBUG: Recommendation API Call | lang=$lang | sent=${requestData['lang']}');
 
       final response = await _dio.post('/recommend', data: requestData);
 
@@ -112,7 +115,7 @@ class RecommendationApiService implements RecommendationRepository {
       throw Exception('Server error: ${response.statusCode}');
     } catch (e) {
       debugPrint('API ERROR: $e');
-      return _buildFallbackResult(userId, detection.id, error: e.toString());
+      return _buildFallbackResult(userId, detection.id, lang: lang, error: e.toString());
     }
   }
 
@@ -120,33 +123,36 @@ class RecommendationApiService implements RecommendationRepository {
   RecommendationResult _buildFallbackResult(
     String userId,
     String detectionId, {
+    String? lang,
     String? error,
   }) {
-    final errorMsg = error != null ? '\nErreur: $error' : '';
+    final isEn = lang == 'en';
+    final errorMsg = error != null ? (isEn ? '\nError: $error' : '\nErreur: $error') : '';
 
     return RecommendationResult(
       id: 'fallback_${DateTime.now().millisecondsSinceEpoch}',
       detectionId: detectionId,
       morningRoutine: const [],
       eveningRoutine: const [],
-      actives: const ['Acide Hyaluronique'],
-      avoid: const ['Acides forts'],
-      lifestyle: const ['Dormir 8h'],
-      nutrition: const ['Boire de l’eau'],
-      habits: const ['Ne pas toucher le visage'],
+      actives: isEn ? const ['Hyaluronic Acid'] : const ['Acide Hyaluronique'],
+      avoid: isEn ? const ['Strong acids'] : const ['Acides forts'],
+      lifestyle: isEn ? const ['Sleep 8h'] : const ['Dormir 8h'],
+      nutrition: isEn ? const ['Drink water'] : const ['Boire de l’eau'],
+      habits: isEn ? const ['Do not touch face'] : const ['Ne pas toucher le visage'],
       strategy: 'SAFE MODE',
       alternativeStrategy: '',
       variationIndex: 0,
-      explanation:
-          'Mode secours activé. Routine générique appliquée.$errorMsg',
+      explanation: isEn
+          ? 'Emergency mode activated. Generic routine applied.$errorMsg'
+          : 'Mode secours activé. Routine générique appliquée.$errorMsg',
       brands: 'CeraVe, La Roche-Posay',
-      disclaimer: 'Fallback system',
+      disclaimer: isEn ? 'Fallback system' : 'Système de secours',
       riskJ3: 0.5,
       hygieneScore: 70,
       severity: 0.5,
       createdAt: DateTime.now(),
-      duration: '7 jours',
-      whyThis: const ['Mode sécurité'],
+      duration: isEn ? '7 days' : '7 jours',
+      whyThis: isEn ? const ['Security mode'] : const ['Mode sécurité'],
       dietTips: const [],
     );
   }

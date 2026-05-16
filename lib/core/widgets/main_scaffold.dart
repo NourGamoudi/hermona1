@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:iconsax/iconsax.dart';
 import '../theme/app_theme.dart';
 
@@ -40,10 +41,10 @@ class MainScaffold extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _NavItem(icon: Iconsax.home_2,   activeIcon: Iconsax.home_25,   label: 'Accueil',    active: idx == 0, onTap: () => _go(context, 0)),
-                _NavItem(icon: Iconsax.magic_star, activeIcon: Iconsax.magic_star, label: 'Routine',    active: idx == 1, onTap: () => _go(context, 1)),
-                _NavItem(icon: Iconsax.chart_2,   activeIcon: Iconsax.chart_25,  label: 'Analyse', active: idx == 2, onTap: () => _go(context, 2)),
-                _NavItem(icon: Iconsax.user,      activeIcon: Iconsax.user5,     label: 'Profil',     active: idx == 3, onTap: () => _go(context, 3)),
+                _NavItem(icon: Iconsax.home_2,   activeIcon: Iconsax.home_25,   label: AppLocalizations.of(context).translate('home_tab'),    active: idx == 0, onTap: () => _go(context, 0)),
+                _NavItem(icon: Iconsax.magic_star, activeIcon: Iconsax.magic_star, label: AppLocalizations.of(context).translate('routine_tab'),    active: idx == 1, onTap: () => _go(context, 1)),
+                _NavItem(icon: Iconsax.chart_2,   activeIcon: Iconsax.chart_25,  label: AppLocalizations.of(context).translate('analysis_tab'), active: idx == 2, onTap: () => _go(context, 2)),
+                _NavItem(icon: Iconsax.user,      activeIcon: Iconsax.user5,     label: AppLocalizations.of(context).translate('profile_tab'),     active: idx == 3, onTap: () => _go(context, 3)),
               ],
             ),
           ),

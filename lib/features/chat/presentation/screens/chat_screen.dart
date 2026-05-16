@@ -14,6 +14,7 @@ import 'package:go_router/go_router.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/features/chat/data/services/chat_api_service.dart';
 import 'package:acneia/features/chat/domain/entities/chat_message.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
@@ -54,12 +55,15 @@ class _ChatScreenState extends State<ChatScreen> {
   UserProfile? _profile;
   PredictionResult? _prediction;
 
-  final List<String> _suggestions = [
-    "Pourquoi mon risque est élevé aujourd'hui ?",
-    "Quels produits éviter avec ma peau ?",
-    "Comment gérer l'acné en phase lutéale ?",
-    "Quelle routine adopter cette semaine ?",
-  ];
+  List<String> get _suggestions {
+    final l = AppLocalizations.of(context);
+    return [
+      l.translate('suggestion_1'),
+      l.translate('suggestion_2'),
+      l.translate('suggestion_3'),
+      l.translate('suggestion_4'),
+    ];
+  }
 
   @override
   void initState() {
@@ -87,7 +91,8 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _initTts() async {
     try {
-      await _tts.setLanguage("fr-FR");
+      final l = AppLocalizations.of(context);
+      await _tts.setLanguage(l.locale.languageCode == 'fr' ? "fr-FR" : "en-US");
       await _tts.setSpeechRate(0.5);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
@@ -148,12 +153,15 @@ class _ChatScreenState extends State<ChatScreen> {
     });
   }
 
-  void _addWelcome() => setState(() => _msgs.add(ChatMessage(
-        id: _uuid.v4(),
-        role: 'assistant',
-        timestamp: DateTime.now(),
-        content: "Bonjour ! Je suis Hermona AI ✨\n\nPosez-moi n'importe quelle question sur votre peau ou votre cycle !\n\nVous pouvez aussi me parler avec le micro !",
-      )));
+  void _addWelcome() {
+    final l = AppLocalizations.of(context);
+    setState(() => _msgs.add(ChatMessage(
+          id: _uuid.v4(),
+          role: 'assistant',
+          timestamp: DateTime.now(),
+          content: l.translate('chat_welcome'),
+        )));
+  }
 
   Future<void> _startRecording() async {
     if (await _audioRecorder.hasPermission()) {
@@ -237,8 +245,9 @@ class _ChatScreenState extends State<ChatScreen> {
         _loading = false;
         _typing = false;
       });
+      final l = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Assistant indisponible : $e")),
+        SnackBar(content: Text("${l.translate('assistant_unavailable')} : $e")),
       );
     }
     _scrollBottom();
@@ -268,12 +277,13 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const FittedBox(fit: BoxFit.scaleDown, child: Text('Assistant Hermona')),
+        title: FittedBox(fit: BoxFit.scaleDown, child: Text(l.translate('assistant_hermona'))),
         leadingWidth: 52,
         leading: Padding(
           padding: const EdgeInsets.all(10.0),
@@ -383,6 +393,7 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Widget _buildInput(Size size) {
+    final l = AppLocalizations.of(context);
     return Container(
       padding: EdgeInsets.fromLTRB(16, 0, 16, MediaQuery.of(context).padding.bottom + 20),
       child: Row(
@@ -424,7 +435,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 minLines: 1,
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500),
                 decoration: InputDecoration(
-                  hintText: 'Écrivez à Hermona...',
+                  hintText: l.translate('chat_hint'),
                   hintStyle: TextStyle(color: AppColors.textSecondaryDark.withValues(alpha: 0.5)),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
                   border: InputBorder.none,
@@ -518,10 +529,10 @@ class _ChatBubble extends StatelessWidget {
                       children: [
                         Text(
                           msg.content, 
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 15, 
                             height: 1.6, 
-                            color: Theme.of(context).textTheme.bodyLarge?.color,
+                            color: Colors.black87, // Force dark color for visibility on light bubble
                           )
                         ),
                         const SizedBox(height: 14),
@@ -538,7 +549,7 @@ class _ChatBubble extends StatelessWidget {
                               children: [
                                 Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary),
                                 const SizedBox(width: 8),
-                                Text('ÉCOUTER', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 1)),
+                                Text(AppLocalizations.of(context).translate('listen'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 1)),
                               ],
                             ),
                           ),

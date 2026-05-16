@@ -39,15 +39,26 @@ class NotificationScreen extends StatelessWidget {
               stream: FirebaseFirestore.instance
                   .collection(AppConstants.colNotifications)
                   .where('userId', isEqualTo: uid)
-                  .orderBy('timestamp', descending: true) // Utilise ton index n°1
+                  .orderBy('timestamp', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) return Center(child: Text('Erreur: ${snapshot.error}'));
                 if (snapshot.connectionState == ConnectionState.waiting) return const Center(child: CircularProgressIndicator());
   
                 final docs = snapshot.data?.docs ?? [];
-                final messageDocs = docs.where((d) => (d.data() as Map)['type'] == 'MESSAGE').toList();
-                final alertDocs   = docs.where((d) => (d.data() as Map)['type'] != 'MESSAGE').toList();
+                
+                // Mark as read (background)
+                _markAllAsRead(docs);
+
+                final messageDocs = docs.where((d) {
+                  final type = (d.data() as Map)['type']?.toString().toUpperCase() ?? '';
+                  return type == 'MESSAGE';
+                }).toList();
+
+                final alertDocs = docs.where((d) {
+                  final type = (d.data() as Map)['type']?.toString().toUpperCase() ?? '';
+                  return type != 'MESSAGE';
+                }).toList();
   
                 return TabBarView(
                   children: [
@@ -59,6 +70,20 @@ class NotificationScreen extends StatelessWidget {
             ),
       ),
     );
+  }
+
+  void _markAllAsRead(List<QueryDocumentSnapshot> docs) {
+    final batch = FirebaseFirestore.instance.batch();
+    bool hasUnread = false;
+    for (var doc in docs) {
+      final data = doc.data() as Map<String, dynamic>;
+      final isRead = data['read'] == true; // Safely check if true
+      if (!isRead) {
+        batch.update(doc.reference, {'read': true});
+        hasUnread = true;
+      }
+    }
+    if (hasUnread) batch.commit();
   }
 
   Widget _buildList(BuildContext context, List<QueryDocumentSnapshot> docs, String emptyTitle, String emptySub) {

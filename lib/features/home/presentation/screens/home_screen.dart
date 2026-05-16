@@ -6,6 +6,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -14,6 +15,7 @@ import 'package:acneia/features/profile/presentation/screens/trends_screen.dart'
 import 'package:acneia/features/home/presentation/screens/evolution_screen.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
+import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 
@@ -25,6 +27,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String? _firstName;
+  CycleStatus? _cycleStatus;
+  bool _loadingCycle = false;
 
   @override
   void initState() {
@@ -34,36 +38,43 @@ class _HomeScreenState extends State<HomeScreen> {
     notifSvc.listenToNotifications();
   }
 
-  void _loadUser() {
+  void _loadUser() async {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
-    FirebaseFirestore.instance
-        .collection(AppConstants.colUsers).doc(uid).get()
-        .then((d) { 
-          if (d.exists && mounted) {
-            setState(() => _firstName = d.data()?['firstName'] as String?);
-            _checkPhaseAlert(d.data() as Map<String, dynamic>);
-          }
+    
+    // 1. Load basic user info
+    final d = await FirebaseFirestore.instance.collection(AppConstants.colUsers).doc(uid).get();
+    if (d.exists && mounted) {
+      setState(() => _firstName = d.data()?['firstName'] as String?);
+    }
+
+    // 2. Load cycle status from API (Source of Truth)
+    setState(() => _loadingCycle = true);
+    try {
+      final cycleSvc = CycleApiService();
+      final status = await cycleSvc.getCycleStatus();
+      if (mounted) {
+        setState(() {
+          _cycleStatus = status;
+          _loadingCycle = false;
         });
+        _checkPhaseAlert();
+      }
+    } catch (e) {
+      debugPrint('Error loading cycle status: $e');
+      if (mounted) setState(() => _loadingCycle = false);
+    }
   }
 
-  void _checkPhaseAlert(Map<String, dynamic> data) {
-    if (data['lastPeriodsDate'] == null) {
-      debugPrint('ℹ️ Cycle Alert: Date des dernières règles absente.');
-      return;
-    }
+  void _checkPhaseAlert() {
+    if (_cycleStatus == null) return;
     
-    final lastDate = _parseDate(data['lastPeriodsDate']);
-    final avgCycle = 28; // Valeur par défaut simplifiée
-    final day = (DateTime.now().difference(lastDate).inDays % avgCycle) + 1;
-
-    debugPrint('ℹ️ Cycle Check: Jour $day / $avgCycle');
-
-    if (day >= 21) { // Lutéale phase
+    if (_cycleStatus!.phase == 'luteal') {
       debugPrint('🔔 Phase Lutéale détectée !');
+      final l = AppLocalizations.of(context);
       NotificationService().sendNotification(
-        title: 'Phase Lutéale',
-        body: 'Votre peau peut devenir plus grasse. N\'oubliez pas votre nettoyage soir !',
+        title: l.translate('phase_luteal'),
+        body: l.translate('luteal_notif_body'),
         type: 'CYCLE',
       );
     }
@@ -72,17 +83,33 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final uid = FirebaseAuth.instance.currentUser?.uid;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor, 
       body: Stack(
         children: [
-          // Background Blobs
+          // Background Blobs - Mesh Gradient Effect
           Positioned(
             top: -100,
             right: -50,
-            child: _Blob(size: 300, color: AppTheme.primary.withValues(alpha: 0.12)),
+            child: _Blob(size: 300, color: AppTheme.primary.withValues(alpha: 0.15)),
+          ),
+          Positioned(
+            top: 200,
+            left: -100,
+            child: _Blob(size: 400, color: const Color(0xFFC084FC).withValues(alpha: 0.1)), // Soft Lavender
+          ),
+          Positioned(
+            bottom: 100,
+            right: -150,
+            child: _Blob(size: 350, color: const Color(0xFFFDBA74).withValues(alpha: 0.1)), // Soft Peach
+          ),
+          Positioned(
+            bottom: -50,
+            left: -50,
+            child: _Blob(size: 250, color: AppTheme.primary.withValues(alpha: 0.08)),
           ),
 
           SafeArea(
@@ -97,21 +124,21 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   
                   // 1. DASHBOARD SECTION (Hygiene & Risk)
-                  _buildScoreRow(uid),
+                  _buildScoreRow(context, uid),
                   const SizedBox(height: 12),
-                  _buildCyclePhaseBar(uid),
+                  _buildCyclePhaseBar(context, uid),
                   const SizedBox(height: 12),
-                  _buildLatestAnalysis(uid),
+                  _buildLatestAnalysis(context, uid),
                   const SizedBox(height: 24),
 
                   // 2. À REMPLIR SECTION
-                  const SectionHeader(title: 'À Remplir'),
+                  SectionHeader(title: l.translate('section_tracking')),
                   const SizedBox(height: 12),
                   _buildToFillSection(context),
                   const SizedBox(height: 32),
 
                   // 3. EXPLORER SECTION
-                  const SectionHeader(title: 'Explorer'),
+                  SectionHeader(title: l.translate('section_community')),
                   const SizedBox(height: 12),
                   _buildExplorerSection(context),
                   
@@ -126,6 +153,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildHeader(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final uid = FirebaseAuth.instance.currentUser?.uid;
     return Row(
       children: [
         Expanded(
@@ -133,18 +162,47 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${_getGreeting()},',
+                'HERMONA',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(letterSpacing: 1, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
               ),
               const SizedBox(height: 2),
               Text(
-                '${_firstName ?? 'Chargement...'} ✨',
+                '${_firstName ?? l.translate('unknown')} ✨',
                 style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: const Color(0xFF2D2D2D)),
               ),
             ],
           ),
         ),
-        _HeaderAction(icon: Iconsax.notification, onTap: () => context.push('/notifications')),
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection(AppConstants.colNotifications)
+              .where('userId', isEqualTo: uid)
+              .where('read', isEqualTo: false)
+              .snapshots(),
+          builder: (context, snap) {
+            final hasNotif = snap.hasData && snap.data!.docs.isNotEmpty;
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _HeaderAction(icon: Iconsax.notification, onTap: () => context.push('/notifications')),
+                if (hasNotif)
+                  Positioned(
+                    right: 0,
+                    top: 0,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
         const SizedBox(width: 12),
         GestureDetector(
           onTap: () => context.push('/profile'),
@@ -161,7 +219,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ).animate().fadeIn(duration: 600.ms).slideY(begin: -0.1);
   }
 
-  Widget _buildScoreRow(String? uid) {
+  Widget _buildScoreRow(BuildContext context, String? uid) {
+    final l = AppLocalizations.of(context);
     if (uid == null) return const SizedBox();
     return Row(
       children: [
@@ -184,9 +243,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 score = (data['hygieneScore'] as num?)?.toInt();
               }
               return _SquareScoreCard(
-                title: 'Hygiène',
+                title: l.translate('hygiene'),
                 value: score != null ? '$score%' : '--',
-                subtitle: 'Score IA',
+                subtitle: l.translate('score_ia'),
                 icon: Iconsax.heart5,
                 color: AppColors.info,
                 onTap: () => context.push('/daily-survey'),
@@ -210,9 +269,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 result = PredictionResult.fromJson(docs.first.data() as Map<String, dynamic>);
               }
               return _SquareScoreCard(
-                title: 'Risque',
+                title: l.translate('risk'),
                 value: result != null ? '${(result.riskJ3 * 100).toInt()}%' : '--',
-                subtitle: result?.riskLevel.name.toUpperCase() ?? 'Inconnu',
+                subtitle: result != null ? l.translate('risk_${result.riskLevel.name.toLowerCase()}') : l.translate('unknown'),
                 icon: Iconsax.status_up,
                 color: result?.riskLevel == RiskLevel.low ? AppColors.success : (result?.riskLevel == RiskLevel.medium ? AppColors.warning : AppColors.error),
                 onTap: () => context.push('/prediction'),
@@ -224,118 +283,139 @@ class _HomeScreenState extends State<HomeScreen> {
     ).animate().fadeIn(delay: 200.ms);
   }
 
-  Widget _buildCyclePhaseBar(String? uid) {
-    if (uid == null) return const SizedBox();
-    return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance.collection(AppConstants.colUsers).doc(uid).snapshots(),
-      builder: (context, snapshot) {
-        String phase = 'Inconnue';
-        int day = 0;
-        int avgCycle = 28;
-        if (snapshot.hasData && snapshot.data!.exists) {
-          final data = snapshot.data!.data() as Map<String, dynamic>;
-          
-          // Calculate average cycle
-          final lastCycles = (data['lastCyclesDuration'] as List<dynamic>?)?.map((e) => (e as num).toInt()).toList() ?? [28, 28, 28];
-          if (lastCycles.isNotEmpty) {
-            avgCycle = (lastCycles.reduce((a, b) => a + b) / lastCycles.length).round();
-          }
+  Widget _buildCyclePhaseBar(BuildContext context, String? uid) {
+    final l = AppLocalizations.of(context);
+    if (_loadingCycle) {
+      return const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()));
+    }
 
-          if (data['lastPeriodsDate'] != null) {
-            final lastDate = _parseDate(data['lastPeriodsDate']);
-            final daysSinceLast = DateTime.now().difference(lastDate).inDays;
-            day = (daysSinceLast % avgCycle) + 1;
-            
-            // Dynamic phase mapping based on cycle length (sync with Daily Survey)
-            if (day <= 5) {
-              phase = 'Menstruelle';
-            } else if (day <= (avgCycle * 0.45).toInt()) {
-              phase = 'Folliculaire';
-            } else if (day <= (avgCycle * 0.55).toInt()) {
-              phase = 'Ovulatoire';
-            } else {
-              phase = 'Lutéale';
-            }
-          }
-        }
-        return GlassCard(
-          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-          onTap: () => _showCycleDetails(context, phase, day, avgCycle),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
-                child: Icon(Icons.waves, size: 18, color: AppTheme.primary),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Phase $phase', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                    Text('Jour $day du cycle • Moyenne: $avgCycle jours', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
-            ],
+    final day = _cycleStatus?.day ?? 0;
+    final avgCycle = _cycleStatus?.cycleLength ?? 28;
+    final phase = _cycleStatus?.phase ?? 'unknown';
+
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+      onTap: () => _showCycleDetails(context, l.translate('phase_$phase'), day, avgCycle),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+            child: Icon(Icons.waves, size: 18, color: AppTheme.primary),
           ),
-        );
-      },
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(l.translate('phase_$phase').toUpperCase(), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                Text('${l.translate('day_label')} $day • ${l.translate('average_cycle')}: $avgCycle ${l.translate('days_label')}', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, size: 20, color: Colors.grey),
+        ],
+      ),
     );
   }
 
   void _showCycleDetails(BuildContext context, String currentPhase, int day, int avgCycle) {
+    final l = AppLocalizations.of(context);
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => GlassCard(
-        borderRadius: 30,
-        padding: const EdgeInsets.all(32),
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFFE5E7EB), // Gris plus foncé / Slate grey
+          borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+        ),
+        padding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
+            Center(child: Container(width: 45, height: 5, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))),
             const SizedBox(height: 24),
-            Text('Votre Cycle Hormonal', style: Theme.of(context).textTheme.displaySmall),
-            const SizedBox(height: 8),
-            Text('Jour $day • Moyenne habituelle: $avgCycle jours', style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+            Text(l.translate('cycle_details'), style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.black, fontWeight: FontWeight.w900)),
+            const SizedBox(height: 12),
+            Text('${l.translate('day_in_cycle')} $day • ${l.translate('average_cycle')}: $avgCycle ${l.translate('days')}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 24),
-            if (currentPhase == 'Menstruelle')
-              _buildPhaseInfo('Menstruelle', 'Jours 1-5', 'Hormones au plus bas. Focus sur le nettoyage doux.', true),
-            if (currentPhase == 'Folliculaire')
-              _buildPhaseInfo('Folliculaire', 'Jours 6-13', 'Peau plus éclatante et réceptive aux soins.', true),
-            if (currentPhase == 'Ovulatoire')
-              _buildPhaseInfo('Ovulatoire', 'Jours 14-15', 'Pic hormonal. Risque de pores obstrués.', true),
-            if (currentPhase == 'Lutéale')
-              _buildPhaseInfo('Lutéale', 'Jours 16-$avgCycle', 'Pic de sébum. Risque d\'acné élevé.', true),
+            if (currentPhase == l.translate('phase_menstrual'))
+              _buildPhaseInfo(context, l.translate('phase_menstrual'), l.translate('phase_menstrual_range'), l.translate('phase_menstrual_desc'), true, [const Color(0xFFFF2D55), const Color(0xFFFF5E3A)]),
+            if (currentPhase == l.translate('phase_follicular'))
+              _buildPhaseInfo(context, l.translate('phase_follicular'), l.translate('phase_follicular_range'), l.translate('phase_follicular_desc'), true, [const Color(0xFFF472B6), const Color(0xFFDB2777)]), // Nouveau Rose
+            if (currentPhase == l.translate('phase_ovulatory'))
+              _buildPhaseInfo(context, l.translate('phase_ovulatory'), l.translate('phase_ovulatory_range'), l.translate('phase_ovulatory_desc'), true, [const Color(0xFFAF52DE), const Color(0xFFFF2D55)]),
+            if (currentPhase == l.translate('phase_luteal'))
+              _buildPhaseInfo(context, l.translate('phase_luteal'), '${l.translate('phase_luteal_range').split('-')[0]}-$avgCycle', l.translate('phase_luteal_desc'), true, [const Color(0xFFFF9500), const Color(0xFFFFCC00)]),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildPhaseInfo(String title, String days, String desc, bool isCur) {
+  Widget _buildPhaseInfo(BuildContext context, String title, String days, String desc, bool isCur, List<Color> colors) {
+    final l = AppLocalizations.of(context);
+    final accentColor = colors.first;
     return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: isCur ? AppColors.primary.withValues(alpha: 0.05) : Colors.transparent, borderRadius: BorderRadius.circular(12)),
-      child: Row(
-        children: [
-          Icon(isCur ? Icons.check_circle : Icons.circle_outlined, size: 18, color: isCur ? AppColors.primary : Colors.grey),
-          const SizedBox(width: 12),
-          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Phase $title ($days)', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-            Text(desc, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-          ])),
-        ],
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: isCur ? [
+          BoxShadow(color: accentColor.withValues(alpha: 0.3), blurRadius: 15, offset: const Offset(0, 8))
+        ] : [],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            gradient: isCur ? LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
+            color: isCur ? null : Colors.white.withValues(alpha: 0.6),
+            border: Border.all(color: isCur ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.05)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isCur ? Colors.white.withValues(alpha: 0.2) : accentColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(isCur ? Icons.auto_awesome : Icons.circle_outlined, size: 20, color: isCur ? Colors.white : accentColor),
+              ),
+              const SizedBox(width: 16),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  '${l.translate('phase')} $title ($days)'.toUpperCase(), 
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900, 
+                    fontSize: 13, 
+                    letterSpacing: 0.5,
+                    color: isCur ? Colors.white : Colors.grey.shade800
+                  )
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  desc, 
+                  style: TextStyle(
+                    fontSize: 12, 
+                    height: 1.6, 
+                    color: isCur ? Colors.white.withValues(alpha: 0.9) : Colors.grey.shade600,
+                    fontWeight: isCur ? FontWeight.w500 : FontWeight.normal,
+                  )
+                ),
+              ])),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildLatestAnalysis(String? uid) {
+  Widget _buildLatestAnalysis(BuildContext context, String? uid) {
+    final l = AppLocalizations.of(context);
     if (uid == null) return const SizedBox();
     return FutureBuilder<QuerySnapshot>(
       future: FirebaseFirestore.instance.collection(AppConstants.colDetections)
@@ -359,8 +439,8 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 16),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Sévérité : ${(data['severityScore'] as num?)?.toInt() ?? 0}%', style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Text('Dernière analyse effectuée.', style: TextStyle(fontSize: 11, color: Colors.grey)),
+                Text('${l.translate('severity_score')} : ${(data['severityScore'] as num?)?.toInt() ?? 0}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(l.translate('latest_photo_analysis'), style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ])),
               const Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey),
             ],
@@ -371,6 +451,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildToFillSection(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return const SizedBox();
 
@@ -378,8 +459,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         _RowAction(
           icon: Iconsax.user_edit, 
-          title: 'Informations Personnelles', 
-          subtitle: 'Profil & Cycle', 
+          title: l.translate('personal_info'), 
+          subtitle: l.translate('personal_info_sub'), 
           onTap: () => context.push('/onboarding')
         ),
         const SizedBox(height: 12),
@@ -405,8 +486,8 @@ class _HomeScreenState extends State<HomeScreen> {
             }
             return _RowAction(
               icon: Iconsax.edit, 
-              title: 'Questionnaire Quotidien', 
-              subtitle: isDone ? '✓ Déjà rempli aujourd\'hui' : 'Suivi de vie', 
+              title: l.translate('daily_q'), 
+              subtitle: isDone ? l.translate('daily_q_done') : l.translate('daily_tracking_subtitle'), 
               onTap: () => context.push('/daily-survey'),
               isCompleted: isDone,
             );
@@ -426,8 +507,8 @@ class _HomeScreenState extends State<HomeScreen> {
             final isDone = snapshot.hasData && snapshot.data!.docs.isNotEmpty;
             return _RowAction(
               icon: Iconsax.calendar_tick, 
-              title: 'Questionnaire Hebdomadaire', 
-              subtitle: isDone ? '✓ Déjà rempli cette semaine' : 'Analyse Photo', 
+              title: l.translate('weekly_q'), 
+              subtitle: isDone ? l.translate('weekly_q_done') : l.translate('weekly_review_subtitle'), 
               onTap: () => context.push('/weekly-survey'),
               isCompleted: isDone,
             );
@@ -438,24 +519,26 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildExplorerSection(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return GridView.count(
       crossAxisCount: 2, crossAxisSpacing: 12, mainAxisSpacing: 12, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), childAspectRatio: 1.6,
       children: [
-        _ExplorerCard(icon: Iconsax.message_notif, title: 'Assistant', color: AppTheme.primary, onTap: () => context.go('/chat')),
-        _ExplorerCard(icon: Iconsax.chart, title: 'Historique', color: AppColors.info, onTap: () => context.push('/history')),
-        _ExplorerCard(icon: Iconsax.people, title: 'Forum', color: AppColors.secondary, onTap: () => context.push('/forum')),
-        _ExplorerCard(icon: Iconsax.message_text, title: 'Messagerie', color: AppColors.accent, onTap: () => context.push('/messages')),
-        _ExplorerCard(icon: Iconsax.chart_21, title: 'Évolution', color: const Color(0xFF9C27B0), onTap: () => context.push('/evolution')),
+        _ExplorerCard(icon: Iconsax.message_notif, title: l.translate('assistant'), color: AppTheme.primary, onTap: () => context.go('/chat')),
+        _ExplorerCard(icon: Iconsax.chart, title: l.translate('history'), color: AppColors.info, onTap: () => context.push('/history')),
+        _ExplorerCard(icon: Iconsax.people, title: l.translate('forum'), color: AppColors.secondary, onTap: () => context.push('/forum')),
+        _ExplorerCard(icon: Iconsax.message_text, title: l.translate('messages'), color: AppColors.accent, onTap: () => context.push('/messages')),
+        _ExplorerCard(icon: Iconsax.chart_21, title: l.translate('acne_evolution'), color: const Color(0xFF9C27B0), onTap: () => context.push('/evolution')),
       ],
     );
   }
 
-  String _getGreeting() {
+  String _getGreeting(BuildContext context) {
     final hour = DateTime.now().hour;
-    if (hour < 5) return 'Bonne nuit';
-    if (hour < 12) return 'Bonjour';
-    if (hour < 18) return 'Bon après-midi';
-    return 'Bonsoir';
+    final l = AppLocalizations.of(context);
+    if (hour < 5) return l.translate('greeting_night');
+    if (hour < 12) return l.translate('greeting_morning');
+    if (hour < 18) return l.translate('greeting_afternoon');
+    return l.translate('greeting_evening');
   }
 
   Widget _buildEvolutionPreview(String? uid) {
@@ -464,6 +547,7 @@ class _HomeScreenState extends State<HomeScreen> {
       create: (context) => TrendsCubit()..loadData(),
       child: BlocBuilder<TrendsCubit, TrendsState>(
         builder: (context, state) {
+          final l = AppLocalizations.of(context);
           if (state is TrendsLoading) {
             return const SizedBox(
               height: 160,
@@ -493,7 +577,7 @@ class _HomeScreenState extends State<HomeScreen> {
               return GlassCard(
                 onTap: () => context.push('/evolution'),
                 padding: const EdgeInsets.all(20),
-                child: const Center(child: Text('Commencez vos analyses pour voir votre évolution', style: TextStyle(fontSize: 12, color: Colors.grey))),
+                child: Center(child: Text(l.translate('start_analyses_evolution'), style: const TextStyle(fontSize: 12, color: Colors.grey))),
               );
             }
 
@@ -506,7 +590,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Expanded(
                         child: _MiniChart(
-                          title: 'Sévérité',
+                          title: l.translate('severity'),
                           color: AppColors.primary,
                           spots: sPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score)).toList(),
                         ),
@@ -514,7 +598,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 20),
                       Expanded(
                         child: _MiniChart(
-                          title: 'Risque',
+                          title: l.translate('risk'),
                           color: AppColors.error,
                           spots: rPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score * 100)).toList(),
                         ),
@@ -522,7 +606,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const Text('Appuyez pour voir le détail complet', style: TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)),
+                  Text(l.translate('tap_for_details'), style: const TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)),
                 ],
               ),
             );

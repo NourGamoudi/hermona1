@@ -7,12 +7,16 @@ import 'package:iconsax/iconsax.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
+import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
 import 'package:acneia/features/questionnaire/domain/entities/daily_survey.dart';
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
+import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 
 class DailyQuestionnaireScreen extends StatefulWidget {
   final DailySurvey? initialSurvey;
-  const DailyQuestionnaireScreen({super.key, this.initialSurvey});
+  final bool isOnboarding;
+  const DailyQuestionnaireScreen({super.key, this.initialSurvey, this.isOnboarding = false});
 
   @override
   State<DailyQuestionnaireScreen> createState() => _DailyQuestionnaireScreenState();
@@ -24,17 +28,23 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   bool loading = false;
   String? error;
 
-  // Form Data
+  // Form Data (Storing technical KEYS instead of translated strings)
   double stress = 5;
   double sleepDuration = 7;
   double sleepQuality = 5;
   int hydration = 4;
-  List<String> food = [];
-  List<String> symptoms = [];
+  List<String> food = []; // Stores keys: 'diet_balanced', 'diet_sugar', etc.
+  List<String> symptoms = []; // Stores keys: 'symptom_none', 'symptom_cramps', etc.
   bool spfUsed = false;
 
-  final List<String> foodOptions = ['équilibrée', 'sucre', 'laitages', 'fast-food', 'fruits'];
-  final List<String> symptomsOptions = ['aucun', 'crampes', 'ballonnements', 'sautes d\'humeur', 'fatigue', 'seins sensibles', 'maux de tête'];
+  final List<String> foodOptionKeys = [
+    'diet_balanced', 'diet_sugar', 'diet_dairy', 'diet_fastfood', 'diet_fruits'
+  ];
+
+  final List<String> symptomOptionKeys = [
+    'symptom_none', 'symptom_cramps', 'symptom_bloating', 'symptom_mood', 
+    'symptom_fatigue', 'symptom_breasts', 'symptom_headache'
+  ];
 
   @override
   void initState() {
@@ -51,44 +61,40 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
   }
 
   Future<void> _save() async {
+    final l = AppLocalizations.of(context);
     if (food.isEmpty) {
-      _showError('Veuillez sélectionner votre alimentation du jour.');
+      _showError(l.translate('error_diet_required'));
       return;
     }
     if (symptoms.isEmpty) {
-      _showError('Veuillez sélectionner vos symptômes (ou "aucun").');
+      _showError(l.translate('error_symptoms_required'));
       return;
     }
 
     setState(() { loading = true; error = null; });
     try {
       final user = FirebaseAuth.instance.currentUser;
-      if (user == null) throw Exception('Utilisateur non connecté');
+      if (user == null) throw Exception(l.translate('user_not_connected'));
 
       final profile = await _service.fetchUserProfile(user.uid);
-      int cycleDay = 0;
-      String cyclePhase = 'inconnue';
-      
-      if (profile != null) {
-        final avgCycle = profile.lastCyclesDuration.isNotEmpty 
-            ? profile.lastCyclesDuration.reduce((a, b) => a + b) / profile.lastCyclesDuration.length 
-            : 28.0;
-        
-        final daysSinceLast = DateTime.now().difference(profile.lastPeriodsDate).inDays;
-        cycleDay = (daysSinceLast % avgCycle.toInt()) + 1;
-        
-        // Dynamic phase mapping based on cycle length
-        if (cycleDay <= 5) {
-          cyclePhase = 'menstruelle';
-        } else if (cycleDay <= (avgCycle * 0.45).toInt()) {
-          cyclePhase = 'folliculaire';
-        } else if (cycleDay <= (avgCycle * 0.55).toInt()) {
-          cyclePhase = 'ovulatoire';
-        } else {
-          cyclePhase = 'lutéale';
-        }
+      // 1. Call AI Prediction first (Backend calculates cycle status during this call)
+      PredictionResult? prediction;
+      try {
+        prediction = await _predictionService.predict({
+          'stress': stress > 7 ? 'high' : stress > 4 ? 'medium' : 'low',
+          'sleep': sleepDuration < 6 ? 'poor' : 'good',
+          'diet': (food.contains('diet_sugar') || food.contains('diet_dairy')) ? 'bad' : 'good',
+          'hydration': hydration,
+          'spf_used': spfUsed,
+        }, lang: l.locale.languageCode);
+      } catch (predictError) {
+        debugPrint('AI Prediction failed: $predictError');
+        // If prediction fails, we might still want to save the survey, 
+        // but the user wants the backend to be the source of truth.
+        // We'll proceed with fallback values or throw error based on strictness.
       }
 
+      // 2. Create and Save Daily Survey using backend-calculated cycle data
       final survey = DailySurvey(
         id: '${user.uid}_${DateTime.now().toIso8601String().split('T')[0]}',
         userId: user.uid,
@@ -99,40 +105,28 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
         hydration: hydration,
         food: food,
         symptoms: symptoms,
-        cycleDay: cycleDay,
-        cyclePhase: cyclePhase,
-        lifestyleScore: 70, // Default or placeholder
+        cycleDay: prediction?.cycleDay ?? 1,
+        cyclePhase: prediction?.cyclePhase ?? 'menstrual',
+        lifestyleScore: 70,
       );
 
-      // 1. Save the survey data locally (Firestore) first so progress is never lost
       await _service.saveDailySurvey(survey);
-
-      try {
-        // 2. Attempt AI prediction
-        final prediction = await _predictionService.predict({
-          'stress': stress > 7 ? 'high' : stress > 4 ? 'medium' : 'low',
-          'sleep': sleepDuration < 6 ? 'poor' : 'good',
-          'diet': (food.contains('sucre') || food.contains('laitages')) ? 'bad' : 'good',
-          'hormonal_cycle': cyclePhase,
-          'hydration': hydration,
-          'spf_used': spfUsed,
-        });
-
+      if (prediction != null) {
         await _predictionService.saveResult(prediction, user.uid);
-      } catch (predictError) {
-        debugPrint('AI Prediction failed (offline or server error): $predictError');
-        // We don't block the user here, they can still proceed
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Bilan quotidien enregistré !')),
+          SnackBar(content: Text(l.translate('daily_saved'))),
         );
-        // Move to the next page regardless of AI success
-        context.pushReplacement('/weekly-survey');
+        if (widget.isOnboarding) {
+          context.pushReplacement('/weekly-survey?onboarding=true');
+        } else {
+          context.go('/home');
+        }
       }
     } catch (e) {
-      setState(() => error = 'Erreur lors de l\'enregistrement : $e');
+      setState(() => error = '${l.translate('error_ia')} : $e');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -140,10 +134,12 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    debugPrint("DEBUG AUDIT: DailyQuestionnaireScreen REBUILDING with locale = ${l.locale.languageCode}");
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Bilan Quotidien'),
+        title: Text(l.translate('daily_title')),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_1),
           onPressed: () => context.pop(),
@@ -151,7 +147,6 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       ),
       body: Stack(
         children: [
-          // Background
           Positioned(
             top: -50,
             right: -50,
@@ -164,11 +159,11 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
               physics: const BouncingScrollPhysics(),
               padding: const EdgeInsets.fromLTRB(24, 110, 24, 100),
               children: [
-                const _HeaderSection(title: 'Suivi Bien-être', sub: 'Tes données permettent à l\'IA d\'affiner ses prédictions.'),
+                _HeaderSection(title: l.translate('daily_header_title'), sub: l.translate('daily_header_sub')),
                 const SizedBox(height: 32),
 
                 _SliderCard(
-                  label: 'Niveau de Stress',
+                  label: l.translate('stress_level'),
                   icon: Iconsax.mask,
                   value: stress,
                   min: 1, max: 10,
@@ -178,7 +173,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                 const SizedBox(height: 20),
 
                 _SliderCard(
-                  label: 'Heures de Sommeil',
+                  label: l.translate('sleep_hours'),
                   icon: Iconsax.moon,
                   value: sleepDuration,
                   min: 0, max: 14,
@@ -189,7 +184,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                 const SizedBox(height: 20),
 
                 _SliderCard(
-                  label: 'Hydratation (Verres)',
+                  label: l.translate('hydration_glasses'),
                   icon: Iconsax.cup,
                   value: hydration.toDouble(),
                   min: 0, max: 15,
@@ -198,15 +193,15 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
 
                 const SizedBox(height: 32),
 
-                _buildSwitch('Protection SPF appliquée', spfUsed, (v) => setState(() => spfUsed = v)),
+                _buildSwitch(l.translate('spf_protection'), spfUsed, (v) => setState(() => spfUsed = v)),
                 const SizedBox(height: 32),
 
-                _buildChipSection('Alimentation du jour', foodOptions, food, (v, s) {
+                _buildChipSection(l.translate('daily_diet'), foodOptionKeys, food, (v, s) {
                   setState(() => s ? food.add(v) : food.remove(v));
                 }),
                 const SizedBox(height: 24),
 
-                _buildChipSection('Symptômes ressentis', symptomsOptions, symptoms, (v, s) {
+                _buildChipSection(l.translate('symptoms_felt'), symptomOptionKeys, symptoms, (v, s) {
                   setState(() => s ? symptoms.add(v) : symptoms.remove(v));
                 }),
 
@@ -219,7 +214,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                 const SizedBox(height: 48),
 
                 PrimaryButton(
-                  label: 'ANALYSER MA JOURNÉE',
+                  label: l.translate('analyze_day'),
                   onTap: _save,
                 ),
               ],
@@ -243,8 +238,9 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
     ).animate().fadeIn(delay: 400.ms);
   }
 
-  Widget _buildChipSection(String title, List<String> options, List<String> current, Function(String, bool) onSel) {
+  Widget _buildChipSection(String title, List<String> optionKeys, List<String> current, Function(String, bool) onSel) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -253,10 +249,11 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
         Wrap(
           spacing: 10,
           runSpacing: 10,
-          children: options.map((o) {
-            final sel = current.contains(o);
+          children: optionKeys.map((key) {
+            final sel = current.contains(key);
+            final translatedLabel = l.translate(key);
             return GestureDetector(
-              onTap: () => onSel(o, !sel),
+              onTap: () => onSel(key, !sel),
               child: AnimatedContainer(
                 duration: 300.ms,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -265,7 +262,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: sel ? Colors.transparent : (isDark ? Colors.white.withValues(alpha: 0.25) : AppColors.dividerLight)),
                 ),
-                child: Text(o.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textMutedPink, fontSize: 10, fontWeight: FontWeight.w900)),
+                child: Text(translatedLabel.toUpperCase(), style: TextStyle(color: sel ? Colors.white : AppColors.textMutedPink, fontSize: 10, fontWeight: FontWeight.w900)),
               ),
             );
           }).toList(),
@@ -276,11 +273,7 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
 
   void _showError(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(msg), 
-        backgroundColor: Colors.redAccent,
-        behavior: SnackBarBehavior.floating,
-      )
+      SnackBar(content: Text(msg), backgroundColor: Colors.redAccent, behavior: SnackBarBehavior.floating),
     );
   }
 }

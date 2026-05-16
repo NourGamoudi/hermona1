@@ -5,11 +5,9 @@ import 'package:acneia/features/detection/domain/entities/detection_result.dart'
 abstract class RecommendationRepository {
 
   Future<RecommendationResult> getRecommendations({
-
     required DetectionResult detection,
-
     required String userId,
-
+    String? lang,
   });
 
 

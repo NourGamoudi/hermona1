@@ -39,9 +39,9 @@ class _TrendsScreenState extends State<TrendsScreen> {
                   tooltip: l.translate('trends_filter'),
                   onSelected: (val) => setState(() => _selectedDays = val),
                   itemBuilder: (ctx) => [
-                    const PopupMenuItem(value: 28, child: Text("4 semaines")),
-                    const PopupMenuItem(value: 84, child: Text("12 semaines")),
-                    const PopupMenuItem(value: 365, child: Text("1 an")),
+                    PopupMenuItem(value: 28, child: Text(l.translate('four_weeks'))),
+                    PopupMenuItem(value: 84, child: Text(l.translate('twelve_weeks'))),
+                    PopupMenuItem(value: 365, child: Text(l.translate('one_year'))),
                   ],
                 ),
               ],
@@ -355,19 +355,28 @@ class _LineChartWidget extends StatelessWidget {
             const SizedBox(height: 24),
             
             if (isDetection && data['imageUrls'] != null && (data['imageUrls'] as List).isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: _buildPhoto(data['imageUrls'][0]),
+              Column(
+                children: [
+                  GestureDetector(
+                    onTap: () => _showFullScreenImage(context, data['imageUrls'][0]),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: _buildPhoto(data['imageUrls'][0]),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(l.translate('tap_to_enlarge'), style: const TextStyle(fontSize: 10, color: Colors.grey)),
+                ],
               ),
             
-            const SizedBox(height: 20),
+            const SizedBox(height: 24),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _DetailMiniStat(label: "Score", value: "${point.value.round()}%", color: color),
+                _DetailMiniStat(label: l.translate('score_label'), value: "${point.value.round()}%", color: color),
                 const SizedBox(width: 40),
                 _DetailMiniStat(
-                  label: "Niveau", 
+                  label: l.translate('level_label'), 
                   value: data['severityLevel'] ?? data['riskLevel'] ?? "N/A", 
                   color: color
                 ),
@@ -394,7 +403,39 @@ class _LineChartWidget extends StatelessWidget {
       final base64str = url.split(',').last;
       return Image.memory(base64Decode(base64str), height: 180, width: double.infinity, fit: BoxFit.cover);
     }
+    if (url.startsWith('http')) {
+      return Image.network(
+        url, 
+        height: 180, 
+        width: double.infinity, 
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => const Icon(Iconsax.image, size: 50, color: Colors.grey),
+      );
+    }
     return const Icon(Iconsax.image, size: 50, color: Colors.grey);
+  }
+
+  void _showFullScreenImage(BuildContext context, String url) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        fullscreenDialog: true,
+        builder: (ctx) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () => Navigator.pop(ctx)),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              child: url.startsWith('data:image') 
+                ? Image.memory(base64Decode(url.split(',').last)) 
+                : Image.network(url),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,9 +45,16 @@ class EvolutionScreen extends StatelessWidget {
     return BlocProvider(
       create: (context) => TrendsCubit()..loadData(),
       child: Scaffold(
-        extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text('Mon Évolution'),
+          title: Text(AppLocalizations.of(context).translate('my_evolution')),
+          backgroundColor: Colors.white.withAlpha(200), // Fond semi-transparent
+          surfaceTintColor: Colors.transparent,
+          flexibleSpace: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(color: Colors.transparent),
+            ),
+          ),
           leading: Padding(
             padding: const EdgeInsets.all(8.0),
             child: GestureDetector(
@@ -125,6 +133,7 @@ class _EvolutionBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Stack(
       children: [
         Positioned(top: -60, right: -60, child: _Blob(size: 220, color: AppTheme.primary.withValues(alpha: 0.07))),
@@ -135,7 +144,7 @@ class _EvolutionBody extends StatelessWidget {
           color: AppColors.primary,
           child: ListView(
             physics: const BouncingScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(20, 100, 20, 40),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
             children: [
               PremiumFadeIn(
                 child: GlassCard(
@@ -152,8 +161,8 @@ class _EvolutionBody extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('Historique de votre peau', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                            Text('${severityPoints.length} bilan(s) • ${riskPoints.length} suivi(s)',
+                            Text(l.translate('skin_history'), style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                            Text('${severityPoints.length} ${l.translate('reports')} • ${riskPoints.length} ${l.translate('trackings')}',
                                 style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                           ],
                         ),
@@ -162,73 +171,63 @@ class _EvolutionBody extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 28),
-
-              if (severityPoints.isNotEmpty && riskPoints.isNotEmpty)
-                PremiumFadeIn(
-                  delay: 50,
-                  child: _ChartSection(
-                    title: 'Comparaison Croisée',
-                    subtitle: 'Corrélation entre votre risque et l\'état réel',
-                    icon: Iconsax.status_up,
-                    color: Colors.purple,
-                    isEmpty: false,
-                    emptyMessage: '',
-                    chart: SizedBox(height: 200, child: _DualChart(sPoints: severityPoints, rPoints: riskPoints)),
-                  ),
-                ),
               const SizedBox(height: 24),
 
+              // --- MAIN SEVERITY CHART (Filtered: Latest vs ~1 Week ago) ---
               PremiumFadeIn(
-                delay: 100,
+                delay: 50,
                 child: _ChartSection(
-                  title: 'Sévérité (Bilan Hebdo)',
-                  subtitle: 'Évolution par analyse photo',
+                  title: l.translate('severity_weekly'),
+                  subtitle: l.translate('evolution_photo_analysis'),
                   icon: Iconsax.scan,
                   color: AppColors.primary,
                   isEmpty: severityPoints.isEmpty,
-                  emptyMessage: 'Aucune analyse photo.',
+                  emptyMessage: l.translate('no_photo_analysis'),
                   chart: severityPoints.isEmpty ? null : _IndividualChart(
-                    spots: severityPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score)).toList(),
+                    spots: _generateTimeSpots(_filterPointsForWeeklyComparison(_filterOnePointPerDay(severityPoints, (p) => p.date))),
                     color: AppColors.primary,
-                    labels: severityPoints.map((p) => DateFormat('d/M', 'fr').format(p.date)).toList(),
-                    onTap: (i) => _showSeverityDetail(context, severityPoints[i]),
+                    labels: _generateTimeLabels(context, _filterPointsForWeeklyComparison(_filterOnePointPerDay(severityPoints, (p) => p.date))),
+                    onTap: (i) {
+                      final filtered = _filterPointsForWeeklyComparison(_filterOnePointPerDay(severityPoints, (p) => p.date));
+                      _showSeverityDetail(context, filtered[i]);
+                    },
                   ),
                 ),
               ),
               const SizedBox(height: 24),
 
+
               PremiumFadeIn(
                 delay: 200,
                 child: _ChartSection(
-                  title: 'Risque (Suivi Quotidien)',
-                  subtitle: 'Évolution selon vos réponses',
+                  title: l.translate('risk_daily_tracking'),
+                  subtitle: l.translate('evolution_responses'),
                   icon: Iconsax.status_up,
                   color: AppColors.error,
                   isEmpty: riskPoints.isEmpty,
-                  emptyMessage: 'Aucun suivi quotidien.',
+                  emptyMessage: l.translate('no_daily_tracking'),
                   chart: riskPoints.isEmpty ? null : _IndividualChart(
-                    spots: riskPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score * 100)).toList(),
+                    spots: _generateRiskTimeSpots(_filterOnePointPerDay(riskPoints, (p) => p.date)),
                     color: AppColors.error,
-                    labels: riskPoints.map((p) => DateFormat('d/M', 'fr').format(p.date)).toList(),
-                    onTap: (i) => _showRiskDetail(context, riskPoints[i]),
+                    labels: _generateRiskTimeLabels(context, _filterOnePointPerDay(riskPoints, (p) => p.date)),
+                    onTap: (i) => _showRiskDetail(context, _filterOnePointPerDay(riskPoints, (p) => p.date)[i]),
                   ),
                 ),
               ),
               const SizedBox(height: 40),
 
-              const PremiumFadeIn(
+              PremiumFadeIn(
                 delay: 300,
                 child: GlassCard(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Text('💡', style: TextStyle(fontSize: 22)),
-                      SizedBox(width: 12),
+                      const Text('💡', style: TextStyle(fontSize: 22)),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Appuyez sur un point pour voir le détail et les photos historiques.',
-                          style: TextStyle(fontSize: 12, height: 1.5),
+                          l.translate('tap_point_details'),
+                          style: const TextStyle(fontSize: 12, height: 1.5),
                         ),
                       ),
                     ],
@@ -242,49 +241,154 @@ class _EvolutionBody extends StatelessWidget {
     );
   }
 
+  List<_SeverityPoint> _filterPointsForWeeklyComparison(List<_SeverityPoint> points) {
+    if (points.length < 2) return points;
+    
+    final latest = points.last;
+    final targetDate = latest.date.subtract(const Duration(days: 7));
+    
+    _SeverityPoint? bestMatch;
+    Duration minDiff = const Duration(days: 365);
+    
+    // Priority: find the point that is at least 6-8 days before latest
+    for (int i = points.length - 2; i >= 0; i--) {
+      final daysDiff = latest.date.difference(points[i].date).inDays;
+      if (daysDiff >= 6) {
+        return [points[i], latest];
+      }
+    }
+    
+    // Fallback: if no point is old enough, just show the earliest and latest to show max possible span
+    return [points.first, latest];
+  }
+
+  List<T> _filterOnePointPerDay<T>(List<T> points, DateTime Function(T) dateExtractor) {
+    if (points.isEmpty) return [];
+    final Map<String, T> dailyMap = {};
+    for (var p in points) {
+      final date = dateExtractor(p);
+      final key = DateFormat('yyyy-MM-dd').format(date);
+      // We keep the latest one for each day (assuming they are in chronological order)
+      dailyMap[key] = p;
+    }
+    return dailyMap.values.toList()..sort((a, b) => dateExtractor(a).compareTo(dateExtractor(b)));
+  }
+
+  List<FlSpot> _generateTimeSpots(List<_SeverityPoint> points) {
+    if (points.isEmpty) return [];
+    final firstDate = points.first.date;
+    return points.map((p) {
+      final days = p.date.difference(firstDate).inDays.toDouble();
+      return FlSpot(days, p.score);
+    }).toList();
+  }
+
+  Map<double, String> _generateTimeLabels(BuildContext context, List<_SeverityPoint> points) {
+    final Map<double, String> labels = {};
+    if (points.isEmpty) return labels;
+    final firstDate = points.first.date;
+    final locale = AppLocalizations.of(context).locale.languageCode;
+    for (var p in points) {
+      final days = p.date.difference(firstDate).inDays.toDouble();
+      labels[days] = DateFormat('d/M', locale).format(p.date);
+    }
+    return labels;
+  }
+
+  List<FlSpot> _generateRiskTimeSpots(List<_RiskPoint> points) {
+    if (points.isEmpty) return [];
+    final firstDate = points.first.date;
+    return points.map((p) {
+      final days = p.date.difference(firstDate).inDays.toDouble();
+      return FlSpot(days, p.score * 100);
+    }).toList();
+  }
+
+  Map<double, String> _generateRiskTimeLabels(BuildContext context, List<_RiskPoint> points) {
+    final Map<double, String> labels = {};
+    if (points.isEmpty) return labels;
+    final firstDate = points.first.date;
+    final locale = AppLocalizations.of(context).locale.languageCode;
+    for (var p in points) {
+      final days = p.date.difference(firstDate).inDays.toDouble();
+      labels[days] = DateFormat('d/M', locale).format(p.date);
+    }
+    return labels;
+  }
+
   void _showSeverityDetail(BuildContext context, _SeverityPoint point) {
+    final l = AppLocalizations.of(context);
     showDialog(
       context: context,
-      barrierColor: Colors.black54,
-      builder: (_) => Dialog(
+      barrierColor: Colors.black87,
+      builder: (dialogCtx) => Dialog(
         backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
           child: BackdropFilter(
             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
             child: Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(32),
               decoration: BoxDecoration(
-                color: Theme.of(context).brightness == Brightness.dark ? Colors.black.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.85),
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.black.withValues(alpha: 0.8) 
+                    : Colors.white.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(28),
                 border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+              child: Stack(
                 children: [
-                  Row(children: [
-                    const Icon(Iconsax.scan, color: AppColors.primary),
-                    const SizedBox(width: 12),
-                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      const Text('Bilan Hebdo', style: TextStyle(fontWeight: FontWeight.bold)),
-                      Text(DateFormat('d MMMM yyyy', 'fr').format(point.date), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                    ]),
-                  ]),
-                  const SizedBox(height: 20),
-                  Text('${point.score.toStringAsFixed(1)}%', style: const TextStyle(fontSize: 42, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  const Text('SCORE DE SÉVÉRITÉ', style: TextStyle(fontSize: 10, letterSpacing: 1)),
-                  const SizedBox(height: 20),
-                  FutureBuilder<DocumentSnapshot>(
-                    future: FirebaseFirestore.instance.collection('detections').doc(point.docId).collection('media').doc('images').get(),
-                    builder: (context, snap) {
-                      if (snap.connectionState == ConnectionState.waiting) return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
-                      final urls = (snap.data?.data() as Map?)?['imageUrls'] as List?;
-                      if (urls == null || urls.isEmpty) return const Text('Photo non disponible');
-                      return ClipRRect(borderRadius: BorderRadius.circular(16), child: Image.network(urls[0], height: 180, width: double.infinity, fit: BoxFit.cover, errorBuilder: (_,__,___)=>const Icon(Icons.broken_image)));
-                    },
+                  Positioned(
+                    top: -10,
+                    right: -10,
+                    child: IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.grey, size: 28),
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                    ),
                   ),
-                  const SizedBox(height: 20),
-                  PrimaryButton(label: 'FERMER', onTap: () => Navigator.pop(context)),
+
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 20),
+                      Text(l.translate('severity_score').toUpperCase(), 
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 2, color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      
+                      // GIANT SCORE
+                      Text(
+                        '${point.score.toStringAsFixed(1)}%',
+                        style: const TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary,
+                          letterSpacing: -2,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      Text(
+                        DateFormat('EEEE d MMMM yyyy', l.locale.languageCode).format(point.date),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                      ),
+                      
+                      const SizedBox(height: 48),
+
+                      // VIEW FULL ANALYSIS BUTTON
+                      PrimaryButton(
+                        label: l.translate('view_full_analysis').toUpperCase(),
+                        onTap: () async {
+                          Navigator.of(dialogCtx).pop();
+                          // Try to fetch full data for navigation
+                          final data = await _getRobustPhotoData(point.docId);
+                          if (data != null && context.mounted) {
+                            context.push('/detection/result', extra: data);
+                          }
+                        },
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -294,11 +398,131 @@ class _EvolutionBody extends StatelessWidget {
     );
   }
 
+  Widget _buildUniversalImage(String url, {double? height, BoxFit fit = BoxFit.cover}) {
+    if (url.startsWith('data:image')) {
+      try {
+        final base64String = url.split(',').last;
+        final bytes = base64Decode(base64String);
+        return Image.memory(bytes, height: height, width: double.infinity, fit: fit);
+      } catch (e) {
+        return const Icon(Icons.broken_image);
+      }
+    }
+    return Image.network(
+      url, 
+      height: height, 
+      width: double.infinity, 
+      fit: fit, 
+      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)
+    );
+  }
+
+  Color _getSeverityColor(String? level) {
+    switch (level?.toLowerCase()) {
+      case 'normal': return AppColors.success;
+      case 'moderate': return AppColors.warning;
+      case 'severe': return AppColors.error;
+      case 'verysevere': return Colors.purple;
+      default: return AppColors.primary;
+    }
+  }
+
+  String? _extractUrlFromData(Map<String, dynamic>? data) {
+    if (data == null) return null;
+    
+    // 1. Direct keys
+    final keys = ['imageUrls', 'images', 'image_urls', 'imageUrl', 'image_url', 'photo', 'photoUrl'];
+    for (var k in keys) {
+      final val = data[k];
+      if (val is List && val.isNotEmpty) return val[0].toString();
+      if (val is String && val.isNotEmpty) return val;
+    }
+    
+    // 2. Nested 'media' object
+    if (data['media'] is Map) {
+      final media = data['media'] as Map<String, dynamic>;
+      for (var k in keys) {
+        final val = media[k];
+        if (val is List && val.isNotEmpty) return val[0].toString();
+        if (val is String && val.isNotEmpty) return val;
+      }
+      // Check for 'full' or 'original' inside media
+      if (media['full'] != null) return media['full'].toString();
+      if (media['original'] != null) return media['original'].toString();
+    }
+    
+    // 3. Recursive search (any long string starting with http or data:)
+    for (var val in data.values) {
+      if (val is String && val.length > 50 && (val.startsWith('http') || val.startsWith('data:image'))) return val;
+      if (val is List && val.isNotEmpty && val[0] is String && val[0].toString().length > 50) {
+        if (val[0].toString().startsWith('http') || val[0].toString().startsWith('data:image')) return val[0].toString();
+      }
+    }
+    
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> _getRobustPhotoData(String docId) async {
+    try {
+      final doc = await FirebaseFirestore.instance.collection('detections').doc(docId).get();
+      if (!doc.exists) return null;
+      
+      final data = doc.data() as Map<String, dynamic>;
+      
+      // Check if main doc has images
+      if (_extractUrlFromData(data) != null) return data;
+      
+      // Fallback to subcollection
+      final subSnap = await doc.reference.collection('media').doc('images').get();
+      if (subSnap.exists) {
+        final subData = subSnap.data() as Map<String, dynamic>;
+        if (_extractUrlFromData(subData) != null) {
+          return {...data, ...subData}; // Merge for UI
+        }
+      }
+      
+      return data;
+    } catch (e) {
+      debugPrint("Error fetching robust photo data: $e");
+    }
+    return null;
+  }
+
+  void _showFullScreenImage(BuildContext context, String url) {
+    showGeneralDialog(
+      context: context,
+      barrierColor: Colors.black,
+      barrierDismissible: true,
+      barrierLabel: 'Close',
+      pageBuilder: (ctx, _, __) => Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                child: url.startsWith('data:image')
+                    ? Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain)
+                    : Image.network(url, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 50, right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 32),
+                onPressed: () => Navigator.of(ctx).pop(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showRiskDetail(BuildContext context, _RiskPoint point) {
     final color = point.score > 0.61 ? AppColors.error : (point.score > 0.48 ? AppColors.warning : AppColors.success);
     showDialog(
       context: context,
-      builder: (_) => Dialog(
+      builder: (dialogCtx) => Dialog(
         backgroundColor: Colors.transparent,
         child: GlassCard(
           padding: const EdgeInsets.all(24),
@@ -306,11 +530,11 @@ class _EvolutionBody extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text('${(point.score * 100).toInt()}%', style: TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: color)),
-              const Text('RISQUE DE POUSSÉE', style: TextStyle(fontSize: 12, letterSpacing: 1.5)),
+              Text(AppLocalizations.of(context).translate('flare_risk'), style: const TextStyle(fontSize: 12, letterSpacing: 1.5)),
               const SizedBox(height: 12),
-              Text(DateFormat('EEEE d MMMM', 'fr').format(point.date), style: const TextStyle(color: Colors.grey)),
+              Text(DateFormat('EEEE d MMMM yyyy', AppLocalizations.of(context).locale.languageCode).format(point.date), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
               const SizedBox(height: 24),
-              PrimaryButton(label: 'FERMER', onTap: () => Navigator.pop(context)),
+              PrimaryButton(label: AppLocalizations.of(context).translate('close'), onTap: () => Navigator.of(dialogCtx).pop()),
             ],
           ),
         ),
@@ -319,56 +543,60 @@ class _EvolutionBody extends StatelessWidget {
   }
 }
 
-class _DualChart extends StatelessWidget {
-  final List<_SeverityPoint> sPoints;
-  final List<_RiskPoint> rPoints;
-  const _DualChart({required this.sPoints, required this.rPoints});
-
-  @override
-  Widget build(BuildContext context) {
-    return LineChart(
-      LineChartData(
-        minY: 0, maxY: 100,
-        gridData: FlGridData(show: true, drawVerticalLine: false, getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.1), strokeWidth: 1)),
-        borderData: FlBorderData(show: false),
-        titlesData: const FlTitlesData(topTitles: AxisTitles(), rightTitles: AxisTitles(), bottomTitles: AxisTitles(), leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 30))),
-        lineBarsData: [
-          LineChartBarData(
-            spots: sPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score)).toList(),
-            isCurved: true, color: AppColors.primary, barWidth: 3, dotData: const FlDotData(show: true),
-          ),
-          LineChartBarData(
-            spots: rPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score * 100)).toList(),
-            isCurved: true, color: AppColors.error, barWidth: 3, dotData: const FlDotData(show: true),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _IndividualChart extends StatelessWidget {
   final List<FlSpot> spots;
   final Color color;
-  final List<String> labels;
+  final Map<double, String> labels;
   final Function(int) onTap;
 
   const _IndividualChart({required this.spots, required this.color, required this.labels, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
+    if (spots.isEmpty) return const SizedBox();
+    
+    final minX = spots.first.x;
+    final maxX = spots.last.x;
+    final horizontalInterval = (maxX - minX) == 0 ? 1.0 : (maxX - minX);
+
     return LineChart(
       LineChartData(
         minY: 0, maxY: 100,
-        gridData: const FlGridData(show: false),
+        minX: minX - 0.5,
+        maxX: maxX + 0.5,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          getDrawingHorizontalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.1), strokeWidth: 1),
+          getDrawingVerticalLine: (v) => FlLine(color: Colors.grey.withValues(alpha: 0.05), strokeWidth: 1),
+        ),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(), rightTitles: const AxisTitles(),
-          bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, getTitlesWidget: (v, _) {
-            final i = v.toInt();
-            if (i < 0 || i >= labels.length) return const SizedBox();
-            return Text(labels[i], style: const TextStyle(fontSize: 10, color: Colors.grey));
-          })),
+          bottomTitles: AxisTitles(sideTitles: SideTitles(
+            showTitles: true, 
+            reservedSize: 22,
+            interval: 1, // Ensure we check every X value for labels
+            getTitlesWidget: (v, _) {
+              // Exact match or very close to a data point
+              for (var entry in labels.entries) {
+                if ((entry.key - v).abs() < 0.1) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6.0),
+                    child: Text(entry.value, style: const TextStyle(fontSize: 9, color: Colors.grey, fontWeight: FontWeight.bold)),
+                  );
+                }
+              }
+              return const SizedBox();
+            }
+          )),
+          leftTitles: AxisTitles(sideTitles: SideTitles(
+            showTitles: true,
+            reservedSize: 35,
+            interval: 20,
+            getTitlesWidget: (v, _) => Text('${v.toInt()}%', style: const TextStyle(fontSize: 9, color: Colors.grey)),
+          )),
         ),
         lineTouchData: LineTouchData(touchCallback: (event, res) {
           if (event is FlTapUpEvent && res != null && res.lineBarSpots != null && res.lineBarSpots!.isNotEmpty) {

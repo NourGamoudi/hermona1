@@ -259,3 +259,31 @@ class StatusBadge extends StatelessWidget {
     );
   }
 }
+
+class SecondaryButton extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  final double? width;
+
+  const SecondaryButton({super.key, required this.label, required this.onTap, this.width});
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width ?? double.infinity,
+      height: 56,
+      child: OutlinedButton(
+        onPressed: onTap,
+        style: OutlinedButton.styleFrom(
+          side: BorderSide(color: AppTheme.primary.withValues(alpha: 0.3), width: 1.5),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          foregroundColor: AppTheme.primary,
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
+        ),
+      ),
+    );
+  }
+}

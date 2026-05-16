@@ -173,7 +173,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                           const SizedBox(height: 20),
 
-                          const _FieldLabel(label: 'Pseudonyme (anonyme)'),
+                          _FieldLabel(label: l.translate('pseudonym_label')),
                           const SizedBox(height: 8),
                           TextFormField(
                             controller: _pseudoCtrl,

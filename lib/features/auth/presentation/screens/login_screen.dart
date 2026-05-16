@@ -296,7 +296,7 @@ class _LoginScreenState extends State<LoginScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'Entrez votre adresse email pour recevoir un lien de réinitialisation.',
+                l.translate('reset_password_desc'),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondaryDark),
               ),
               const SizedBox(height: 20),

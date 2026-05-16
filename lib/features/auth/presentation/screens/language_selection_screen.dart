@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 
 import 'package:acneia/core/services/language_service.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
+import 'package:acneia/main.dart';
 
 
 
@@ -67,6 +69,8 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
     if (mounted) {
 
+      HermonaApp.of(context)?.setLocale(Locale(code));
+
       if (widget.isFromProfile) {
 
         context.pop(); // Retour au profil
@@ -119,28 +123,19 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
               children: [
 
-                const Text('🌍', style: TextStyle(fontSize: 64)),
+                const Text('🌍 ', style: TextStyle(fontSize: 64)),
 
                 const SizedBox(height: 24),
 
                 Text(
-
-                  'Choisissez votre langue',
-
+                  AppLocalizations.of(context).translate('choose_language'),
                   style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
-
                   textAlign: TextAlign.center,
-
                 ).animate().fadeIn(duration: 600.ms).slideY(begin: 0.2),
-
                 const SizedBox(height: 8),
-
-                const Text(
-
-                  'Choose your preferred language',
-
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-
+                Text(
+                  AppLocalizations.of(context).translate('choose_language_sub'),
+                  style: const TextStyle(color: Colors.grey, fontSize: 16),
                 ).animate().fadeIn(delay: 200.ms),
 
                 const SizedBox(height: 48),
@@ -155,7 +150,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
                   code: 'fr',
 
-                  flag: '🧴‡«🧴‡·',
+                  flag: '🇫🇷',
 
                 ).animate().fadeIn(delay: 400.ms).slideX(begin: -0.1),
 
@@ -173,7 +168,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
 
                   code: 'en',
 
-                  flag: '🧴‡º🧴‡¸',
+                  flag: '🇺🇸',
 
                 ).animate().fadeIn(delay: 600.ms).slideX(begin: 0.1),
 

@@ -5,11 +5,11 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 """
-HERMONA BACKEND - SCIENTIFIC STATUS:
-- ML STATUS: REAL (LightGBM Regression)
-- EXPLAINABILITY: REAL (SHAP TreeExplainer)
-- BIOLOGICAL FEATURES: INJECTED CONSTANTS (Population Means)
-- CALIBRATION: DATA-DRIVEN (Percentile Quantiles)
+HERMONA HYBRID CLINICAL-ML DECISION SYSTEM:
+- Clinical Layer: Deterministic rule-based estimation (Clinical Engine).
+- ML Layer: Probabilistic risk prediction (LightGBM Contextual Predictor).
+- API Layer: Orchestration of the clinical-to-ML pipeline.
+- Frontend Layer: Presentation and data collection.
 """
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,7 +24,45 @@ import hashlib
 import json
 import shap
 from dotenv import load_dotenv
+import firebase_admin
+from firebase_admin import credentials, firestore
 from model.yolo_model import get_model
+
+# --- Configuration ---
+env_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(env_path)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("HermonaBackend")
+
+# --- Firebase Initialization ---
+def initialize_firebase():
+    possible_paths = [
+        "serviceAccountKey.json",
+        os.path.join("scripts", "serviceAccountKey.json"),
+        os.path.join(os.path.dirname(__file__), "..", "scripts", "serviceAccountKey.json"),
+        os.path.join(os.path.dirname(__file__), "serviceAccountKey.json")
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            try:
+                cred = credentials.Certificate(path)
+                firebase_admin.initialize_app(cred)
+                logger.info(f"✅ Firebase initialized with {path}")
+                return
+            except Exception as e:
+                logger.error(f"❌ Error initializing Firebase with {path}: {e}")
+                
+    # Fallback to default credentials
+    try:
+        firebase_admin.initialize_app()
+        logger.info("✅ Firebase initialized with default credentials")
+    except Exception as e:
+        logger.error(f"❌ Firebase initialization fallback failed: {e}")
+
+initialize_firebase()
+
+db = firestore.client()
 
 from .ml_pipeline.builder import MLFeatureBuilder
 from .ml_pipeline.defaults import RISK_THRESHOLDS
@@ -41,10 +79,6 @@ if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(_
     explainer = shap.TreeExplainer(_model)
 
 # --- Configuration ---
-env_path = os.path.join(os.path.dirname(__file__), '.env')
-load_dotenv(env_path)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("HermonaBackend")
 
 app = FastAPI(title="Hermona AI Backend")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -103,6 +137,7 @@ class RecommendationRequest(BaseModel):
     hydration: int = 5
     diet: List[str] = []
     symptoms: List[str] = []
+    lang: str = "fr"
     hygiene_score: int = Field(70, alias="hygieneScore")
     hygiene_breakdown: Optional[Dict[str, Any]] = Field(None, alias="hygieneBreakdown")
     hygiene_details: Optional[List[str]] = Field(None, alias="hygieneDetails")
@@ -481,15 +516,30 @@ def calculate_hygiene_metrics(sanitized_profile: dict):
 
     return s_final, c_coverage, interpretation, breakdown
 
+@app.get("/cycle-status/{user_id}")
+async def get_cycle_status(user_id: str):
+    try:
+        from .utils.cycle_utils import compute_cycle_state
+        # Fetch profile from Firestore
+        profile_doc = db.collection("users").document(user_id).get()
+        if not profile_doc.exists:
+            return {"error": "Profile not found"}
+            
+        profile = profile_doc.to_dict()
+        return compute_cycle_state(profile)
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.post("/predict")
 async def predict(body: PredictPayload, _ = Depends(verify_api_key)):
+    print("🚀 PREDICT REQUEST RECEIVED")
     # V7.1: Version Enforcement
     # V8: Version Enforcement
     if body.schema_version not in ["v7", "v8"]:
         raise HTTPException(status_code=400, detail=f"SCHEMA VERSION MISMATCH: Expected v7 or v8, got {body.schema_version}")
 
     answers = body.answers
-    profile_raw = answers.get('profile', {})
+    lang = body.get('lang', 'fr') if hasattr(body, 'get') else getattr(body, 'lang', 'fr')
     
     # --- LAYER 2: PURE SCORING (Hygiene) ---
     hygiene_data = HygieneScoreService.calculate(answers)
@@ -507,33 +557,42 @@ async def predict(body: PredictPayload, _ = Depends(verify_api_key)):
     }
     
     # --- LAYER 3: ML PREDICTION (RISK J+3) ---
-    # Sources: strict parity with training script
+    # 1. CLINICAL ENGINE: Compute cycle status first (Single Source of Truth)
+    from .utils.cycle_utils import compute_cycle_state
+    profile = answers.get('profile', {})
+    cycle_data = compute_cycle_state(profile)
+    
+    cycle_day = cycle_data['cycleDay']
+    cycle_phase = cycle_data['cyclePhase']
+    ovulation_day = cycle_data['ovulationDay']
+
+    # 2. ML PIPELINE: Predict risk using clinical state as features
+    risk_j3 = 0.45 # Default fallback
+    df = None
     if pkl_model is not None:
         try:
-            # 1. Feature Engineering (STRICT PARITY via Modular ML Pipeline)
-            df = MLFeatureBuilder.build_vector(answers)
+            # Inject cycle state into feature builder
+            df = MLFeatureBuilder.build_vector(answers, cycle_day, cycle_phase)
             
-            # 2. Regression Prediction (0.0 to 1.0)
-            risk_j3 = float(pkl_model.predict(df)[0])
-            risk_j3 = min(1.0, max(0.0, risk_j3))
-            
-            logger.info(f"🔮 ML Prediction Success: riskJ3={risk_j3:.4f}")
+            # CRITICAL FIX: Force numeric types for LightGBM/SHAP compatibility
+            if df is not None:
+                df = df.astype(float)
+                risk_j3 = float(pkl_model.predict(df)[0])
+                risk_j3 = min(1.0, max(0.0, risk_j3))
+                logger.info(f"🔮 ML Prediction Success: riskJ3={risk_j3:.4f}")
+            else:
+                logger.warning("⚠️ ML Feature Builder returned None, using default risk.")
         except Exception as e:
             logger.error(f"❌ ML Prediction Failure: {e}")
-            # Safe Fallback to a neutral-ish risk if model fails
-            risk_j3 = 0.45
-    else:
-        logger.error("❌ Model not loaded, using fallback risk.")
-        risk_j3 = 0.45
-
-    # --- Trend Logic (Comparison with previous if available) ---
-    # For now, we return a trend based on the raw value until we have history
+            df = None # Ensure df is None if error
+    
+    # --- Trend Logic ---
     trend = "increasing" if risk_j3 > 0.5 else "stable"
     
     # --- IMMUTABILITY: INPUT SNAPSHOT HASH ---
     input_string = json.dumps(answers, sort_keys=True)
     input_hash = f"sha256:{hashlib.sha256(input_string.encode()).hexdigest()}"
-
+    
     return {
         "id": f"pred_{uuid.uuid4().hex[:8]}",
         "hygieneScore": hygiene_score_pct,
@@ -547,29 +606,25 @@ async def predict(body: PredictPayload, _ = Depends(verify_api_key)):
         },
         "ui": ui_config,
         "weekly_insight": None,
-        # --- SCIENTIFIC VALIDATION: RAW ML OUTPUT ---
-        # riskJ3 is the direct regression output from the LightGBM model.
-        # No post-processing or heuristic weighting is applied to this value.
         "riskJ3": round(risk_j3, 2),
         "riskLevel": "high" if risk_j3 > RISK_THRESHOLDS['MEDIUM'] else "medium" if risk_j3 > RISK_THRESHOLDS['LOW'] else "low",
         "trend": trend,
         
         # --- SCIENTIFIC EXPLAINABILITY: REAL SHAP VALUES ---
-        # Calculation of feature contributions using TreeExplainer
         "shapFactors": (lambda: {
-            # Compute top contributors if explainer is active
             k: round(v, 3) for k, v in sorted(
-                zip(FEATURE_NAMES, explainer.shap_values(df)[0] if explainer else [0]*40),
+                zip(FEATURE_NAMES, explainer.shap_values(df)[0] if (explainer and df is not None) else [0.0]*40),
                 key=lambda x: abs(x[1]), reverse=True
             )[:3]
-        })() if explainer else {
+        })() if (explainer and df is not None) else {
             "Stress": 0.05,
             "Sommeil": 0.05,
             "Hormonal": 0.05
         },
         
-        "cycleDay": int(answers.get('cycle_day', 14)),
-        "cyclePhase": "Luteale" if int(answers.get('cycle_day', 14)) > 14 else "Folliculaire",
+        "cycleDay": cycle_day,
+        "cyclePhase": cycle_phase,
+        "ovulationDay": int(ovulation_day),
         "audit": {
             "input_hash": input_hash,
             "model_version": "lightgbm_v1_5000",
@@ -614,6 +669,7 @@ async def recommend(req: RecommendationRequest, _ = Depends(verify_api_key)):
         # Use model_dump for Pydantic v2 compatibility if available
         data = req.model_dump() if hasattr(req, 'model_dump') else req.dict()
         engine = RecommendationEngine(data)
+        logger.info(f"API CALL: /recommend | userId={req.userId} | lang={engine.lang}")
         response = engine.get_recommendations()
         return response
     except Exception as e:

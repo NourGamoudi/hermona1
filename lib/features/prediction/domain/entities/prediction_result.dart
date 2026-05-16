@@ -15,6 +15,7 @@ class PredictionResult extends Equatable {
   final Map<String, num>? hygieneBreakdown;
   final int cycleDay;
   final String cyclePhase;
+  final int ovulationDay;
   final DateTime predictedAt;
 
   const PredictionResult({
@@ -28,6 +29,7 @@ class PredictionResult extends Equatable {
     this.hygieneBreakdown,
     required this.cycleDay,
     required this.cyclePhase,
+    required this.ovulationDay,
     required this.predictedAt,
   });
 
@@ -47,6 +49,7 @@ class PredictionResult extends Equatable {
           : null,
       cycleDay: (j['cycleDay'] as num?)?.toInt() ?? 0,
       cyclePhase: j['cyclePhase'] ?? '',
+      ovulationDay: (j['ovulationDay'] as num?)?.toInt() ?? 14,
       predictedAt: j['predictedAt'] is String ? DateTime.parse(j['predictedAt']) : (j['predictedAt'] as Timestamp).toDate(),
     );
   }
@@ -62,6 +65,7 @@ class PredictionResult extends Equatable {
     'hygieneBreakdown': hygieneBreakdown,
     'cycleDay': cycleDay,
     'cyclePhase': cyclePhase,
+    'ovulationDay': ovulationDay,
     'predictedAt': Timestamp.fromDate(predictedAt),
   };
 

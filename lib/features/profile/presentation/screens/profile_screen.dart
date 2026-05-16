@@ -11,6 +11,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
+import 'package:acneia/core/services/language_service.dart';
 import 'package:acneia/main.dart';
 import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 
@@ -37,6 +39,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final name = '${_user?['firstName'] ?? ''} ${_user?['lastName'] ?? ''}'.trim();
     final email = _user?['email'] ?? '';
@@ -95,40 +98,41 @@ class _ProfileScreenState extends State<ProfileScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
             sliver: SliverList(
               delegate: SliverChildListDelegate([
-                _buildStats(),
+                _buildStats(context),
                 const SizedBox(height: 32),
 
-                _buildSection('Mon Profil', [
-                  _ProfileItem(Iconsax.user, 'Mes Informations', 'Âge: ${_user?['age'] ?? '?'}, IMC: ${_user?['imc'] ?? '?'}', () {
+                _buildSection(context, l.translate('section_profile'), [
+                  _ProfileItem(Iconsax.user, l.translate('mes_informations'), '${l.translate('age_label')}: ${_user?['age'] ?? '?'}, ${l.translate('imc_label')}: ${_user?['imc'] ?? '?'}', () {
                     if (_user != null) {
                       final p = UserProfile.fromJson(_user!, FirebaseAuth.instance.currentUser!.uid);
                       context.push('/onboarding', extra: p);
                     }
                   }),
-                  _ProfileItem(Iconsax.magic_star, 'Type de Peau', '${_user?['skinType'] ?? 'Inconnu'}', null),
+                  _ProfileItem(Iconsax.magic_star, l.translate('skin_type'), '${l.translate(_user?['skinType']?.toString().toLowerCase() ?? 'unknown')}', null),
                 ]),
 
                 const SizedBox(height: 24),
 
-                _buildSection('Historique & Suivi', [
-                  _ProfileItem(Iconsax.scan, 'Mes Analyses', 'Résultats de détection', () => context.push('/history?tab=0')),
-                  _ProfileItem(Iconsax.chart_21, 'Mes Prédictions', 'Historique AI', () => context.push('/history?tab=2')),
-                  _ProfileItem(Iconsax.message_text, 'Conversations', 'Messages assistante', () => context.push('/messages')),
+                _buildSection(context, l.translate('section_tracking'), [
+                  _ProfileItem(Iconsax.scan, l.translate('my_analyses'), l.translate('detection_results_sub'), () => context.push('/history?tab=0')),
+                  _ProfileItem(Iconsax.chart_21, l.translate('my_predictions'), l.translate('ai_history_sub'), () => context.push('/history?tab=2')),
+                  _ProfileItem(Iconsax.message_text, l.translate('conversations'), l.translate('assistant_messages_sub'), () => context.push('/messages')),
                 ]),
 
                 const SizedBox(height: 24),
 
-                _buildSection('Personnalisation', [
-                  const _ProfileItem(Iconsax.moon, 'Thème Sombre', 'Activer/Désactiver', null, trailing: _ThemeSwitch()),
-                  _ProfileItem(Iconsax.colorfilter, 'Couleur de Marque', 'Choisir une teinte', () => _colorPicker()),
+                _buildSection(context, l.translate('personalization'), [
+                  _ProfileItem(Iconsax.moon, l.translate('dark_theme'), l.translate('enable_disable'), null, trailing: const _ThemeSwitch()),
+                  _ProfileItem(Iconsax.colorfilter, l.translate('brand_color'), l.translate('choose_color_sub'), () => _colorPicker(context)),
+                  _ProfileItem(Iconsax.language_square, l.translate('language'), l.translate('change_lang_sub'), () => _languagePicker(context)),
                 ]),
 
                 const SizedBox(height: 48),
 
                 PrimaryButton(
-                  label: 'DÉCONNEXION',
+                  label: l.translate('logout').toUpperCase(),
                   color: AppColors.error,
-                  onTap: _logout,
+                  onTap: () => _logout(context),
                 ),
                 const SizedBox(height: 100),
               ]),
@@ -139,20 +143,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildStats() {
+  Widget _buildStats(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final uid = FirebaseAuth.instance.currentUser?.uid;
     return Row(
       children: [
-        _StatTile(label: 'Analyses', icon: Iconsax.scan, col: AppConstants.colDetections, uid: uid),
+        _StatTile(label: l.translate('analyses'), icon: Iconsax.scan, col: AppConstants.colDetections, uid: uid),
         const SizedBox(width: 12),
-        _StatTile(label: 'Risques', icon: Iconsax.chart_2, col: AppConstants.colPredictions, uid: uid),
+        _StatTile(label: l.translate('risks'), icon: Iconsax.chart_2, col: AppConstants.colPredictions, uid: uid),
         const SizedBox(width: 12),
-        _StatTile(label: 'Posts', icon: Iconsax.people, col: AppConstants.colForumPosts, uid: uid),
+        _StatTile(
+          label: l.translate('posts'), 
+          icon: Iconsax.people, 
+          col: AppConstants.colForumPosts, 
+          uid: uid,
+          field: 'authorId', // Forum posts use authorId
+        ),
       ],
     ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1);
   }
 
-  Widget _buildSection(String title, List<_ProfileItem> items) {
+  Widget _buildSection(BuildContext context, String title, List<_ProfileItem> items) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -189,19 +200,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _colorPicker() {
+  void _colorPicker(BuildContext context) {
+    final l = AppLocalizations.of(context);
     Color current = AppTheme.primary;
     showDialog(context: context, builder: (ctx) => BackdropFilter(
       filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
       child: AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        title: const Text('Personnaliser Hermona'),
+        title: Text(l.translate('customize_hermona')),
         content: SingleChildScrollView(child: ColorPicker(
           pickerColor: current, onColorChanged: (c) => current = c, enableAlpha: false, labelTypes: const [],
         )),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ANNULER')),
-          PrimaryButton(label: 'APPLIQUER', width: 120, onTap: () async {
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.translate('cancel'))),
+          PrimaryButton(label: l.translate('apply'), width: 120, onTap: () async {
             final navigator = Navigator.of(ctx);
             AppTheme.setPrimary(current);
             final p = await SharedPreferences.getInstance();
@@ -216,33 +228,85 @@ class _ProfileScreenState extends State<ProfileScreen> {
     ));
   }
 
-  void _logout() => showDialog(context: context, builder: (ctx) => BackdropFilter(
-    filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-    child: AlertDialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      title: const Text('Déconnexion'),
-      content: const Text('Voulez-vous vraiment quitter votre session Hermona ?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('RESTER')),
-        PrimaryButton(label: 'QUITTER', width: 100, color: AppColors.error, onTap: () async {
-          await FirebaseAuth.instance.signOut();
-          if (mounted) {
-            context.go('/login');
-          }
-        }),
-      ],
-    ),
-  ));
+  void _languagePicker(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final current = l.locale.languageCode;
+
+    showDialog(context: context, builder: (ctx) => BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        title: Text(l.translate('choose_language')),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _langTile(ctx, 'Français', 'fr', current == 'fr'),
+            _langTile(ctx, 'English', 'en', current == 'en'),
+          ],
+        ),
+      ),
+    ));
+  }
+
+  Widget _langTile(BuildContext context, String label, String code, bool active) {
+    return ListTile(
+      title: Text(label, style: TextStyle(fontWeight: active ? FontWeight.w900 : FontWeight.normal, color: active ? AppColors.primary : null)),
+      trailing: active ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+      onTap: () async {
+        final navigator = Navigator.of(context);
+        debugPrint("DEBUG AUDIT: Switching language to $code");
+        await LanguageService().setLanguage(code);
+        if (context.mounted) {
+          HermonaApp.of(context)?.setLocale(Locale(code));
+          navigator.pop();
+        }
+      },
+    );
+  }
+
+  void _logout(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    showDialog(context: context, builder: (ctx) => BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+      child: AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: Text(l.translate('logout_confirm_title')),
+        content: Text(l.translate('logout_confirm_desc')),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.translate('stay'))),
+          PrimaryButton(label: l.translate('leave'), width: 100, color: AppColors.error, onTap: () async {
+            await FirebaseAuth.instance.signOut();
+            if (mounted) {
+              context.go('/login');
+            }
+          }),
+        ],
+      ),
+    ));
+  }
 }
 
 class _StatTile extends StatelessWidget {
-  final String label, col; final IconData icon; final String? uid;
-  const _StatTile({required this.label, required this.icon, required this.col, this.uid});
+  final String label, col; 
+  final IconData icon; 
+  final String? uid;
+  final String field; // Added field parameter
+
+  const _StatTile({
+    required this.label, 
+    required this.icon, 
+    required this.col, 
+    this.uid,
+    this.field = 'userId', // Default to userId
+  });
 
   @override
   Widget build(BuildContext context) => Expanded(
     child: StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance.collection(col).where('userId', isEqualTo: uid).snapshots(),
+      stream: FirebaseFirestore.instance
+          .collection(col)
+          .where(field, isEqualTo: uid) // Use the dynamic field name
+          .snapshots(),
       builder: (_, snap) => GlassCard(
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Column(

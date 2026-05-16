@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:timeago/timeago.dart' as timeago;
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
@@ -28,6 +29,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     super.initState();
     _tab = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
     timeago.setLocaleMessages('fr', timeago.FrMessages());
+    timeago.setLocaleMessages('en', timeago.EnMessages());
   }
 
   @override
@@ -38,10 +40,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Journal Hermona'),
+        title: Text(l.translate('hermona_journal')),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_1),
           onPressed: () => context.pop(),
@@ -63,11 +66,11 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
               labelColor: Colors.white,
               unselectedLabelColor: AppColors.textSecondaryDark,
               labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 0.5),
-              tabs: const [
-                Tab(text: 'ANALYSES'),
-                Tab(text: 'ROUTINES'),
-                Tab(text: 'PRÉDICTIONS'),
-                Tab(text: 'CHATS'),
+              tabs: [
+                Tab(text: l.translate('analyses_tab')),
+                Tab(text: l.translate('routines_tab')),
+                Tab(text: l.translate('predictions_tab')),
+                Tab(text: l.translate('chats_tab')),
               ],
             ),
           ),
@@ -89,8 +92,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 col: AppConstants.colDetections,
                 uid: _uid,
                 orderField: 'analyzedAt',
-                emptyTitle: 'Aucune analyse',
-                emptySubtitle: 'Lancer un scan pour voir vos résultats.',
+                emptyTitle: l.translate('no_analysis'),
+                emptySubtitle: l.translate('launch_scan_desc'),
                 emptyIcon: Iconsax.scan,
                 itemBuilder: (ctx, data, id) {
                   final score = (data['severityScore'] as num?)?.toInt() ?? 0;
@@ -108,7 +111,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                             children: [
                               StatusBadge(text: level.toUpperCase(), color: color),
                               const SizedBox(height: 6),
-                              Text(_ago(data['analyzedAt']), style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
+                              Text(_ago(data['analyzedAt'], l), style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
                             ],
                           ),
                         ),
@@ -122,8 +125,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 col: AppConstants.colRecommendations,
                 uid: _uid,
                 orderField: 'createdAt',
-                emptyTitle: 'Aucune routine',
-                emptySubtitle: 'Vos routines personnalisées apparaîtront ici.',
+                emptyTitle: l.translate('no_routine'),
+                emptySubtitle: l.translate('personalized_routines_desc'),
                 emptyIcon: Iconsax.star,
                 itemBuilder: (ctx, data, id) => GlassCard(
                   onTap: () => ctx.push('/recommendation/${data['detectionId']}', extra: data),
@@ -139,10 +142,10 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('ROUTINE SUR-MESURE', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
+                            Text(l.translate('bespoke_routine'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 14)),
                             const SizedBox(height: 4),
-                            Text('Durée : ${data['duration'] ?? 'N/A'}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryDark)),
-                            Text(_ago(data['createdAt']), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
+                            Text('${l.translate('duration_label')}${data['duration'] ?? 'N/A'}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondaryDark)),
+                            Text(_ago(data['createdAt'], l), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
                           ],
                         ),
                       ),
@@ -155,8 +158,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 col: AppConstants.colPredictions,
                 uid: _uid,
                 orderField: 'predictedAt',
-                emptyTitle: 'Aucun risque',
-                emptySubtitle: 'Anticipez les poussées avec l\'IA.',
+                emptyTitle: l.translate('no_risk'),
+                emptySubtitle: l.translate('anticipate_risks_desc'),
                 emptyIcon: Iconsax.chart_2,
                 itemBuilder: (ctx, data, id) {
                   final risk = (data['riskJ3'] as num?)?.toDouble() ?? 0.0;
@@ -174,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                             children: [
                               StatusBadge(text: level.toUpperCase(), color: color),
                               const SizedBox(height: 6),
-                              Text(_ago(data['predictedAt']), style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
+                              Text(_ago(data['predictedAt'], l), style: const TextStyle(fontSize: 11, color: AppColors.textSecondaryDark)),
                             ],
                           ),
                         ),
@@ -189,8 +192,8 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                 uid: _uid,
                 extraWhere: const {'role': 'user'},
                 orderField: 'timestamp',
-                emptyTitle: 'Aucun chat',
-                emptySubtitle: 'Vos questions à l\'assistante Hermona.',
+                emptyTitle: l.translate('no_chat'),
+                emptySubtitle: l.translate('assistant_questions_desc'),
                 emptyIcon: Iconsax.message,
                 itemBuilder: (ctx, data, id) => GlassCard(
                   onTap: () => ctx.push('/chat?targetId=$id'),
@@ -208,7 +211,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                           children: [
                             Text(data['content'] ?? '', style: const TextStyle(fontSize: 13, height: 1.4), maxLines: 2, overflow: TextOverflow.ellipsis),
                             const SizedBox(height: 6),
-                            Text(_ago(data['timestamp']), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
+                            Text(_ago(data['timestamp'], l), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
                           ],
                         ),
                       ),
@@ -224,7 +227,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     );
   }
 
-  String _ago(dynamic ts) {
+  String _ago(dynamic ts, AppLocalizations l) {
     if (ts == null) return '';
     DateTime? dt;
     if (ts is String) {
@@ -238,7 +241,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
     }
     
     if (dt == null) return '';
-    return timeago.format(dt, locale: 'fr');
+    return timeago.format(dt, locale: l.locale.languageCode);
   }
 }
 

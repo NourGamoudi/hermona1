@@ -13,7 +13,7 @@ import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 
 import 'package:acneia/core/widgets/common_widgets.dart';
-
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/forum/data/services/forum_service.dart';
 
 
@@ -59,8 +59,8 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
     } catch (e) {
 
       if (mounted) {
-
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e'), backgroundColor: AppColors.error));
+        final l = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('${l.translate('error_prefix')}: $e'), backgroundColor: AppColors.error));
 
         setState(() => _loading = false);
 
@@ -75,10 +75,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   @override
 
   Widget build(BuildContext context) {
-
+    final l = AppLocalizations.of(context);
     return Scaffold(
 
-      appBar: AppBar(title: const Text('Nouveau post')),
+      appBar: AppBar(title: Text(l.translate('new_post_title'))),
 
       body: SingleChildScrollView(padding: const EdgeInsets.all(20), child: Form(key: _formKey, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
@@ -88,11 +88,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
           child: Row(children: [const Icon(Iconsax.shield_tick, color: AppColors.info, size: 18), const SizedBox(width: 10),
 
-            Expanded(child: Text('Post anonyme. Ne partagez pas d\'infos personnelles.', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.info)))])).animate().fadeIn(),
+            Expanded(child: Text(l.translate('anon_post_warning'), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.info)))])).animate().fadeIn(),
 
         const SizedBox(height: 22),
 
-        Text('Catégorie', style: Theme.of(context).textTheme.labelLarge),
+        Text(l.translate('category_label'), style: Theme.of(context).textTheme.labelLarge),
 
         const SizedBox(height: 8),
 
@@ -114,35 +114,35 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
 
         const SizedBox(height: 22),
 
-        Text('Titre *', style: Theme.of(context).textTheme.labelLarge),
+        Text(l.translate('title_with_asterisk'), style: Theme.of(context).textTheme.labelLarge),
 
         const SizedBox(height: 8),
 
         TextFormField(controller: _titleCtrl,
 
-          decoration: const InputDecoration(hintText: 'Titre de votre question...'),
+          decoration: InputDecoration(hintText: l.translate('post_title_hint')),
 
-          validator: (v) => (v == null || v.trim().length < 5) ? 'Min. 5 caractères' : null,
+          validator: (v) => (v == null || v.trim().length < 5) ? l.translate('min_5_chars') : null,
 
           maxLength: 100).animate().fadeIn(delay: 200.ms),
 
         const SizedBox(height: 14),
 
-        Text('Contenu *', style: Theme.of(context).textTheme.labelLarge),
+        Text(l.translate('content_with_asterisk'), style: Theme.of(context).textTheme.labelLarge),
 
         const SizedBox(height: 8),
 
         TextFormField(controller: _contentCtrl, maxLines: 8, minLines: 5,
 
-          decoration: const InputDecoration(hintText: 'Décrivez votre question...', alignLabelWithHint: true),
+          decoration: InputDecoration(hintText: l.translate('post_content_hint'), alignLabelWithHint: true),
 
-          validator: (v) => (v == null || v.trim().length < 20) ? 'Min. 20 caractères' : null,
+          validator: (v) => (v == null || v.trim().length < 20) ? l.translate('min_20_chars') : null,
 
           maxLength: 2000).animate().fadeIn(delay: 280.ms),
 
         const SizedBox(height: 28),
 
-        PrimaryButton(label: 'Publier anonymement ✨', icon: Iconsax.send_1, onTap: _submit, isLoading: _loading)
+        PrimaryButton(label: l.translate('publish_anon_label'), icon: Iconsax.send_1, onTap: _submit, isLoading: _loading)
             .animate().fadeIn(delay: 360.ms),
 
         const SizedBox(height: 40),

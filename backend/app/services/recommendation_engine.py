@@ -51,24 +51,25 @@ def normalize(t: str) -> str:
     return ''.join(c for c in unicodedata.normalize('NFD', t) if unicodedata.category(c) != 'Mn')
 
 # --- CONSTANTS ---
-STRATEGY_PREVENTION = "PRÉVENTION"
-STRATEGY_EQUILIBRE = "ÉQUILIBRE"
-STRATEGY_PROTECTION = "PROTECTION"
-STRATEGY_MEDICAL = "PROTOCOLE MÉDICAL (ISOTRÉTINOÏNE)"
+# --- CONSTANTS (IDs) ---
+STRATEGY_PREVENTION = "strategy_prevention"
+STRATEGY_EQUILIBRE = "strategy_equilibre"
+STRATEGY_PROTECTION = "strategy_protection"
+STRATEGY_MEDICAL = "strategy_medical"
 
 # --- DATA LAYER ---
 INGREDIENT_DB = {
-    "retinol": {"display": "Rétinol", "type": "irritant", "strength": 5.0},
-    "vitamine_c": {"display": "Vitamine C", "type": "antioxydant", "strength": 4.0},
-    "aha": {"display": "AHA (Acide Glycolique)", "type": "acide", "strength": 3.0},
-    "bha": {"display": "BHA (Acide Salicylique)", "type": "acide", "strength": 3.0},
-    "niacinamide": {"display": "Niacinamide", "type": "apaisant", "strength": 2.5},
-    "zinc": {"display": "Zinc PCA", "type": "purifiant", "strength": 2.0},
-    "acide_hyaluronique": {"display": "Acide Hyaluronique", "type": "hydratant", "strength": 1.5},
-    "centella_asiatica": {"display": "Centella Asiatica", "type": "apaisant", "strength": 1.0},
-    "panthenol": {"display": "Panthénol (B5)", "type": "apaisant", "strength": 1.0},
-    "aloe_vera": {"display": "Aloe Vera", "type": "hydratant", "strength": 1.0},
-    "acide_salicylique": {"display": "Acide Salicylique (BHA)", "type": "acide", "strength": 3.0},
+    "retinol": {"display": {"fr": "Rétinol", "en": "Retinol"}, "type": "irritant", "strength": 5.0},
+    "vitamine_c": {"display": {"fr": "Vitamine C", "en": "Vitamin C"}, "type": "antioxydant", "strength": 4.0},
+    "aha": {"display": {"fr": "AHA (Acide Glycolique)", "en": "AHA (Glycolic Acid)"}, "type": "acide", "strength": 3.0},
+    "bha": {"display": {"fr": "BHA (Acide Salicylique)", "en": "BHA (Salicylic Acid)"}, "type": "acide", "strength": 3.0},
+    "niacinamide": {"display": {"fr": "Niacinamide", "en": "Niacinamide"}, "type": "apaisant", "strength": 2.5},
+    "zinc": {"display": {"fr": "Zinc PCA", "en": "Zinc PCA"}, "type": "purifiant", "strength": 2.0},
+    "acide_hyaluronique": {"display": {"fr": "Acide Hyaluronique", "en": "Hyaluronic Acid"}, "type": "hydratant", "strength": 1.5},
+    "centella_asiatica": {"display": {"fr": "Centella Asiatica", "en": "Centella Asiatica"}, "type": "apaisant", "strength": 1.0},
+    "panthenol": {"display": {"fr": "Panthénol (B5)", "en": "Panthenol (B5)"}, "type": "apaisant", "strength": 1.0},
+    "aloe_vera": {"display": {"fr": "Aloe Vera", "en": "Aloe Vera"}, "type": "hydratant", "strength": 1.0},
+    "acide_salicylique": {"display": {"fr": "Acide Salicylique (BHA)", "en": "Salicylic Acid (BHA)"}, "type": "acide", "strength": 3.0},
 }
 
 PRODUCT_EXAMPLES = {
@@ -105,6 +106,55 @@ CONFLICT_RULES = {
     "vitamine_c": {"retinol", "aha", "bha"},
 }
 
+# --- LEGACY DATA MAPPING (FR -> Technical Keys) ---
+LEGACY_MAPPING = {
+    # Skin Type
+    "peau grasse": "skin_grasse",
+    "peau mixte": "skin_mixte",
+    "peau sèche": "skin_seche",
+    "peau sensible": "skin_sensible",
+    "peau normale": "skin_normale",
+    "mixte": "skin_mixte",
+    "grasse": "skin_grasse",
+    "sèche": "skin_seche",
+    "sensible": "skin_sensible",
+    
+    # Phases
+    "menstruelle": "phase_menstrual",
+    "folliculaire": "phase_follicular",
+    "ovulatoire": "phase_ovulatory",
+    "lutéale": "phase_luteal",
+    "menstrual": "phase_menstrual",
+    "follicular": "phase_follicular",
+    "ovulatory": "phase_ovulatory",
+    "luteal": "phase_luteal",
+    
+    # Frequencies
+    "tous les jours": "freq_daily",
+    "jamais": "freq_never",
+    "parfois": "freq_sometimes",
+    "rarement": "freq_rarely",
+    "2x/jour": "cleans_twice",
+    "1x/jour": "cleans_once",
+    
+    # Treatments
+    "aucun": "treat_none",
+    "antibiotiques": "treat_antibiotics",
+    "isotrétinoïne": "treat_isotretinoin",
+    "local": "treat_topical",
+    "none": "treat_none",
+    "aucune": "hormonal_none",
+}
+
+def normalize_value(val: Any) -> str:
+    """Maps legacy French strings to technical keys."""
+    if not val: return ""
+    v = str(val).lower().strip()
+    # Normalize unicode (accents) for matching
+    import unicodedata
+    v_norm = "".join(c for c in unicodedata.normalize('NFD', v) if unicodedata.category(c) != 'Mn')
+    return LEGACY_MAPPING.get(v, LEGACY_MAPPING.get(v_norm, normalize(v)))
+
 # --- ENGINE ---
 
 class RecommendationEngine:
@@ -130,6 +180,183 @@ class RecommendationEngine:
         self._rng = random.Random(self._seed)  # isolated RNG — never touches global state
         self.variation_index = 0
         self.alternative_strategy = ""
+        self.lang = self.req.get('lang', 'fr').lower()[:2]
+        if self.lang not in ['fr', 'en']: self.lang = 'fr'
+
+        # Localized active ingredient database
+        self.actives_db = {
+            "en": {
+                "Rétinol": "Retinol",
+                "Acide salicylique": "Salicylic Acid",
+                "Acide Azélaïque": "Azelaic Acid",
+                "Niacinamide": "Niacinamide",
+                "Peroxyde de benzoyle": "Benzoyl Peroxide",
+                "Vitamine C": "Vitamin C",
+                "Zinc PCA": "Zinc PCA",
+                "Acide Hyaluronique": "Hyaluronic Acid",
+                "Huile de Jojoba": "Jojoba Oil",
+                "Aloe Vera": "Aloe Vera",
+                "Centella Asiatica": "Centella Asiatica"
+            },
+            "fr": {
+                "Rétinol": "Rétinol",
+                "Acide salicylique": "Acide Salicylique",
+                "Acide Azélaïque": "Acide Azélaïque",
+                "Niacinamide": "Niacinamide",
+                "Peroxyde de benzoyle": "Peroxyde de Benzoyle",
+                "Vitamine C": "Vitamine C",
+                "Zinc PCA": "Zinc PCA",
+                "Acide Hyaluronique": "Acide Hyaluronique",
+                "Huile de Jojoba": "Huile de Jojoba",
+                "Aloe Vera": "Aloe Vera",
+                "Centella Asiatica": "Centella Asiatica"
+            }
+        }
+
+        self.messages = {
+            "en": {
+                "allergy_warning": "⚠️ CAUTION: This routine has been adjusted because of your cosmetic allergies.",
+                "fragrance_warning": "Avoid products with added fragrance (Parfum) to minimize sensitivity.",
+                "explanation_header": "Based on your clinical data, I have designed an adaptative routine."
+            },
+            "fr": {
+                "allergy_warning": "⚠️ ATTENTION : Cette routine a été ajustée en fonction de vos allergies cosmétiques.",
+                "fragrance_warning": "Évitez les produits avec parfum ajouté pour minimiser la sensibilité.",
+                "explanation_header": "Basé sur vos données cliniques, j'ai conçu une routine adaptative."
+            }
+        }
+
+        # Translation Map
+        self._translations = {
+            "en": {
+                "strategy_prevention": "PREVENTION",
+                "strategy_equilibre": "BALANCE",
+                "strategy_protection": "PROTECTION",
+                "strategy_medical": "MEDICAL PROTOCOL (ISOTRETINOIN)",
+                "msg_isotretinoin": "On isotretinoin — Absolute gentleness required. Consult your dermatologist.",
+                "tip_pillow": "Change your pillowcase every 2 days",
+                "tip_water": "Stay hydrated: at least 2L of water per day",
+                "tip_scrub": "AVOID grain scrubs (e.g. St. Ives) which tear your skin barrier.",
+                "tip_probiotics": "Add probiotics to support your gut flora",
+                "tip_sun": "Mandatory SPF50 sun protection (photosensitization)",
+                "msg_antibiotics": "Antibiotics detected — protect your skin from the sun.",
+                "msg_protection": "Risk or inflammation — Priority to soothing and repairing.",
+                "msg_equilibre": "Balance strategy — Maintenance and sebum regulation.",
+                "msg_prevention": "Optimal score — Prevention routine and barrier maintenance.",
+                "why_protection": "Your current profile requires a protective approach to avoid inflammation.",
+                "why_niacinamide": "Niacinamide was chosen to regulate sebum without irritating your skin in the luteal phase.",
+                "why_barrier": "Optimizing skin barrier",
+                "why_sebum": "Sebum regulation",
+                "tip_nutrition_luteal": [
+                    "Anti-inflammatory foods: salmon, walnuts (Omega-3), blueberries.",
+                    "Peppermint tea: reduces androgens and sebum.",
+                    "AVOID sugar, dairy, and iced drinks."
+                ],
+                "tip_lifestyle_luteal": [
+                    "Gentle exercise (Yoga, Pilates, Walking) to limit cortisol.",
+                    "Sleep: 8h minimum to help skin regeneration.",
+                    "Hygiene: Change your pillowcase every 2 days."
+                ],
+                "tip_nutrition_menstrual": [
+                    "Iron-rich foods (lentils, dark chocolate >70%).",
+                    "Turmeric/ginger tea for inflammation.",
+                    "Avoid cold drinks and excessive caffeine."
+                ],
+                "tip_lifestyle_menstrual": "Priority rest. Hot water bottle and restorative sleep.",
+                "tip_nutrition_follicular": "Ideal time for detox foods (lemon, cucumber, kefir).",
+                "tip_lifestyle_follicular": "High energy: ideal for cardio or new treatments.",
+                "tip_nutrition_ovulatory": "Cruciferous vegetables (broccoli) for estrogen balance.",
+                "tip_lifestyle_ovulatory": "Stay hydrated, body temperature increases slightly.",
+                "tip_fast_food": "Fast food saturates the liver and increases inflammation in the {} phase",
+                "tip_sugar": "Reducing fast sugars helps calm inflammatory acne.",
+                "tip_stress": "High stress level detected → add 10min of relaxation and reduce sugar/dairy.",
+                "tip_sleep": "Lack of sleep → your skin barrier regeneration is slowed down.",
+                "tip_sugar_igf1": "Sugar spikes IGF-1: avoid sodas and pastries this week.",
+                "tip_dairy": "Dairy products contain growth hormones that stimulate acne.",
+                "tip_cold_drinks": "Iced drinks: create a digestive shock that promotes inflammation.",
+                "tip_alcohol": "Regular alcohol: dehydrates and increases cortisol (inflammation).",
+                "tip_tobacco": "Tobacco: reduces skin oxygenation and delays healing.",
+                "tip_cleansing": "COMPLETE makeup removal every night, without exception.",
+                "tip_phone": "Clean your phone screen with a disinfectant wipe.",
+                "tip_breathing": "High stress: try 'box breathing' (4-4-4-4).",
+                "tip_sleep_hours": "Only {}h of sleep: no phone 1h before sleeping.",
+                "tip_hydration": "Dehydration ({} glasses): drink water before your coffee.",
+                "tip_hormonal": " | Hormonal anticipation required.",
+                "tip_shap_stress": "SHAP Stress: reduce irritating actives this week.",
+                "tip_chin": "Chin/jaw acne: often hormonal. Be gentle.",
+                "tip_forehead": "Forehead: avoid bangs and check your shampoos.",
+                "explanation_loading": "✅ CONNECTION SUCCESSFUL! Your personalized routine is being generated...",
+                "disclaimer": "Hermona is not a medical tool. Consult a dermatologist.",
+                "fallback_why": ["Skin barrier optimization", "Sebum regulation"],
+                "fragrance_free": " | FRAGRANCE-FREE required."
+            },
+            "fr": {
+                "strategy_prevention": "PRÉVENTION",
+                "strategy_equilibre": "ÉQUILIBRE",
+                "strategy_protection": "PROTECTION",
+                "strategy_medical": "PROTOCOLE MÉDICAL (ISOTRÉTINOÏNE)",
+                "msg_isotretinoin": "Sous isotrétinoïne — Douceur absolue requise. Consultez votre dermatologue.",
+                "tip_pillow": "Changez votre taie d'oreiller tous les 2 jours",
+                "tip_water": "Hydratez-vous : 2L d'eau par jour minimum",
+                "tip_scrub": "ÉVITEZ le gommage à grains (ex: St. Ives) qui déchire votre barrière cutanée.",
+                "tip_probiotics": "Ajoutez des probiotiques pour soutenir votre flore intestinale",
+                "tip_sun": "Protection solaire SPF50 obligatoire (photosensibilisation)",
+                "msg_antibiotics": "Antibiotiques détectés — protégez votre peau du soleil.",
+                "msg_protection": "Risque ou inflammation — Priorité à l'apaisement et la réparation.",
+                "msg_equilibre": "Stratégie d'équilibre — Maintenance et régulation du sébum.",
+                "msg_prevention": "Score optimal — Routine de prévention et maintien de la barrière.",
+                "why_protection": "Votre profil actuel nécessite une approche protectrice pour éviter l'inflammation.",
+                "why_niacinamide": "La niacinamide a été choisie pour réguler le sébum sans irriter votre peau en phase lutéale.",
+                "why_barrier": "Optimisation de la barrière cutanée",
+                "why_sebum": "Régulation du sébum",
+                "tip_nutrition_luteal": [
+                    "Aliments anti-inflammatoires : saumon, noix (Omega-3), myrtilles.",
+                    "Tisane de menthe poivrée : réduit les androgènes et le sébum.",
+                    "ÉVITEZ le sucre, les produits laitiers et les boissons glacées."
+                ],
+                "tip_lifestyle_luteal": [
+                    "Sport doux (Yoga, Pilates, Marche) pour limiter le cortisol.",
+                    "Sommeil : 8h minimum pour aider la régénération cutanée.",
+                    "Hygiène : Changez votre taie d'oreiller tous les 2 jours."
+                ],
+                "tip_nutrition_menstrual": [
+                    "Aliments riches en fer (lentilles, chocolat noir >70%).",
+                    "Tisane curcuma/gingembre pour l'inflammation.",
+                    "Évitez les boissons froides et l'excès de caféine."
+                ],
+                "tip_lifestyle_menstrual": "Repos prioritaire. Bouillotte chaude et sommeil réparateur.",
+                "tip_nutrition_follicular": "Moment idéal pour des aliments détox (citron, concombre, kéfir).",
+                "tip_lifestyle_follicular": "Énergie haute : idéal pour cardio ou nouveaux soins.",
+                "tip_nutrition_ovulatory": "Légumes crucifères (brocoli) pour l'équilibre des œstrogènes.",
+                "tip_lifestyle_ovulatory": "Restez hydratée, la température corporelle augmente légèrement.",
+                "tip_fast_food": "Le fast-food sature le foie et augmente l'inflammation en phase {}",
+                "tip_sugar": "Réduire les sucres rapides aide à calmer l'acné inflammatoire.",
+                "tip_stress": "Niveau de stress élevé détecté → ajoutez 10min de relaxation et réduisez sucres/produits laitiers.",
+                "tip_sleep": "Manque de sommeil → la régénération de votre barrière cutanée est ralentie.",
+                "tip_sugar_igf1": "Le sucre spike l'IGF-1 : évitez les sodas et pâtisseries cette semaine.",
+                "tip_dairy": "Les produits laitiers contiennent des hormones de croissance qui stimulent l'acné.",
+                "tip_cold_drinks": "Boissons glacées : créent un choc digestif qui favorise l'inflammation.",
+                "tip_alcohol": "Alcool régulier : déshydrate et augmente le cortisol (inflammation).",
+                "tip_tobacco": "Tabac : réduit l'oxygénation de la peau et retarde la cicatrisation.",
+                "tip_cleansing": "Démaquillage COMPLET chaque soir, sans exception.",
+                "tip_phone": "Nettoyez l'écran de votre téléphone avec une lingette désinfectante.",
+                "tip_breathing": "Stress élevé : essayez la respiration 'box breathing' (4-4-4-4).",
+                "tip_sleep_hours": "Seulement {}h de sommeil : pas de téléphone 1h avant de dormir.",
+                "tip_hydration": "Déshydratation ({} verres) : buvez de l'eau avant votre café.",
+                "tip_hormonal": " | Anticipation hormonale requise.",
+                "tip_shap_stress": "SHAP Stress : réduisez les actifs irritants cette semaine.",
+                "tip_chin": "Acné menton/mâchoire : souvent hormonale. Soyez douce.",
+                "tip_forehead": "Front : évitez les franges et vérifiez vos shampooings.",
+                "explanation_loading": "✅ CONNEXION RÉUSSIE ! Votre routine est en cours de génération personnalisée...",
+                "disclaimer": "Hermona n'est pas un outil médical. Consultez un dermatologue.",
+                "fallback_why": ["Optimisation de la barrière cutanée", "Régulation du sébum"],
+                "fragrance_free": " | SANS PARFUM requis."
+            }
+        }
+        self.explanation = self._t("explanation_loading")
+
+    def _t(self, key: str) -> Any:
+        return self._translations.get(self.lang, self._translations["fr"]).get(key, self._translations["fr"].get(key, key))
 
     def _norm(self, v: Any) -> float:
         try:
@@ -165,23 +392,24 @@ class RecommendationEngine:
     def _check_medical_safety(self) -> bool:
         treat = normalize(self.req.get('acne_treatment', ''))
         
+        
         # ISOTRETINOIN - ABSOLUTE PRIORITY
         if any(alias in treat for alias in ISOTRETINOIN_ALIASES):
             self.strategy = STRATEGY_MEDICAL
             self.is_medical_isotretinoin = True
             self.actives_pool = {"acide_hyaluronique", "panthenol", "centella_asiatica"}
             self.avoid_pool = {"retinol", "aha", "bha", "vitamine_c"}
-            self.message = "Sous isotrétinoïne — Douceur absolue requise. Consultez votre dermatologue."
-            self.lifestyle_tips.append("Changez votre taie d'oreiller tous les 2 jours")
-            self.nutrition_tips.append("Hydratez-vous : 2L d'eau par jour minimum")
-            self.habits_tips.append("ÉVITEZ le gommage à grains (ex: St. Ives) qui déchire votre barrière cutanée.")
+            self.message = self._t("msg_isotretinoin")
+            self.lifestyle_tips.append(self._t("tip_pillow"))
+            self.nutrition_tips.append(self._t("tip_water"))
+            self.habits_tips.append(self._t("tip_scrub"))
             return True
 
         # ANTIBIOTICS
         if "antibio" in treat:
-            self.nutrition_tips.append("Ajoutez des probiotiques pour soutenir votre flore intestinale")
-            self.lifestyle_tips.append("Protection solaire SPF50 obligatoire (photosensibilisation)")
-            self.message = "Antibiotiques détectés — protégez votre peau du soleil."
+            self.nutrition_tips.append(self._t("tip_probiotics"))
+            self.lifestyle_tips.append(self._t("tip_sun"))
+            self.message = self._t("msg_antibiotics")
 
         return False
 
@@ -310,9 +538,9 @@ class RecommendationEngine:
         )
 
         strat_meta = {
-            STRATEGY_PROTECTION: {"level": "intensive",    "msg": "Risque ou inflammation — Priorité à l'apaisement et la réparation."},
-            STRATEGY_EQUILIBRE:  {"level": "moderate",     "msg": "Stratégie d'équilibre — Maintenance et régulation du sébum."},
-            STRATEGY_PREVENTION: {"level": "maintenance",  "msg": "Score optimal — Routine de prévention et maintien de la barrière."},
+            STRATEGY_PROTECTION: {"level": "intensive",    "msg": self._t("msg_protection")},
+            STRATEGY_EQUILIBRE:  {"level": "moderate",     "msg": self._t("msg_equilibre")},
+            STRATEGY_PREVENTION: {"level": "maintenance",  "msg": self._t("msg_prevention")},
         }
 
         self.strategy            = selected_key
@@ -327,7 +555,7 @@ class RecommendationEngine:
 
         if self.strategy == STRATEGY_PROTECTION:
             self.avoid_pool.update({"retinol", "aha", "bha", "vitamine_c"})
-            self.why_this.append("Votre profil actuel nécessite une approche protectrice pour éviter l'inflammation.")
+            self.why_this.append(self._t("why_protection"))
 
     def _apply_phase_rules(self):
         if self.strategy == STRATEGY_PROTECTION: return
@@ -344,7 +572,7 @@ class RecommendationEngine:
                 self.actives_pool.update({"bha", "niacinamide"})
             else:
                 self.actives_pool.add("niacinamide") # Risk rule wins over phase
-                self.why_this.append("La niacinamide a été choisie pour réguler le sébum sans irriter votre peau en phase lutéale.")
+                self.why_this.append(self._t("why_niacinamide"))
         elif "menstruelle" in phase:
             self.actives_pool.update({"centella_asiatica", "aloe_vera", "acide_hyaluronique"})
             self.avoid_pool.update({"retinol", "aha", "bha"})
@@ -364,85 +592,73 @@ class RecommendationEngine:
         phase = normalize(self.req.get('phase', ''))
         
         if "luteale" in phase:
-            self.nutrition_tips.extend([
-                "Aliments anti-inflammatoires : saumon, noix (Omega-3), myrtilles.",
-                "Tisane de menthe poivrée : réduit les androgènes et le sébum.",
-                "ÉVITEZ le sucre, les produits laitiers et les boissons glacées."
-            ])
-            self.lifestyle_tips.extend([
-                "Sport doux (Yoga, Pilates, Marche) pour limiter le cortisol.",
-                "Sommeil : 8h minimum pour aider la régénération cutanée.",
-                "Hygiène : Changez votre taie d'oreiller tous les 2 jours."
-            ])
+            self.nutrition_tips.extend(self._t("tip_nutrition_luteal"))
+            self.lifestyle_tips.extend(self._t("tip_lifestyle_luteal"))
         elif "menstruelle" in phase:
-            self.nutrition_tips.extend([
-                "Aliments riches en fer (lentilles, chocolat noir >70%).",
-                "Tisane curcuma/gingembre pour l'inflammation.",
-                "Évitez les boissons froides et l'excès de caféine."
-            ])
-            self.lifestyle_tips.append("Repos prioritaire. Bouillotte chaude et sommeil réparateur.")
+            self.nutrition_tips.extend(self._t("tip_nutrition_menstrual"))
+            self.lifestyle_tips.append(self._t("tip_lifestyle_menstrual"))
         elif "folliculaire" in phase:
-            self.nutrition_tips.append("Moment idéal pour des aliments détox (citron, concombre, kéfir).")
-            self.lifestyle_tips.append("Énergie haute : idéal pour cardio ou nouveaux soins.")
+            self.nutrition_tips.append(self._t("tip_nutrition_follicular"))
+            self.lifestyle_tips.append(self._t("tip_lifestyle_follicular"))
         elif "ovulatoire" in phase:
-            self.nutrition_tips.append("Légumes crucifères (brocoli) pour l'équilibre des œstrogènes.")
-            self.lifestyle_tips.append("Restez hydratée, la température corporelle augmente légèrement.")
+            self.nutrition_tips.append(self._t("tip_nutrition_ovulatory"))
+            self.lifestyle_tips.append(self._t("tip_lifestyle_ovulatory"))
 
         # 2. PERSONALIZED ADVICE BASED ON PROFILE & DIET (Section 4.B)
         diet = self.req.get('diet', [])
         if "fast_food" in diet or "fastfood" in diet:
-            self.nutrition_tips.append("Le fast-food sature le foie et augmente l'inflammation en phase " + phase)
+            self.nutrition_tips.append(self._t("tip_fast_food").format(phase))
         if "sugar" in diet or "sucre" in diet:
-            self.nutrition_tips.append("Réduire les sucres rapides aide à calmer l'acné inflammatoire.")
+            self.nutrition_tips.append(self._t("tip_sugar"))
             
         stress = self.req.get('stress', 5)
         if stress > 7:
-            self.lifestyle_tips.append("Niveau de stress élevé détecté → ajoutez 10min de relaxation et réduisez sucres/produits laitiers.")
+            self.lifestyle_tips.append(self._t("tip_stress"))
             
         sleep = self.req.get('sleep', 7)
         if sleep < 6:
-            self.lifestyle_tips.append("Manque de sommeil → la régénération de votre barrière cutanée est ralentie.")
-            self.nutrition_tips.append("Le sucre spike l'IGF-1 : évitez les sodas et pâtisseries cette semaine.")
+            self.lifestyle_tips.append(self._t("tip_sleep"))
+            self.nutrition_tips.append(self._t("tip_sugar_igf1"))
         if "dairy" in diet:
-            self.nutrition_tips.append("Les produits laitiers contiennent des hormones de croissance qui stimulent l'acné.")
+            self.nutrition_tips.append(self._t("tip_dairy"))
         if "cold_drinks" in diet:
-            self.nutrition_tips.append("Boissons glacées : créent un choc digestif qui favorise l'inflammation.")
+            self.nutrition_tips.append(self._t("tip_cold_drinks"))
             
         if self.req.get('alcohol') == "regular":
-            self.nutrition_tips.append("Alcool régulier : déshydrate et augmente le cortisol (inflammation).")
+            self.nutrition_tips.append(self._t("tip_alcohol"))
         if self.req.get('smoker') is True:
-            self.lifestyle_tips.append("Tabac : réduit l'oxygénation de la peau et retarde la cicatrisation.")
+            self.lifestyle_tips.append(self._t("tip_tobacco"))
 
         # 3. HYGIENE & HABITS (Section 4.F)
-        self.habits_tips.append("Démaquillage COMPLET chaque soir, sans exception.")
-        self.habits_tips.append("Nettoyez l'écran de votre téléphone avec une lingette désinfectante.")
+        self.habits_tips.append(self._t("tip_cleansing"))
+        self.habits_tips.append(self._t("tip_phone"))
         
         stress = int(self.req.get('stress', 5))
         if stress > 7:
-            self.lifestyle_tips.append("Stress élevé : essayez la respiration 'box breathing' (4-4-4-4).")
+            self.lifestyle_tips.append(self._t("tip_breathing"))
             self.actives_pool.add("centella_asiatica")
             
         sleep = float(self.req.get('sleep', 8))
         if sleep < 7:
-            self.lifestyle_tips.append(f"Seulement {sleep}h de sommeil : pas de téléphone 1h avant de dormir.")
+            self.lifestyle_tips.append(self._t("tip_sleep_hours").format(sleep))
             
         hydration = int(self.req.get('hydration', 6))
         if hydration < 5:
-            self.nutrition_tips.append(f"Déshydratation ({hydration} verres) : buvez de l'eau avant votre café.")
+            self.nutrition_tips.append(self._t("tip_hydration").format(hydration))
 
         # 4. SHAP FINE-TUNING (Step 7)
         shaps = self.req.get('top3_shap', [])
         if any(word in str(shaps).lower() for word in ["hormon", "progesteron"]):
-            self.message += " | Anticipation hormonale requise."
+            self.message += self._t("tip_hormonal")
         if any("stress" in str(s).lower() for s in shaps):
-            self.lifestyle_tips.append("SHAP Stress : réduisez les actifs irritants cette semaine.")
+            self.lifestyle_tips.append(self._t("tip_shap_stress"))
             
         # 5. ZONES SPECIFIC
         zones = self.req.get('zones', [])
         if "chin" in zones or "jaw" in zones:
-            self.habits_tips.append("Acné menton/mâchoire : souvent hormonale. Soyez douce.")
+            self.habits_tips.append(self._t("tip_chin"))
         if "forehead" in zones:
-            self.habits_tips.append("Front : évitez les franges et vérifiez vos shampooings.")
+            self.habits_tips.append(self._t("tip_forehead"))
 
 
     def _apply_allergy_filter(self):
@@ -453,7 +669,7 @@ class RecommendationEngine:
             if cid:
                 self.avoid_pool.add(cid)
             if "parfum" in norm_a:
-                self.message += " | SANS PARFUM requis."
+                self.message += self._t("fragrance_free")
             if "alcool" in norm_a:
                 self.avoid_pool.add("alcohol")
 
@@ -463,42 +679,61 @@ class RecommendationEngine:
         try:
             client = Groq(api_key=key)
             
-            # Prepare context for AI
-            risk = self._norm(self.req.get('risk_j3', 0.0))
-            severity = self._norm(self.req.get('severity', 0.0))
-            shaps = self.req.get('top3_shap', [])
-            lifestyle = f"Stress: {self.req.get('stress')}, Sommeil: {self.req.get('sleep')}h, Hydratation: {self.req.get('hydration')} verres"
-            phase = self.req.get('phase', 'inconnue')
-            skin = self.req.get('skin_type', 'mixte')
+            # 1. Normalize Context for AI (Translation layer)
+            # This ensures that even if inputs were legacy French, the AI gets the correct terms in the target language.
+            phase_key = normalize_value(self.req.get('phase', 'inconnue'))
+            skin_key = normalize_value(self.req.get('skin_type', 'mixte'))
+            
+            # Localized descriptors for the prompt
+            localized_data = {
+                "en": {
+                    "phase": self._t(phase_key) if "phase_" in phase_key else phase_key,
+                    "skin": self._t(skin_key) if "skin_" in skin_key else skin_key,
+                    "lifestyle": f"Stress: {self.req.get('stress')}/10, Sleep: {self.req.get('sleep')}h, Hydration: {self.req.get('hydration')} glasses",
+                },
+                "fr": {
+                    "phase": self._t(phase_key) if "phase_" in phase_key else phase_key,
+                    "skin": self._t(skin_key) if "skin_" in skin_key else skin_key,
+                    "lifestyle": f"Stress: {self.req.get('stress')}/10, Sommeil: {self.req.get('sleep')}h, Hydratation: {self.req.get('hydration')} verres",
+                }
+            }
+            
+            ctx = localized_data.get(self.lang, localized_data["fr"])
+            
+            # 2. Build strict language prompt
+            target_lang_name = "ENGLISH" if self.lang == "en" else "FRENCH"
             
             prompt = f"""
+            STRICT INSTRUCTION: YOU MUST RESPOND ENTIRELY IN {target_lang_name}. 
+            DO NOT USE ANY OTHER LANGUAGE. IGNORE ANY FRENCH WORDS IN THE INPUT CONTEXT BELOW.
+
             TU ES HERMONA AI — TON RÔLE : COACH PERSONNEL EN SOINS DE LA PEAU (HUMAN SKINCARE COACH).
             Tu n'es pas un système clinique, mais une voix experte, douce et empathique.
 
-            CONTEXTE UTILISATRICE :
-            - Risque aujourd'hui : {risk}/1
-            - Sévérité visuelle : {severity}/1
-            - Facteurs SHAP (Causes) : {shaps}
-            - Phase du cycle : {phase}
-            - Type de peau : {skin}
-            - Lifestyle : {lifestyle}
-            - Allergies : {self.req.get('allergies')}
-            - Traitement actuel : {self.req.get('acne_treatment')}
+            CONTEXTE UTILISATRICE (IN {target_lang_name}) :
+            - Risque aujourd'hui : {self._norm(self.req.get('risk_j3', 0.0))}/1
+            - Sévérité visuelle : {self._norm(self.req.get('severity', 0.0))}/1
+            - Facteurs SHAP (Causes) : {self.req.get('top3_shap', [])}
+            - Phase du cycle : {ctx['phase']}
+            - Type de peau : {ctx['skin']}
+            - Lifestyle : {ctx['lifestyle']}
+            - Allergies : {self.req.get('allergies', [])}
+            - Traitement actuel : {self.req.get('acne_treatment', 'none')}
 
             TES MISSIONS :
             1. EXPLIQUE LA ROUTINE ÉTAPE PAR ÉTAPE comme un tuteur humain.
-            2. DÉCRIS LE "COMMENT" : gestuelle, pression des doigts, timing (ex: massage de 60s).
-            3. ADAPTE TON TON : Calme et rassurant si la peau est enflammée (risque/sévérité élevés), encourageant si la peau est stable.
-            4. INTERPRÈTE LES CAUSES (SHAP) : Explique l'impact du stress ou du sommeil sur sa peau cette semaine.
+            2. DÉCRIS LE "COMMENT" : gestuelle, pression des doigts, timing.
+            3. ADAPTE TON TON : Calme et rassurant si la peau est enflammée, encourageant si la peau est stable.
+            4. INTERPRÈTE LES CAUSES (SHAP) : Explique l'impact du stress ou du sommeil sur sa peau.
             5. EXPLIQUE LE "POURQUOI" : Pourquoi cet actif ? Pourquoi cette étape ?
-            6. CONSEILS LIFESTYLE : Explique l'impact de son alimentation/sommeil au lieu de juste lister des faits.
+            6. CONSEILS LIFESTYLE : Explique l'impact de son alimentation/sommeil.
 
             STYLE DE RÉPONSE :
-            - Langage humain simple (pas de jargon médical complexe).
+            - Langage humain simple.
             - Ton chaleureux et protecteur.
             - Utilise "Je" pour parler en tant que coach.
             - Structure par 🌅 Routine Matin, 🌙 Routine Soir, et 🌿 Conseils de Coach.
-            - TERMINE TOUJOURS par cette phrase exacte : "⚕️ DISCLAIMER : Ceci est un système de recommandation de soins de la peau et non un diagnostic médical. Consultez un dermatologue si nécessaire."
+            - TERMINE TOUJOURS par cette phrase exacte : "{self._t('disclaimer')}"
 
             RÈGLE D'OR : Fais en sorte que l'utilisatrice se sente guidée, en sécurité et comprise.
             """
@@ -506,7 +741,7 @@ class RecommendationEngine:
             chat_completion = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}], 
                 model="llama-3.3-70b-versatile",
-                timeout=15.0 # Increased timeout for more detailed response
+                temperature=0.7
             )
             self.explanation = chat_completion.choices[0].message.content
         except Exception as e:
@@ -516,7 +751,10 @@ class RecommendationEngine:
     def _build_response(self) -> Dict[str, Any]:
         # Filter actives by avoid pool
         final_actives = [cid for cid in self.actives_pool if cid not in self.avoid_pool]
-        display_actives = [INGREDIENT_DB[a]["display"] for a in final_actives if a in INGREDIENT_DB]
+        display_actives = [
+            INGREDIENT_DB[a]["display"].get(self.lang, INGREDIENT_DB[a]["display"]["fr"]) 
+            for a in final_actives if a in INGREDIENT_DB
+        ]
         
         # Build routines based on skin type and strategy
         morning, evening = self._generate_routines(final_actives)
@@ -531,13 +769,13 @@ class RecommendationEngine:
             "nutrition": list(set(self.nutrition_tips))[:3],
             "habits": list(set(self.habits_tips))[:3],
             "diet_tips": self.nutrition_tips,
-            "strategy": self.strategy,
-            "alternative_strategy": self.alternative_strategy,
+            "strategy": self._t(self.strategy),
+            "alternative_strategy": self._t(self.alternative_strategy),
             "variation_index": self.variation_index,
             "explanation": self.explanation or self.message,
-            "why_this": self.why_this if self.why_this else ["Optimisation de la barrière cutanée", "Régulation du sébum"],
+            "why_this": self.why_this if self.why_this else self._t("fallback_why"),
             "brands": "CeraVe, La Roche-Posay, Avène, The Ordinary",
-            "disclaimer": "Hermona n'est pas un outil médical. Consultez un dermatologue.",
+            "disclaimer": self._t("disclaimer"),
             "riskJ3": self._norm(self.req.get('risk_j3', 0.0)),
             "hygieneScore": self.req.get('hygiene_score', 70),
             "severity": self._norm(self.req.get('severity', 0.0)),
@@ -559,15 +797,47 @@ class RecommendationEngine:
         is_dry = "seche" in skin or "deshydratee" in skin
         
         # Default Cleansers
-        m_cleanser = "Gel Nettoyant Purifiant" if is_oily else "Nettoyant Doux Hydratant"
-        e_cleanser = "Gel Nettoyant Purifiant" if is_oily else "Baume Nettoyant"
-        
-        if self.is_medical_isotretinoin:
-            m_cleanser = "Nettoyant Doux Hydratant"
-            e_cleanser = "Baume Nettoyant"
+        if self.lang == "en":
+            m_cleanser = "Purifying Cleansing Gel" if is_oily else "Gentle Hydrating Cleanser"
+            e_cleanser = "Purifying Cleansing Gel" if is_oily else "Cleansing Balm"
+            if self.is_medical_isotretinoin:
+                m_cleanser = "Gentle Hydrating Cleanser"
+                e_cleanser = "Cleansing Balm"
+        else:
+            m_cleanser = "Gel Nettoyant Purifiant" if is_oily else "Nettoyant Doux Hydratant"
+            e_cleanser = "Gel Nettoyant Purifiant" if is_oily else "Baume Nettoyant"
+            if self.is_medical_isotretinoin:
+                m_cleanser = "Nettoyant Doux Hydratant"
+                e_cleanser = "Baume Nettoyant"
 
         def get_ex(k): 
-            items = PRODUCT_EXAMPLES.get(normalize(k), [])
+            # We map some common keys to PRODUCT_EXAMPLES
+            key_map = {
+                "Purifying Cleansing Gel": "gel_nettoyant_purifiant",
+                "Gentle Hydrating Cleanser": "nettoyant_doux_hydratant",
+                "Cleansing Balm": "baume_nettoyant",
+                "Gel Nettoyant Purifiant": "gel_nettoyant_purifiant",
+                "Nettoyant Doux Hydratant": "nettoyant_doux_hydratant",
+                "Baume Nettoyant": "baume_nettoyant",
+                "Sérum Vitamine C": "serum_vitamine_c",
+                "Vitamin C Serum": "serum_vitamine_c",
+                "Sérum Niacinamide": "serum_niacinamide",
+                "Niacinamide Serum": "serum_niacinamide",
+                "Hydratant Adapté": "fluide_hydratant" if is_oily else "creme_riche",
+                "Suitable Moisturizer": "fluide_hydratant" if is_oily else "creme_riche",
+                "Solaire SPF 50+": "solaire_spf_50+",
+                "Sunscreen SPF 50+": "solaire_spf_50+",
+                "Baume/Huile Démaquillante": "baume_nettoyant",
+                "Cleansing Balm/Oil": "baume_nettoyant",
+                "Sérum Rétinol": "serum_retinol",
+                "Retinol Serum": "serum_retinol",
+                "Sérum Acide Salicylique": "serum_acide_salicylique",
+                "Salicylic Acid Serum": "serum_acide_salicylique",
+                "Crème de Nuit Réparatrice": "creme_nuit",
+                "Repairing Night Cream": "creme_nuit"
+            }
+            mapped_key = key_map.get(k, normalize(k))
+            items = PRODUCT_EXAMPLES.get(mapped_key, [])
             if items:
                 return self._rng.sample(items, min(2, len(items)))
             return []
@@ -576,15 +846,20 @@ class RecommendationEngine:
         zones = self.req.get("zones", [])
         for z in zones:
             if z.lower() == "front":
-                self.zone_focus[z] = "Focus on oil control and forehead cleansing"
+                self.zone_focus[z] = "Focus on oil control and forehead cleansing" if self.lang == "en" else "Focus sur le contrôle du sébum et le nettoyage du front"
             elif z.lower() == "chin" or z.lower() == "menton":
-                self.zone_focus[z] = "Hormonal acne suspected → monitor closely"
+                self.zone_focus[z] = "Hormonal acne suspected → monitor closely" if self.lang == "en" else "Acné hormonale suspectée → surveillance accrue"
             else:
-                self.zone_focus[z] = "Standard care"
+                self.zone_focus[z] = "Standard care" if self.lang == "en" else "Soins standards"
 
-        m_instruction = "Lavez votre visage à l'eau tiède avec des mouvements circulaires doux pendant 60 secondes."
-        if self.level == "maintenance":
-            m_instruction = "Light cleansing once per day is enough (or just warm water in the morning)."
+        if self.lang == "en":
+            m_instruction = "Wash your face with lukewarm water using gentle circular motions for 60 seconds."
+            if self.level == "maintenance":
+                m_instruction = "Light cleansing once per day is enough (or just warm water in the morning)."
+        else:
+            m_instruction = "Lavez votre visage à l'eau tiède avec des mouvements circulaires doux pendant 60 secondes."
+            if self.level == "maintenance":
+                m_instruction = "Un nettoyage léger une fois par jour suffit (ou juste de l'eau tiède le matin)."
 
         m = [{
             "step": "1", 
@@ -592,87 +867,89 @@ class RecommendationEngine:
             "instruction": m_instruction, 
             "icon": "🧼", 
             "productExamples": get_ex(m_cleanser),
-            "reason": "Élimine les impuretés de la nuit sans agresser le film hydrolipidique."
+            "reason": "Removes night impurities without attacking the hydrolipidic film." if self.lang == "en" else "Élimine les impuretés de la nuit sans agresser le film hydrolipidique."
         }]
         if "vitamine_c" in actives:
             m.append({
                 "step": "2", 
-                "product": "Sérum Vitamine C", 
-                "instruction": "Appliquez 3 gouttes sur peau sèche. Tapotez légèrement.", 
+                "product": "Vitamin C Serum" if self.lang == "en" else "Sérum Vitamine C", 
+                "instruction": "Apply 3 drops to dry skin. Gently pat." if self.lang == "en" else "Appliquez 3 gouttes sur peau sèche. Tapotez légèrement.", 
                 "icon": "✨", 
-                "productExamples": get_ex("serum_vitamine_c"),
-                "reason": "Protège des radicaux libres et booste l'éclat."
+                "productExamples": get_ex("Vitamin C Serum" if self.lang == "en" else "Sérum Vitamine C"),
+                "reason": "Protects from free radicals and boosts radiance." if self.lang == "en" else "Protège des radicaux libres et booste l'éclat."
             })
         elif "niacinamide" in actives:
             m.append({
                 "step": "2", 
-                "product": "Sérum Niacinamide", 
-                "instruction": "Appliquez sur les zones à pores dilatés ou à rougeurs.", 
+                "product": "Niacinamide Serum" if self.lang == "en" else "Sérum Niacinamide", 
+                "instruction": "Apply to areas with enlarged pores or redness." if self.lang == "en" else "Appliquez sur les zones à pores dilatés ou à rougeurs.", 
                 "icon": "🧪", 
-                "productExamples": get_ex("serum_niacinamide"),
-                "reason": "Régule le sébum et apaise les inflammations."
+                "productExamples": get_ex("Niacinamide Serum" if self.lang == "en" else "Sérum Niacinamide"),
+                "reason": "Regulates sebum and soothes inflammation." if self.lang == "en" else "Régule le sébum et apaise les inflammations."
             })
         
         m.append({
             "step": "3", 
-            "product": "Hydratant Adapté", 
-            "instruction": "Massez du centre vers l'extérieur du visage.", 
+            "product": "Suitable Moisturizer" if self.lang == "en" else "Hydratant Adapté", 
+            "instruction": "Massage from the center to the outside of the face." if self.lang == "en" else "Massez du centre vers l'extérieur du visage.", 
             "icon": "💧", 
-            "productExamples": get_ex("fluide_hydratant" if is_oily else "creme_riche"),
-            "reason": "Maintient la barrière cutanée scellée et évite la déshydratation."
+            "productExamples": get_ex("Suitable Moisturizer" if self.lang == "en" else "Hydratant Adapté"),
+            "reason": "Keeps the skin barrier sealed and avoids dehydration." if self.lang == "en" else "Maintient la barrière cutanée scellée et évite la déshydratation."
         })
         m.append({
             "step": "4", 
-            "product": "Solaire SPF 50+", 
-            "instruction": "La quantité de deux doigts pour tout le visage.", 
+            "product": "Sunscreen SPF 50+" if self.lang == "en" else "Solaire SPF 50+", 
+            "instruction": "Two fingers worth for the whole face." if self.lang == "en" else "La quantité de deux doigts pour tout le visage.", 
             "icon": "☀️", 
-            "productExamples": get_ex("solaire_spf_50+"),
-            "reason": "Évite l'oxydation du sébum et les taches post-acné."
+            "productExamples": get_ex("Sunscreen SPF 50+" if self.lang == "en" else "Solaire SPF 50+"),
+            "reason": "Avoids sebum oxidation and post-acne spots." if self.lang == "en" else "Évite l'oxydation du sébum et les taches post-acné."
         })
 
         e = [{
             "step": "1", 
-            "product": "Baume/Huile Démaquillante", 
-            "instruction": "Massez sur peau sèche pour dissoudre le maquillage et le SPF, puis rincez.", 
+            "product": "Cleansing Balm/Oil" if self.lang == "en" else "Baume/Huile Démaquillante", 
+            "instruction": "Massage onto dry skin to dissolve makeup and SPF, then rinse." if self.lang == "en" else "Massez sur peau sèche pour dissoudre le maquillage et le SPF, puis rincez.", 
             "icon": "🌙", 
-            "productExamples": get_ex("baume_nettoyant"),
-            "reason": "Le gras dissout le gras (maquillage, sébum oxydé)."
+            "productExamples": get_ex("Cleansing Balm/Oil" if self.lang == "en" else "Baume/Huile Démaquillante"),
+            "reason": "Oil dissolves oil (makeup, oxidized sebum)." if self.lang == "en" else "Le gras dissout le gras (maquillage, sébum oxydé)."
         }]
         e.append({
             "step": "2", 
             "product": e_cleanser, 
-            "instruction": "Utilisez votre nettoyant à base d'eau pour parfaire le nettoyage.", 
+            "instruction": "Use your water-based cleanser to complete the cleansing." if self.lang == "en" else "Utilisez votre nettoyant à base d'eau pour parfaire le nettoyage.", 
             "icon": "🧼", 
             "productExamples": get_ex(e_cleanser),
-            "reason": "Élimine les derniers résidus pour une peau parfaitement propre."
+            "reason": "Removes last residues for perfectly clean skin." if self.lang == "en" else "Élimine les derniers résidus pour une peau parfaitement propre."
         })
         
         if "retinol" in actives and "luteale" not in normalize(self.req.get('phase', '')):
             e.append({
                 "step": "3", 
-                "product": "Sérum Rétinol", 
-                "instruction": "Une noisette sur peau parfaitement sèche. Évitez le contour des yeux.", 
+                "product": "Retinol Serum" if self.lang == "en" else "Sérum Rétinol", 
+                "instruction": "A pea-sized amount on perfectly dry skin. Avoid the eye area." if self.lang == "en" else "Une noisette sur peau parfaitement sèche. Évitez le contour des yeux.", 
                 "icon": "🧪", 
-                "productExamples": get_ex("serum_retinol"),
-                "reason": "Accélère le renouvellement cellulaire pour traiter l'acné en profondeur."
+                "productExamples": get_ex("Retinol Serum" if self.lang == "en" else "Sérum Rétinol"),
+                "reason": "Accelerates cell renewal to treat acne deeply." if self.lang == "en" else "Accélère le renouvellement cellulaire pour traiter l'acné en profondeur."
             })
         elif "bha" in actives:
             e.append({
                 "step": "3", 
-                "product": "Sérum Acide Salicylique", 
-                "instruction": "Appliquez uniquement sur les zones congestionnées.", 
+                "product": "Salicylic Acid Serum" if self.lang == "en" else "Sérum Acide Salicylique", 
+                "instruction": "Apply only to congested areas." if self.lang == "en" else "Appliquez uniquement sur les zones congestionnées.", 
                 "icon": "🧪", 
-                "productExamples": get_ex("serum_acide_salicylique"),
-                "reason": "Débouche les pores et élimine les points noirs."
+                "productExamples": get_ex("Salicylic Acid Serum" if self.lang == "en" else "Sérum Acide Salicylique"),
+                "reason": "Unclogs pores and removes blackheads." if self.lang == "en" else "Débouche les pores et élimine les points noirs."
             })
             
         e.append({
             "step": "4", 
-            "product": "Crème de Nuit Réparatrice", 
-            "instruction": "Appliquez généreusement pour aider la peau à se régénérer.", 
+            "product": "Repairing Night Cream" if self.lang == "en" else "Crème de nuit", 
+            "instruction": "Apply generously to help the skin regenerate." if self.lang == "en" else "Appliquez généreusement pour aider la peau à se régénérer.", 
             "icon": "🌙", 
-            "productExamples": get_ex("creme_nuit"),
-            "reason": "Soutient la barrière cutanée pendant le pic de régénération nocturne."
+            "productExamples": get_ex("Repairing Night Cream" if self.lang == "en" else "Crème de nuit"),
+            "reason": "Supports the skin barrier during the peak of nocturnal regeneration." if self.lang == "en" else "Soutient la barrière cutanée pendant le pic de régénération nocturne."
         })
+        
+        return m, e
         
         return m, e

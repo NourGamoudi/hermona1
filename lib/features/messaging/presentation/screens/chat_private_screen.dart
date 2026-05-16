@@ -7,6 +7,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/messaging/data/services/messaging_service.dart';
 
 class ChatPrivateScreen extends StatefulWidget {
@@ -46,6 +47,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
@@ -53,14 +55,10 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
           children: [
             _AnonymAvatar(seed: widget.conversationId, size: 36),
             const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Membre Hermona', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 14), overflow: TextOverflow.ellipsis),
-                  Text('Anonyme • En ligne', style: TextStyle(fontSize: 10, color: AppColors.success, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
-                ],
+            Expanded(
+              child: Text(
+                l.translate('chat_private_title'), 
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)
               ),
             ),
           ],
@@ -83,11 +81,11 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 24),
                 color: AppColors.warning.withValues(alpha: 0.05),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Iconsax.shield_tick, size: 14, color: AppColors.warning),
-                    SizedBox(width: 10),
-                    Expanded(child: Text('Données personnelles interdites.', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.bold))),
+                    const Icon(Iconsax.shield_tick, size: 14, color: AppColors.warning),
+                    const SizedBox(width: 10),
+                    Expanded(child: Text(l.translate('personal_data_forbidden'), style: const TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.bold))),
                   ],
                 ),
               ),
@@ -101,13 +99,13 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollBottom());
                     
                     if (docs.isEmpty) {
-                      return const Center(
+                      return Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Iconsax.message_text, size: 48, color: AppColors.primary),
-                            SizedBox(height: 16),
-                            Text('Dites bonjour !', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark)),
+                            const Icon(Iconsax.message_text, size: 48, color: AppColors.primary),
+                            const SizedBox(height: 16),
+                            Text(l.translate('say_hello'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark)),
                           ],
                         ),
                       ).animate().fadeIn();
@@ -125,7 +123,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                         return _MessageBubble(
                           content: d['content'] ?? '',
                           isMe: isMe,
-                          date: timeago.format(date, locale: 'fr'),
+                          date: timeago.format(date, locale: l.locale.languageCode),
                         );
                       },
                     );
@@ -148,7 +146,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                           maxLines: 4,
                           minLines: 1,
                           style: const TextStyle(fontSize: 14),
-                          decoration: const InputDecoration(hintText: 'Votre message...', border: InputBorder.none, isDense: true, contentPadding: EdgeInsets.symmetric(vertical: 12)),
+                          decoration: InputDecoration(hintText: l.translate('your_message_hint'), border: InputBorder.none, isDense: true, contentPadding: const EdgeInsets.symmetric(vertical: 12)),
                           onSubmitted: (_) => _send(),
                         ),
                       ),
@@ -211,7 +209,7 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
-                  Text(content, style: TextStyle(color: isMe ? Colors.white : Colors.white.withValues(alpha: 0.9), fontSize: 14, height: 1.4)),
+                  Text(content, style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14, height: 1.4)),
                   const SizedBox(height: 6),
                   Text(date, style: TextStyle(color: (isMe ? Colors.white : AppColors.textSecondaryDark).withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.bold)),
                 ],

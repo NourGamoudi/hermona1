@@ -16,7 +16,7 @@ import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 
 import 'package:acneia/core/widgets/common_widgets.dart';
-
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/forum/data/services/forum_service.dart';
 
 
@@ -69,10 +69,10 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
   @override
 
   Widget build(BuildContext context) {
-
+    final l = AppLocalizations.of(context);
     return Scaffold(
 
-      appBar: AppBar(title: const Text('Discussion')),
+      appBar: AppBar(title: Text(l.translate('discussion_title'))),
 
       body: Column(children: [
 
@@ -103,14 +103,14 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
                       future: _svc.getAuthorProfile(post['authorId']),
                       builder: (ctx, uSnap) {
                         final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                        final pseudo = uData?['pseudonym'] ?? 'Anonyme';
-                        return Text('par $pseudo', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic), overflow: TextOverflow.ellipsis);
+                        final pseudo = uData?['pseudonym'] ?? l.translate('anonymous');
+                        return Text('${l.translate('by_author_label')} $pseudo', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic), overflow: TextOverflow.ellipsis);
                       },
                     ),
                   ),
                   const SizedBox(width: 8),
                   if (post['createdAt'] is Timestamp)
-                    Text(timeago.format((post['createdAt'] as Timestamp).toDate(), locale: 'fr'),
+                    Text(timeago.format((post['createdAt'] as Timestamp).toDate(), locale: l.locale.languageCode),
                         style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontSize: 11)),
                 ]),
 
@@ -130,7 +130,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
               const SizedBox(height: 18),
 
-              Text('Réponses', style: Theme.of(ctx).textTheme.headlineMedium),
+              Text(l.translate('replies_label'), style: Theme.of(ctx).textTheme.headlineMedium),
 
               const SizedBox(height: 12),
 
@@ -159,7 +159,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
                   if (top.isEmpty) {
                     return Center(child: Padding(padding: const EdgeInsets.all(24),
 
-                      child: Text('Soyez la première à répondre ! 🧴’¬', style: Theme.of(ctx).textTheme.bodySmall)));
+                      child: Text(l.translate('first_to_reply'), style: Theme.of(ctx).textTheme.bodySmall)));
                   }
 
                   return Column(children: top.asMap().entries.map((e) => _ReplyCard(
@@ -202,7 +202,7 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
 
             const SizedBox(width: 8),
 
-            Expanded(child: Text('Répondre : $_replyingToPreview', style: TextStyle(fontSize: 12, color: AppTheme.primary), overflow: TextOverflow.ellipsis)),
+            Expanded(child: Text('${l.translate('replying_to')} $_replyingToPreview', style: TextStyle(fontSize: 12, color: AppTheme.primary), overflow: TextOverflow.ellipsis)),
 
             IconButton(icon: const Icon(Icons.close, size: 16),
 
@@ -227,9 +227,9 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
                     controller: _replyCtrl,
                     maxLines: 4,
                     minLines: 1,
-                    decoration: const InputDecoration(
-                      hintText: 'Votre réponse...',
-                      contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: InputDecoration(
+                      hintText: l.translate('your_reply_hint'),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -358,7 +358,7 @@ class _ReplyCardState extends State<_ReplyCard> {
                 future: widget.svc.getAuthorProfile(d['authorId']),
                 builder: (ctx, uSnap) {
                   final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                  final pseudo = uData?['pseudonym'] ?? 'Anonyme';
+                  final pseudo = uData?['pseudonym'] ?? AppLocalizations.of(context).translate('anonymous');
                   return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis);
                 },
               ),
@@ -366,7 +366,7 @@ class _ReplyCardState extends State<_ReplyCard> {
 
             const Spacer(),
 
-            Text(timeago.format(date, locale: 'fr'), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10)),
+            Text(timeago.format(date, locale: AppLocalizations.of(context).locale.languageCode), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10)),
 
           ]),
 
@@ -408,7 +408,7 @@ class _ReplyCardState extends State<_ReplyCard> {
 
               child: Row(children: [Icon(Icons.reply, size: 15, color: AppTheme.primary), const SizedBox(width: 4),
 
-                Text('Répondre', style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600))]),
+                Text(AppLocalizations.of(context).translate('reply_button'), style: TextStyle(color: AppTheme.primary, fontSize: 12, fontWeight: FontWeight.w600))]),
 
             ),
 
@@ -446,16 +446,16 @@ class _ReplyCardState extends State<_ReplyCard> {
 
                 FutureBuilder<DocumentSnapshot>(
                   future: widget.svc.getAuthorProfile(nd['authorId']),
-                  builder: (ctx, uSnap) {
-                    final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                    final pseudo = uData?['pseudonym'] ?? 'Anonyme';
-                    return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 11));
-                  },
+                    builder: (ctx, uSnap) {
+                      final uData = uSnap.data?.data() as Map<String, dynamic>?;
+                      final pseudo = uData?['pseudonym'] ?? AppLocalizations.of(context).translate('anonymous');
+                      return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 11));
+                    },
                 ),
 
                 const Spacer(),
 
-                Text(timeago.format(ndt, locale: 'fr'), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10)),
+                Text(timeago.format(ndt, locale: AppLocalizations.of(context).locale.languageCode), style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10)),
 
               ]),
 

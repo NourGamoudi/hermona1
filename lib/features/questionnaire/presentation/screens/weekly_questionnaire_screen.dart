@@ -17,10 +17,12 @@ import 'package:acneia/features/detection/data/services/detection_api_service.da
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
 import 'package:acneia/features/recommendation/data/services/recommendation_api_service.dart';
 import 'package:acneia/features/detection/presentation/screens/face_capture_screen.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 
 class WeeklyQuestionnaireScreen extends StatefulWidget {
   final WeeklySurvey? initialSurvey;
-  const WeeklyQuestionnaireScreen({super.key, this.initialSurvey});
+  final bool isOnboarding;
+  const WeeklyQuestionnaireScreen({super.key, this.initialSurvey, this.isOnboarding = false});
 
   @override
   State<WeeklyQuestionnaireScreen> createState() => _WeeklyQuestionnaireScreenState();
@@ -34,14 +36,22 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   bool loading = false;
   String? error;
 
-  // Data
+  // Data (Storing technical KEYS)
   Map<String, String> photos = {};
-  String makeupFrequency = '';
-  String makeupType = '';
-  String makeupRemoval = '';
-  String cleansingFrequency = '';
-  String routineFollowed = '';
-  String spfThisWeek = '';
+  String makeupFrequency = 'freq_daily';
+  String makeupType = 'makeup_medium';
+  String makeupRemoval = 'removal_partial';
+  String cleansingFrequency = 'cleans_once';
+  String routineFollowed = 'routine_rarely';
+  String spfThisWeek = 'spf_sometimes';
+
+  // Option Mappings
+  final List<String> makeupFreqKeys = ['freq_daily', 'freq_4_6j', 'freq_2_3j', 'freq_1j', 'freq_rarely', 'freq_never'];
+  final List<String> makeupTypeKeys = ['makeup_full', 'makeup_medium', 'makeup_light', 'makeup_natural', 'makeup_none'];
+  final List<String> removalKeys = ['removal_full', 'removal_simple', 'removal_partial', 'removal_rarely', 'freq_never'];
+  final List<String> cleansFreqKeys = ['cleans_twice', 'cleans_once', 'cleans_rarely', 'freq_never'];
+  final List<String> routineFollowKeys = ['routine_full', 'routine_partial', 'routine_rarely'];
+  final List<String> spfKeys = ['spf_always', 'spf_sometimes', 'spf_never'];
 
   @override
   void initState() {
@@ -107,14 +117,13 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   }
 
   Future<void> _save() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (photos['face'] == null) {
-      _showError('Veuillez ajouter une photo de face.');
+    final l = AppLocalizations.of(context);
+    if (!_formKey.currentState!.validate()) {
+      _showError(l.translate('complete_all_fields'));
       return;
     }
-
-    if (makeupFrequency.isEmpty || cleansingFrequency.isEmpty || routineFollowed.isEmpty || spfThisWeek.isEmpty) {
-      _showError('Veuillez répondre à toutes les questions.');
+    if (photos['face'] == null) {
+      _showError(l.translate('photo_required'));
       return;
     }
 
@@ -138,9 +147,9 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         cleansingFrequency: cleansingFrequency,
         routineFollowed: routineFollowed,
         spfThisWeek: spfThisWeek,
-        autoCorrection: cleansingFrequency == 'rarement',
-        reminderSent: routineFollowed == 'Non',
-        spfAlert: spfThisWeek == 'Jamais',
+        autoCorrection: cleansingFrequency == 'cleans_rarely' || cleansingFrequency == 'freq_never',
+        reminderSent: routineFollowed == 'routine_rarely',
+        spfAlert: spfThisWeek == 'spf_never',
       );
       
       await _service.saveWeeklySurvey(survey);
@@ -153,14 +162,13 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
       // 2. Prediction (Risque & Hygiène)
       final predictService = PredictionApiService();
       Map<String, dynamic> answers = {
-        'spf_used': spfThisWeek != 'Jamais',
+        'spf_used': spfThisWeek != 'spf_never',
         'cleansing': cleansingFrequency,
         'makeup': makeupFrequency,
         'routine_followed': routineFollowed,
       };
 
       try {
-        // On récupère aussi les dernières données quotidiennes pour le sommeil/stress
         final dailySnap = await FirebaseFirestore.instance
             .collection('daily_surveys')
             .where('userId', isEqualTo: user.uid)
@@ -179,7 +187,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
           });
         }
 
-        final predictionResult = await predictService.predict(answers);
+        final predictionResult = await predictService.predict(answers, lang: l.locale.languageCode);
         await predictService.saveResult(predictionResult, user.uid);
 
         // 3. Recommendation (Routine)
@@ -187,6 +195,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         final recommendation = await recommendService.getRecommendations(
           detection: detectionResult,
           userId: user.uid,
+          lang: l.locale.languageCode,
         );
         await recommendService.saveResult(recommendation, user.uid);
       } catch (e) {
@@ -210,64 +219,65 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(title: const Text('Bilan Hebdomadaire')),
+      appBar: AppBar(title: Text(l.translate('weekly_title'))),
       body: Stack(
         children: [
           Positioned(top: -50, left: -50, child: _Blob(size: 250, color: AppColors.secondary.withValues(alpha: 0.05))),
           loading 
-          ? const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 24), Text('IA : Analyse du risque par zone...', style: TextStyle(fontWeight: FontWeight.bold))]))
+          ? Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const CircularProgressIndicator(), const SizedBox(height: 24), Text(l.translate('error_ia'), style: const TextStyle(fontWeight: FontWeight.bold))]))
           : Form(
               key: _formKey,
               child: ListView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(24, 110, 24, 100),
                 children: [
-                  const _HeaderSection(title: 'Audit Cutané', sub: 'Évaluons les progrès et l\'observance de ta routine.'),
+                  _HeaderSection(title: l.translate('cutaneous_audit'), sub: l.translate('audit_desc')),
                   const SizedBox(height: 32),
                   
                   // Photo Section
-                  const SectionHeader(title: 'Analyse Visuelle'),
+                  SectionHeader(title: l.translate('visual_analysis')),
                   const SizedBox(height: 16),
                   Center(child: _PhotoUploadBox(path: photos['face'], onTap: () => _showPhotoSourceDialog('face'))),
                   const SizedBox(height: 32),
 
-                  // Questions Restored
-                  const SectionHeader(title: 'Maquillage & Nettoyage'),
+                  // Questions
+                  SectionHeader(title: l.translate('makeup_cleansing')),
                   const SizedBox(height: 12),
                   GlassCard(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        _buildDropdown('Fréquence Maquillage', makeupFrequency, ['tous les jours', '4-6j', '2-3j', '1j', 'jamais'], (v) => setState(() => makeupFrequency = v!)),
+                        _buildDropdown(l.translate('makeup_freq_label'), makeupFrequency, makeupFreqKeys, (v) => setState(() => makeupFrequency = v!)),
                         const SizedBox(height: 20),
-                        _buildDropdown('Type de Maquillage', makeupType, ['complet', 'modéré', 'léger', 'naturel', 'aucun'], (v) => setState(() => makeupType = v!)),
+                        _buildDropdown(l.translate('makeup_type_label'), makeupType, makeupTypeKeys, (v) => setState(() => makeupType = v!)),
                         const SizedBox(height: 20),
-                        _buildDropdown('Démaquillage', makeupRemoval, ['complet', 'simple', 'partiel', 'rarement'], (v) => setState(() => makeupRemoval = v!)),
+                        _buildDropdown(l.translate('cleansing_label'), makeupRemoval, removalKeys, (v) => setState(() => makeupRemoval = v!)),
                       ],
                     ),
                   ),
                   
                   const SizedBox(height: 32),
 
-                  const SectionHeader(title: 'Observance Routine'),
+                  SectionHeader(title: l.translate('routine_observance')),
                   const SizedBox(height: 12),
                   GlassCard(
                     padding: const EdgeInsets.all(24),
                     child: Column(
                       children: [
-                        _buildDropdown('Fréquence Nettoyage', cleansingFrequency, ['2x/jour', '1x/jour', 'rarement'], (v) => setState(() => cleansingFrequency = v!)),
+                        _buildDropdown(l.translate('cleansing_freq_label'), cleansingFrequency, cleansFreqKeys, (v) => setState(() => cleansingFrequency = v!)),
                         const SizedBox(height: 20),
-                        _buildDropdown('Routine Suivie ?', routineFollowed, ['Oui', 'Partiellement', 'Non'], (v) => setState(() => routineFollowed = v!)),
+                        _buildDropdown(l.translate('routine_followed_label'), routineFollowed, routineFollowKeys, (v) => setState(() => routineFollowed = v!)),
                         const SizedBox(height: 20),
-                        _buildDropdown('Protection Solaire', spfThisWeek, ['Tous les jours', 'Parfois', 'Jamais'], (v) => setState(() => spfThisWeek = v!)),
+                        _buildDropdown(l.translate('spf_label'), spfThisWeek, spfKeys, (v) => setState(() => spfThisWeek = v!)),
                       ],
                     ),
                   ),
                   
                   const SizedBox(height: 48),
-                  PrimaryButton(label: 'VALIDER LE BILAN SEMAINE', onTap: _save),
+                  PrimaryButton(label: l.translate('finish').toUpperCase(), onTap: _save),
                 ],
               ),
             ),
@@ -277,17 +287,18 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
   }
 
   Widget _buildDropdown(String label, String value, List<String> options, Function(String?) onChanged) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark, letterSpacing: 1)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          initialValue: value.isEmpty ? null : value,
+          value: value.isEmpty ? null : value,
           dropdownColor: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : Colors.white,
           decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
           style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, fontSize: 13, fontWeight: FontWeight.w600),
-          items: options.map((e) => DropdownMenuItem(value: e, child: Text(e.toUpperCase()))).toList(),
+          items: options.map((e) => DropdownMenuItem(value: e, child: Text(l.translate(e).toUpperCase()))).toList(),
           onChanged: onChanged,
           validator: (v) => v == null ? 'Requis' : null,
           icon: const Icon(Iconsax.arrow_down_1, size: 16),

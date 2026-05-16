@@ -4,7 +4,7 @@ class AppConstants {
   // ——————————————————————————————————————————————————————————————————————————————————————
   static const String apiBaseUrl = kReleaseMode 
       ? 'https://hermona-api.onrender.com' // PROD
-      : 'http://10.179.75.131:8000'; // DEV (Auto-detected IP)
+      : 'http://10.174.12.131:8000'; // DEV (Wi-Fi Machine IP)
   static const String apiKey     = 'hermona_secret_2026';
 
 
@@ -86,15 +86,12 @@ class AppConstants {
 
   static const String photoTipsBad =
 
-      'âŒ Pas de filtres ni retouches\n'
+      'â Œ Pas de filtres ni retouches\n'
 
-      'âŒ Pas de flash direct\n'
+      'â Œ Pas de flash direct\n'
 
-      'âŒ Pas de lunettes\n'
+      'â Œ Pas de lunettes\n'
 
-      'âŒ Éviter le mauvais éclairage';
+      'â Œ Éviter le mauvais éclairage';
 
 }
-
-
-

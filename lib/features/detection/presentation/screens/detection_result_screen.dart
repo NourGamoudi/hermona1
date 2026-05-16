@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/detection/domain/entities/detection_result.dart';
@@ -14,12 +15,13 @@ class DetectionResultScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final result = DetectionResult.fromJson(detectionData);
 
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Résultats de l\'analyse'),
+        title: Text(l.translate('analysis_results_title')),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_1),
           onPressed: () => context.go('/home'),
@@ -39,20 +41,20 @@ class DetectionResultScreen extends StatelessWidget {
           ListView(
             padding: const EdgeInsets.fromLTRB(24, 120, 24, 100),
             children: [
-              _buildSeverityDonut(result),
+              _buildSeverityDonut(context, result),
               const SizedBox(height: 24),
-              _buildAcnerypesChart(result),
+              _buildAcnerypesChart(context, result),
               const SizedBox(height: 32),
-              const Text('Détails des Lésions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(l.translate('lesion_details'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               ...result.classifications.map((c) => _buildClassificationCard(c)),
               const SizedBox(height: 32),
-              const Text('Analyse par Zone', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(l.translate('zone_analysis'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               _buildFacePartsGrid(context, result),
               const SizedBox(height: 40),
               PrimaryButton(
-                label: 'Voir mes recommandations',
+                label: l.translate('view_recommendations'),
                 onTap: () => context.go('/my-routine'),
               ),
             ],
@@ -62,13 +64,14 @@ class DetectionResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSeverityDonut(DetectionResult result) {
+  Widget _buildSeverityDonut(BuildContext context, DetectionResult result) {
+    final l = AppLocalizations.of(context);
     final color = _getSeverityColor(result.severityLevel);
     return GlassCard(
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
       child: Column(
         children: [
-          const Text('Score de sévérité', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(l.translate('severity_score'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 24),
           SizedBox(
             height: 180,
@@ -117,7 +120,7 @@ class DetectionResultScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              _getSeverityLabel(result.severityLevel),
+              _getSeverityLabel(context, result.severityLevel),
               style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
             ),
           ),
@@ -125,7 +128,7 @@ class DetectionResultScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
-              _getSeverityDescription(result.severityLevel),
+              _getSeverityDescription(context, result.severityLevel),
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 13, color: Colors.black54, height: 1.4),
             ),
@@ -135,13 +138,14 @@ class DetectionResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAcnerypesChart(DetectionResult result) {
+  Widget _buildAcnerypesChart(BuildContext context, DetectionResult result) {
+    final l = AppLocalizations.of(context);
     return GlassCard(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Types d\'acné détectés', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(l.translate('detected_acne_types'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 32),
           Row(
             children: [
@@ -236,28 +240,36 @@ class DetectionResultScreen extends StatelessWidget {
 
   Widget _buildFacePartsGrid(BuildContext context, DetectionResult result) {
     if (result.imageUrls.isEmpty) {
+      final l = AppLocalizations.of(context);
       return GlassCard(
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
             Icon(Iconsax.image, size: 48, color: AppColors.primary.withValues(alpha: 0.2)),
             const SizedBox(height: 16),
-            const Text(
-              'Visualisation indisponible',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            Text(
+              l.translate('visualization_unavailable'),
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Les photos détaillées par zone ne sont pas conservées pour optimiser la mémoire de l\'appareil.',
+            Text(
+              l.translate('viz_desc'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
+              style: const TextStyle(fontSize: 12, color: Colors.grey, height: 1.4),
             ),
           ],
         ),
       );
     }
     final zones = ['front', 'menton', 'joue_gauche', 'joue_droite', 'nez'];
-    final zoneNames = ['FRONT', 'MENTON', 'JOUE GAUCHE', 'JOUE DROITE', 'NEZ'];
+    final l = AppLocalizations.of(context);
+    final zoneNames = [
+      l.translate('front'),
+      l.translate('chin'),
+      l.translate('left_cheek'),
+      l.translate('right_cheek'),
+      l.translate('nose')
+    ];
 
     return Column(
       children: List.generate(result.imageUrls.length, (index) {
@@ -302,7 +314,7 @@ class DetectionResultScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('RISQUE', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                            Text(l.translate('risk_label'), style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
                             Text('${risk.toInt()}%', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: _getRiskColor(risk))),
                           ],
                         ),
@@ -313,9 +325,9 @@ class DetectionResultScreen extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const Text('ÉTAT', style: TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
+                            Text(l.translate('status_label'), style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold)),
                             Text(
-                              _getZoneStatus(result, index), 
+                              _getZoneStatus(context, result, index), 
                               textAlign: TextAlign.end,
                               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                             ),
@@ -333,11 +345,12 @@ class DetectionResultScreen extends StatelessWidget {
     );
   }
 
-  String _getZoneStatus(DetectionResult result, int index) {
+  String _getZoneStatus(BuildContext context, DetectionResult result, int index) {
+    final l = AppLocalizations.of(context);
     final zones = ['front', 'joue_droite', 'joue_gauche', 'menton', 'nez'];
-    if (index >= zones.length) return 'Normal';
+    if (index >= zones.length) return l.translate('normal');
     final counts = result.zoneCounts?[zones[index]];
-    if (counts == null || counts.isEmpty) return 'Peau Saine';
+    if (counts == null || counts.isEmpty) return l.translate('healthy_skin');
     return counts.entries.map((e) => '${e.value} ${e.key}').join(', ');
   }
 
@@ -350,21 +363,23 @@ class DetectionResultScreen extends StatelessWidget {
     }
   }
 
-  String _getSeverityLabel(SeverityLevel level) {
+  String _getSeverityLabel(BuildContext context, SeverityLevel level) {
+    final l = AppLocalizations.of(context);
     switch (level) {
-      case SeverityLevel.normal: return 'Faible';
-      case SeverityLevel.moderate: return 'Modérée';
-      case SeverityLevel.severe: return 'Sévère';
-      case SeverityLevel.verySevere: return 'Très Sévère';
+      case SeverityLevel.normal: return l.translate('severity_low');
+      case SeverityLevel.moderate: return l.translate('severity_moderate');
+      case SeverityLevel.severe: return l.translate('severity_severe');
+      case SeverityLevel.verySevere: return l.translate('severity_very_severe');
     }
   }
 
-  String _getSeverityDescription(SeverityLevel level) {
+  String _getSeverityDescription(BuildContext context, SeverityLevel level) {
+    final l = AppLocalizations.of(context);
     switch (level) {
-      case SeverityLevel.normal: return 'Acné légère. Continuez votre routine de soins préventifs.';
-      case SeverityLevel.moderate: return 'Acné modérée. Une routine ciblée est recommandée.';
-      case SeverityLevel.severe: return 'Acné sévère. Consultez un dermatologue en complément des soins.';
-      case SeverityLevel.verySevere: return 'Acné très sévère. Une consultation dermatologique urgente est conseillée.';
+      case SeverityLevel.normal: return l.translate('severity_desc_low');
+      case SeverityLevel.moderate: return l.translate('severity_desc_moderate');
+      case SeverityLevel.severe: return l.translate('severity_desc_severe');
+      case SeverityLevel.verySevere: return l.translate('severity_desc_very_severe');
     }
   }
 

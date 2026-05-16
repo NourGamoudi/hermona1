@@ -19,7 +19,7 @@ class PredictionApiService implements PredictionRepository {
         ));
 
   @override
-  Future<PredictionResult> predict(Map<String, dynamic> answers) async {
+  Future<PredictionResult> predict(Map<String, dynamic> answers, {String? lang}) async {
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) throw Exception('Non connecté');
@@ -28,8 +28,9 @@ class PredictionApiService implements PredictionRepository {
       final profileSnap = await _db.collection(AppConstants.colUsers).doc(uid).get();
       final profile = profileSnap.data() ?? {};
 
-      // 2. Prepare Payload (Simplified - Backend handles the score)
+      // 2. Prepare Payload
       final payload = {
+        'lang': lang ?? 'fr',
         'answers': _sanitizeMap({
           ...answers,
           'profile': profile,

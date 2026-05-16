@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,6 +12,7 @@ import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/recommendation/domain/entities/recommendation_result.dart';
 import 'package:acneia/features/recommendation/data/services/recommendation_api_service.dart';
 import 'package:acneia/features/detection/domain/entities/detection_result.dart';
@@ -41,6 +43,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
     super.initState();
     if (widget.initialResult != null) {
       _result = widget.initialResult;
+    } else {
+      // Auto-trigger prediction on load
+      WidgetsBinding.instance.addPostFrameCallback((_) => _predict());
     }
   }
 
@@ -48,9 +53,34 @@ class _PredictionScreenState extends State<PredictionScreen> {
     setState(() { _loading = true; _result = null; _recommendation = null; });
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
-      if (uid == null) throw Exception('Utilisateur non connecté');
+      if (uid == null) {
+        final l = AppLocalizations.of(context);
+        throw Exception(l.translate('user_not_connected'));
+      }
 
       Map<String, dynamic> answers = {};
+
+      String normalizeValue(dynamic val) {
+        if (val == null) return '';
+        final v = val.toString().toLowerCase().trim();
+        final map = {
+          'lutéale': 'phase_luteal',
+          'folliculaire': 'phase_follicular',
+          'menstruelle': 'phase_menstrual',
+          'ovulatoire': 'phase_ovulatory',
+          '2x/jour': 'cleans_twice',
+          '1x/jour': 'cleans_once',
+          'rarement': 'cleans_rarely',
+          'tous les jours': 'freq_daily',
+          'parfois': 'freq_sometimes',
+          'oui': 'routine_full',
+          'non': 'routine_none',
+          'laitages': 'diet_dairy',
+          'sucre': 'diet_sugar',
+          'fast-food': 'diet_fastfood',
+        };
+        return map[v] ?? v;
+      }
 
       try {
         // 1. Fetch Latest Daily Survey (Optimized with index)
@@ -63,14 +93,15 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
         if (dailySnap.docs.isNotEmpty) {
           final d = dailySnap.docs.first.data();
+          final List<dynamic> food = d['food'] ?? [];
           answers.addAll({
             'stress': d['stress'],
             'sleep': d['sleepDuration'],
             'sleep_quality': d['sleepQuality'],
             'hydration': d['hydration'],
-            'diet': d['food'],
+            'diet': food.map((f) => normalizeValue(f)).toList(),
             'cycle_day': d['cycleDay'],
-            'cycle_phase': d['cyclePhase'],
+            'cycle_phase': normalizeValue(d['cyclePhase']),
           });
           debugPrint('DEBUG: Daily data found via index: ${dailySnap.docs.first.id}');
         }
@@ -87,10 +118,10 @@ class _PredictionScreenState extends State<PredictionScreen> {
         if (weeklySnap.docs.isNotEmpty) {
           final w = weeklySnap.docs.first.data();
           answers.addAll({
-            'cleansing': w['cleansingFrequency'],
-            'spf_used': w['spfThisWeek'] != 'Jamais',
-            'makeup_frequency': w['makeupFrequency'],
-            'routine_followed': w['routineFollowed'],
+            'cleansing': normalizeValue(w['cleansingFrequency']),
+            'spf_used': w['spfThisWeek'] != 'Jamais' && w['spfThisWeek'] != 'spf_never',
+            'makeup_frequency': normalizeValue(w['makeupFrequency']),
+            'routine_followed': normalizeValue(w['routineFollowed']),
           });
           _weeklySurvey = WeeklySurvey.fromJson(w, weeklySnap.docs.first.id);
           debugPrint('DEBUG: Weekly data found via index: ${weeklySnap.docs.first.id}');
@@ -99,10 +130,11 @@ class _PredictionScreenState extends State<PredictionScreen> {
         debugPrint('DEBUG: Survey fetch error (wait for index build): $e');
       }
 
+      final l = AppLocalizations.of(context);
       debugPrint('DEBUG: Final payload to API: $answers');
 
       // 3. Fetch Prediction (Risk & Hygiene)
-      final res = await _predictSvc.predict(answers); 
+      final res = await _predictSvc.predict(answers, lang: l.locale.languageCode); 
       await _predictSvc.saveResult(res, uid);
 
       // Trigger Smart Notification check immediately after new prediction
@@ -136,7 +168,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
       // 4. Fetch Recommendations based on real detection + answers
       final rec = await _recommendSvc.getRecommendations(
         detection: latestDetection, 
-        userId: uid
+        userId: uid,
+        lang: l.locale.languageCode,
       );
       await _recommendSvc.saveResult(rec, uid);
 
@@ -148,8 +181,9 @@ class _PredictionScreenState extends State<PredictionScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
+        final l = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur IA : $e'), backgroundColor: AppColors.error),
+          SnackBar(content: Text('${l.translate('error_ia')} : $e'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -157,6 +191,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (_result != null) {
       return _ResultView(
         result: _result!, 
@@ -166,10 +201,34 @@ class _PredictionScreenState extends State<PredictionScreen> {
       );
     }
 
+    if (_loading) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _ScanIcon(),
+              const SizedBox(height: 32),
+              Text(
+                l.translate('skin_analysis_progress'),
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+              ).animate(onPlay: (c) => c.repeat()).shimmer(duration: 1200.ms),
+              const SizedBox(height: 12),
+              Text(
+                l.translate('ai_working_desc'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Bilan Prédictif'),
+        title: Text(l.translate('predictive_report_title')),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_1),
           onPressed: () => context.pop(),
@@ -192,19 +251,15 @@ class _PredictionScreenState extends State<PredictionScreen> {
                 children: [
                   const _ScanIcon(),
                   const SizedBox(height: 32),
-                  Text('Analyse Prédictive', style: Theme.of(context).textTheme.displayMedium),
+                  Text(l.translate('predictive_analysis'), style: Theme.of(context).textTheme.displayMedium),
                   const SizedBox(height: 12),
-                  const Text(
-                    'Prédit tes futurs risques d\'acné basés sur ton cycle, ton hygiène et tes habitudes.',
+                  Text(
+                    l.translate('predictive_desc'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
+                    style: const TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
                   ),
                   const SizedBox(height: 48),
-                  PrimaryButton(
-                    label: 'LANCER L\'ANALYSE IA',
-                    isLoading: _loading,
-                    onTap: _predict,
-                  ),
+                  // Button removed as analysis is automatic
                 ],
               ),
             ),
@@ -224,6 +279,7 @@ class _ResultView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     final color = result.riskLevel == RiskLevel.low ? AppColors.success 
                 : result.riskLevel == RiskLevel.medium ? AppColors.warning 
                 : AppColors.error;
@@ -233,7 +289,15 @@ class _ResultView extends StatelessWidget {
       child: Scaffold(
         extendBodyBehindAppBar: true,
         appBar: AppBar(
-          title: const Text('Rapport Hermona'),
+          title: Text(l.translate('hermona_report')),
+          backgroundColor: Colors.white.withAlpha(180),
+          surfaceTintColor: Colors.transparent,
+          flexibleSpace: ClipRRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+              child: Container(color: Colors.transparent),
+            ),
+          ),
           leading: IconButton(
             icon: const Icon(Iconsax.arrow_left_1),
             onPressed: () => context.pop(),
@@ -243,7 +307,7 @@ class _ResultView extends StatelessWidget {
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.white.withAlpha(12),
+                color: Colors.white.withAlpha(25),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: Colors.white.withAlpha(12)),
               ),
@@ -256,10 +320,10 @@ class _ResultView extends StatelessWidget {
                 labelColor: Colors.white,
                 unselectedLabelColor: AppColors.textSecondaryDark,
                 labelStyle: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5),
-                tabs: const [
-                  Tab(text: 'ANALYSE'),
-                  Tab(text: 'ROUTINE'),
-                  Tab(text: 'LIFESTYLE'),
+                tabs: [
+                  Tab(text: l.translate('analysis_tab_upper')),
+                  Tab(text: l.translate('routine_tab')),
+                  Tab(text: l.translate('lifestyle_tab')),
                 ],
               ),
             ),
@@ -274,7 +338,7 @@ class _ResultView extends StatelessWidget {
         ),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: onRetry,
-          label: const Text('NOUVEAU SCAN', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
+          label: Text(l.translate('new_scan'), style: const TextStyle(fontWeight: FontWeight.w900, letterSpacing: 1)),
           icon: const Icon(Iconsax.refresh, size: 20),
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
@@ -293,6 +357,7 @@ class _AnalysisTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return ListView(
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
@@ -305,9 +370,9 @@ class _AnalysisTab extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Risque Estimé', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  Text(l.translate('estimated_risk'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
                   StatusBadge(
-                    text: result.riskLevel.name.toUpperCase(),
+                    text: l.translate('risk_${result.riskLevel.name.toLowerCase()}').toUpperCase(),
                     color: color,
                   ),
                 ],
@@ -321,7 +386,7 @@ class _AnalysisTab extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text('${(result.riskJ3 * 100).toInt()}%', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: color)),
-                    const Text('RISQUE J+3', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
+                    Text(l.translate('risk_j3_label'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, letterSpacing: 1)),
                   ],
                 ),
                 progressColor: color,
@@ -334,11 +399,11 @@ class _AnalysisTab extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  _InfoBox(label: 'Tendance', value: result.trend == TrendDirection.increasing ? 'EN HAUSSE' : 'STABLE', color: color),
+                  Expanded(child: _InfoBox(label: l.translate('trend'), value: result.trend == TrendDirection.increasing ? l.translate('increasing') : l.translate('stable'), color: color)),
                   _VerticalDivider(),
-                  _InfoBox(label: 'Phase Cycle', value: result.cyclePhase.toUpperCase(), color: AppColors.secondary),
+                  Expanded(child: _InfoBox(label: l.translate('cycle_phase'), value: l.translate('phase_${result.cyclePhase.toLowerCase()}').toUpperCase(), color: AppColors.secondary)),
                   _VerticalDivider(),
-                  _InfoBox(label: 'Hygiène', value: '${result.hygieneScore}%', color: AppColors.success),
+                  Expanded(child: _InfoBox(label: l.translate('hygiene'), value: '${result.hygieneScore}%', color: AppColors.success)),
                 ],
               ),
             ],
@@ -349,7 +414,7 @@ class _AnalysisTab extends StatelessWidget {
         if ((weeklySurvey != null && (weeklySurvey!.spfAlert || weeklySurvey!.autoCorrection || weeklySurvey!.routineFollowed == 'Non')) || 
             (result.riskLevel == RiskLevel.high)) ...[
           const SizedBox(height: 32),
-          const SectionHeader(title: 'Alertes & Vigilance'),
+          SectionHeader(title: l.translate('alerts_vigilance')),
           const SizedBox(height: 12),
           GlassCard(
             padding: const EdgeInsets.all(24),
@@ -357,33 +422,33 @@ class _AnalysisTab extends StatelessWidget {
               children: [
                 // 1. High Priority: Risk J+3 Breakout Prediction
                 if (result.riskLevel == RiskLevel.high)
-                  const _AlertItem(
-                    title: "Vigilance : Poussée à J+3",
-                    body: "Une hausse du risque est prévue d'ici 3 jours. Anticipez avec votre routine.",
+                  _AlertItem(
+                    title: l.translate('alert_j3_title'),
+                    body: l.translate('alert_j3_desc'),
                     icon: Iconsax.warning_2,
                     color: AppColors.error,
                   ),
                 // 2. Priority: SPF absence
                 if (weeklySurvey?.spfAlert ?? false)
-                  const _AlertItem(
-                    title: "Protection Solaire Manquante",
-                    body: "L'absence de SPF aggrave l'inflammation et les marques résiduelles.",
+                  _AlertItem(
+                    title: l.translate('alert_spf_title'),
+                    body: l.translate('alert_spf_desc'),
                     icon: Iconsax.sun_1,
                     color: AppColors.error,
                   ),
                 // 3. Priority: Routine observance
                 if (weeklySurvey?.routineFollowed == 'Non')
-                  const _AlertItem(
-                    title: "Observance de Routine",
-                    body: "La régularité est indispensable pour stabiliser votre peau.",
+                  _AlertItem(
+                    title: l.translate('alert_routine_title'),
+                    body: l.translate('alert_routine_desc'),
                     icon: Iconsax.task_square,
                     color: AppColors.primary,
                   ),
                 // 4. Priority: Cleansing frequency
                 if (weeklySurvey?.autoCorrection ?? false)
-                  const _AlertItem(
-                    title: "Nettoyage Cutané",
-                    body: "Un nettoyage trop rare favorise l'obstruction des pores par le sébum.",
+                  _AlertItem(
+                    title: l.translate('alert_cleansing_title'),
+                    body: l.translate('alert_cleansing_desc'),
                     icon: Iconsax.brush_1,
                     color: AppColors.warning,
                   ),
@@ -395,12 +460,18 @@ class _AnalysisTab extends StatelessWidget {
         const SizedBox(height: 32),
 
         // SHAP Factors
-        const SectionHeader(title: 'Facteurs d\'Influence'),
+        SectionHeader(title: l.translate('influence_factors')),
         const SizedBox(height: 12),
         GlassCard(
           padding: const EdgeInsets.all(24),
           child: Column(
-            children: result.shapFactors.entries.map((e) => _ShapIndicator(label: e.key, value: e.value)).toList(),
+            children: result.shapFactors.entries.map((e) {
+              final rawKey = e.key.toLowerCase().replaceAll(' ', '_');
+              return _ShapIndicator(
+                label: l.translate(rawKey), // On utilise la clé brute (ex: 'pcos', 'stress')
+                value: e.value,
+              );
+            }).toList(),
           ),
         ).animate().fadeIn(delay: 200.ms),
       ],
@@ -414,6 +485,7 @@ class _RoutineTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (recommendation == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -423,12 +495,12 @@ class _RoutineTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
       children: [
         if (recommendation!.morningRoutine.isNotEmpty) ...[
-          const SectionHeader(title: 'Routine Matin'),
+          SectionHeader(title: l.translate('morning_routine')),
           const SizedBox(height: 12),
           ...recommendation!.morningRoutine.asMap().entries.map((e) => PremiumFadeIn(
             delay: e.key * 100,
             child: _TipCard(
-              text: '${e.value.product}: ${e.value.instruction}', 
+              text: '${l.translate(e.value.product)}: ${l.translate(e.value.instruction)}', 
               icon: Iconsax.sun_1, 
               color: AppColors.primary
             ),
@@ -436,12 +508,12 @@ class _RoutineTab extends StatelessWidget {
         ],
         const SizedBox(height: 24),
         if (recommendation!.eveningRoutine.isNotEmpty) ...[
-          const SectionHeader(title: 'Routine Soir'),
+          SectionHeader(title: l.translate('evening_routine')),
           const SizedBox(height: 12),
           ...recommendation!.eveningRoutine.asMap().entries.map((e) => PremiumFadeIn(
             delay: (e.key + 5) * 100,
             child: _TipCard(
-              text: '${e.value.product}: ${e.value.instruction}', 
+              text: '${l.translate(e.value.product)}: ${l.translate(e.value.instruction)}', 
               icon: Iconsax.moon, 
               color: const Color(0xFF6366F1)
             ),
@@ -449,11 +521,11 @@ class _RoutineTab extends StatelessWidget {
         ],
         const SizedBox(height: 24),
         if (recommendation!.avoid.isNotEmpty) ...[
-          const SectionHeader(title: 'À Éviter'),
+          SectionHeader(title: l.translate('avoid')),
           const SizedBox(height: 12),
           ...recommendation!.avoid.asMap().entries.map((e) => PremiumFadeIn(
             delay: (e.key + 10) * 100,
-            child: _TipCard(text: e.value, icon: Iconsax.close_circle, color: AppColors.error),
+            child: _TipCard(text: l.translate(e.value), icon: Iconsax.close_circle, color: AppColors.error),
           )),
         ],
       ],
@@ -467,6 +539,7 @@ class _LifestyleTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     if (recommendation == null) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -481,14 +554,14 @@ class _LifestyleTab extends StatelessWidget {
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(24, 160, 24, 100),
       children: [
-        const SectionHeader(title: 'Habitudes & Hygiène'),
+        SectionHeader(title: l.translate('habits_hygiene')),
         const SizedBox(height: 12),
         if (combinedLifestyle.isEmpty)
-          const _TipCard(text: "Suivez votre routine habituelle.", icon: Iconsax.info_circle, color: AppColors.info)
+          _TipCard(text: l.translate('follow_usual_routine'), icon: Iconsax.info_circle, color: AppColors.info)
         else
           ...combinedLifestyle.asMap().entries.map((e) => PremiumFadeIn(
             delay: e.key * 100,
-            child: _TipCard(text: e.value, icon: Iconsax.heart5, color: AppColors.info),
+            child: _TipCard(text: l.translate(e.value), icon: Iconsax.heart5, color: AppColors.info),
           )),
       ],
     );
@@ -535,10 +608,17 @@ class _InfoBox extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark, letterSpacing: 1)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark, letterSpacing: 1)),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(value, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: color)),
+        ),
       ],
     );
   }

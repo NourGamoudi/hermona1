@@ -12,6 +12,7 @@ import 'core/theme/app_theme.dart';
 import 'core/constants/app_constants.dart';
 import 'core/localization/app_localizations.dart';
 import 'features/notification/data/services/notification_service.dart';
+import 'core/services/language_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,20 +33,26 @@ void main() async {
   await FirebaseFirestore.instance.clearPersistence();
 
   await initializeDateFormatting('fr', null);
+  await initializeDateFormatting('en', null);
 
   // Restore saved primary colour
   final prefs = await SharedPreferences.getInstance();
   final saved = prefs.getInt(AppConstants.keyPrimaryColor);
   if (saved != null) AppTheme.setPrimary(Color(saved));
 
+  // Restore saved language
+  final langCode = await LanguageService().getLanguage();
+  
   runApp(HermonaApp(
     initialDark: prefs.getBool(AppConstants.keyThemeMode) ?? false,
+    initialLocale: Locale(langCode),
   ));
 }
 
 class HermonaApp extends StatefulWidget {
   final bool initialDark;
-  const HermonaApp({super.key, required this.initialDark});
+  final Locale initialLocale;
+  const HermonaApp({super.key, required this.initialDark, required this.initialLocale});
 
   static HermonaAppState? of(BuildContext context) =>
       context.findAncestorStateOfType<HermonaAppState>();
@@ -62,13 +69,21 @@ class HermonaAppState extends State<HermonaApp> {
   void initState() {
     super.initState();
     _mode = widget.initialDark ? ThemeMode.dark : ThemeMode.light;
+    _locale = widget.initialLocale;
   }
 
   void setThemeMode(ThemeMode m) => setState(() => _mode = m);
-  void setLocale(Locale l) => setState(() => _locale = l);
+  void setLocale(Locale l) {
+    debugPrint("DEBUG AUDIT: HermonaAppState.setLocale called with ${l.languageCode}");
+    setState(() => _locale = l);
+  }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint("DEBUG AUDIT: MaterialApp REBUILDING with locale = ${_locale?.languageCode}");
+    debugPrint("DEBUG AUDIT: MATERIALAPP LOCALE = $_locale");
+    debugPrint("DEBUG AUDIT: SUPPORTED LOCALES = [fr, en]");
+
     return MaterialApp.router(
       title: 'HERMONA',
       debugShowCheckedModeBanner: false,

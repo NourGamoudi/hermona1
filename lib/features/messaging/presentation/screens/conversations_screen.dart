@@ -7,6 +7,7 @@ import 'package:timeago/timeago.dart' as timeago;
 
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
+import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/messaging/data/services/messaging_service.dart';
 
 class ConversationsScreen extends StatefulWidget {
@@ -25,10 +26,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Messagerie Anonyme'),
+        title: Text(l.translate('anon_messaging')),
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_1),
           onPressed: () => context.pop(),
@@ -48,7 +50,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               SizedBox(height: MediaQuery.of(context).padding.top + 60),
               
               // Safety Warning
-              const Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: GlassCard(
                   padding: EdgeInsets.all(16),
@@ -58,8 +60,8 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                       SizedBox(width: 16),
                       Expanded(
                         child: Text(
-                          'Messagerie 100% anonyme. Ne partagez jamais vos données réelles.',
-                          style: TextStyle(color: AppColors.warning, fontSize: 11, fontWeight: FontWeight.w600),
+                          l.translate('anon_warning'),
+                          style: const TextStyle(color: AppColors.warning, fontSize: 11, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -88,9 +90,9 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           children: [
                             Icon(Iconsax.message_text, size: 64, color: AppColors.textSecondaryDark.withValues(alpha: 0.2)),
                             const SizedBox(height: 24),
-                            const Text('Aucune conversation', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+                            Text(l.translate('no_conversations'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
                             const SizedBox(height: 8),
-                            const Text('Démarrez un chat depuis le forum.', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)),
+                            Text(l.translate('start_chat_forum'), style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)),
                           ],
                         ),
                       ).animate().fadeIn();
@@ -121,11 +123,11 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                                       Row(
                                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                         children: [
-                                          const Flexible(
-                                            child: Text('MEMBRE HERMONA', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5), overflow: TextOverflow.ellipsis),
+                                          Flexible(
+                                            child: Text(l.translate('hermona_member'), style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5), overflow: TextOverflow.ellipsis),
                                           ),
                                           const SizedBox(width: 8),
-                                          Text(timeago.format(date, locale: 'fr'), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
+                                          Text(timeago.format(date, locale: l.locale.languageCode), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
                                         ],
                                       ),
                                       const SizedBox(height: 6),
@@ -190,13 +192,13 @@ class _ConversationMenu extends StatelessWidget {
       color: AppColors.cardDark,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       itemBuilder: (_) => [
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'del',
           child: Row(
             children: [
-              Icon(Iconsax.trash, size: 16, color: AppColors.error),
-              SizedBox(width: 12),
-              Text('Supprimer', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const Icon(Iconsax.trash, size: 16, color: AppColors.error),
+              const SizedBox(width: 12),
+              Text(AppLocalizations.of(context).translate('delete'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
             ],
           ),
         ),
