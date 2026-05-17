@@ -11,8 +11,6 @@ import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:acneia/features/profile/presentation/cubit/trends_cubit.dart';
-import 'package:acneia/features/profile/presentation/screens/trends_screen.dart';
-import 'package:acneia/features/home/presentation/screens/evolution_screen.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
@@ -529,91 +527,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _ExplorerCard(icon: Iconsax.message_text, title: l.translate('messages'), color: AppColors.accent, onTap: () => context.push('/messages')),
         _ExplorerCard(icon: Iconsax.chart_21, title: l.translate('acne_evolution'), color: const Color(0xFF9C27B0), onTap: () => context.push('/evolution')),
       ],
-    );
-  }
-
-  String _getGreeting(BuildContext context) {
-    final hour = DateTime.now().hour;
-    final l = AppLocalizations.of(context);
-    if (hour < 5) return l.translate('greeting_night');
-    if (hour < 12) return l.translate('greeting_morning');
-    if (hour < 18) return l.translate('greeting_afternoon');
-    return l.translate('greeting_evening');
-  }
-
-  Widget _buildEvolutionPreview(String? uid) {
-    if (uid == null) return const SizedBox();
-    return BlocProvider(
-      create: (context) => TrendsCubit()..loadData(),
-      child: BlocBuilder<TrendsCubit, TrendsState>(
-        builder: (context, state) {
-          final l = AppLocalizations.of(context);
-          if (state is TrendsLoading) {
-            return const SizedBox(
-              height: 160,
-              child: GlassCard(child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
-            );
-          }
-          if (state is TrendsLoaded) {
-            // Process Detections (Severity)
-            final sPoints = state.detections.map((d) {
-              final data = d.data() as Map<String, dynamic>;
-              final date = _parseDate(data['analyzedAt']);
-              final score = (data['severityScore'] as num?)?.toDouble() ?? 0.0;
-              return _SeverityPoint(date: date, score: score, docId: d.id);
-            }).toList();
-            sPoints.sort((a, b) => a.date.compareTo(b.date));
-
-            // Process Predictions (Risk)
-            final rPoints = state.predictions.map((d) {
-              final data = d.data() as Map<String, dynamic>;
-              final date = _parseDate(data['predictedAt']);
-              final score = (data['riskJ3'] as num?)?.toDouble() ?? 0.0;
-              return _RiskPoint(date: date, score: score);
-            }).toList();
-            rPoints.sort((a, b) => a.date.compareTo(b.date));
-
-            if (sPoints.isEmpty && rPoints.isEmpty) {
-              return GlassCard(
-                onTap: () => context.push('/evolution'),
-                padding: const EdgeInsets.all(20),
-                child: Center(child: Text(l.translate('start_analyses_evolution'), style: const TextStyle(fontSize: 12, color: Colors.grey))),
-              );
-            }
-
-            return GlassCard(
-              onTap: () => context.push('/evolution'),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _MiniChart(
-                          title: l.translate('severity'),
-                          color: AppColors.primary,
-                          spots: sPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score)).toList(),
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: _MiniChart(
-                          title: l.translate('risk'),
-                          color: AppColors.error,
-                          spots: rPoints.asMap().entries.map((e) => FlSpot(e.key.toDouble(), e.value.score * 100)).toList(),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(l.translate('tap_for_details'), style: const TextStyle(fontSize: 10, color: Colors.grey, fontStyle: FontStyle.italic)),
-                ],
-              ),
-            );
-          }
-          return const SizedBox();
-        },
-      ),
     );
   }
 
