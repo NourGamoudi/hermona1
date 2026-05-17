@@ -19,6 +19,7 @@ import 'package:acneia/features/detection/domain/entities/detection_result.dart'
 import 'package:acneia/features/detection/data/services/detection_api_service.dart';
 import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
 import 'package:acneia/core/services/smart_notification_manager.dart';
+import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
 
 class PredictionScreen extends StatefulWidget {
   final PredictionResult? initialResult;
@@ -33,6 +34,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
   PredictionResult? _result;
   RecommendationResult? _recommendation;
   WeeklySurvey? _weeklySurvey;
+  bool _missingSurveys = false;
   
   final _predictSvc = PredictionApiService();
   final _recommendSvc = RecommendationApiService();
@@ -50,7 +52,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
   }
 
   Future<void> _predict() async {
-    setState(() { _loading = true; _result = null; _recommendation = null; });
+    setState(() { _loading = true; _result = null; _recommendation = null; _missingSurveys = false; });
     try {
       final uid = FirebaseAuth.instance.currentUser?.uid;
       if (uid == null) {
@@ -91,6 +93,12 @@ class _PredictionScreenState extends State<PredictionScreen> {
             .limit(1)
             .get();
 
+        // Fetch Real-time Cycle Phase instead of using stale daily survey data
+        final cycleSvc = CycleApiService();
+        final cycleStatus = await cycleSvc.getCycleStatus();
+        final realPhase = cycleStatus?.phase ?? '';
+        final realDay = cycleStatus?.day ?? 0;
+
         if (dailySnap.docs.isNotEmpty) {
           final d = dailySnap.docs.first.data();
           final List<dynamic> food = d['food'] ?? [];
@@ -100,8 +108,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
             'sleep_quality': d['sleepQuality'],
             'hydration': d['hydration'],
             'diet': food.map((f) => normalizeValue(f)).toList(),
-            'cycle_day': d['cycleDay'],
-            'cycle_phase': normalizeValue(d['cyclePhase']),
+            'cycle_day': realDay > 0 ? realDay : d['cycleDay'],
+            'cycle_phase': normalizeValue(realPhase.isNotEmpty ? realPhase : d['cyclePhase']),
           });
           debugPrint('DEBUG: Daily data found via index: ${dailySnap.docs.first.id}');
         }
@@ -126,8 +134,55 @@ class _PredictionScreenState extends State<PredictionScreen> {
           _weeklySurvey = WeeklySurvey.fromJson(w, weeklySnap.docs.first.id);
           debugPrint('DEBUG: Weekly data found via index: ${weeklySnap.docs.first.id}');
         }
+
+        bool isValid = false;
+
+        if (dailySnap.docs.isNotEmpty && weeklySnap.docs.isNotEmpty) {
+          final d = dailySnap.docs.first.data();
+          
+          final dateVal = d['date'];
+          DateTime? dt;
+          if (dateVal is Timestamp) {
+            dt = dateVal.toDate();
+          } else if (dateVal is String) {
+            dt = DateTime.tryParse(dateVal);
+          }
+          
+          bool isRecent = false;
+          if (dt != null) {
+            isRecent = DateTime.now().difference(dt).inHours.abs() < 36;
+          }
+
+          // Use the real-time phase fetched earlier, fallback to daily survey if empty
+          final phaseToCheck = realPhase.isNotEmpty ? realPhase : (d['cyclePhase']?.toString() ?? '');
+          bool hasPhase = phaseToCheck.isNotEmpty && phaseToCheck.toLowerCase() != 'unknown' && phaseToCheck.toLowerCase() != 'inconnu';
+
+          if (isRecent && hasPhase) {
+            isValid = true;
+          } else {
+            debugPrint('DEBUG: Invalid surveys - isRecent: $isRecent, hasPhase: $hasPhase');
+          }
+        }
+
+        if (!isValid) {
+          if (mounted) {
+            setState(() {
+              _loading = false;
+              _missingSurveys = true;
+            });
+          }
+          return;
+        }
+
       } catch (e) {
-        debugPrint('DEBUG: Survey fetch error (wait for index build): $e');
+        debugPrint('DEBUG: Survey fetch error: $e');
+        if (mounted) {
+          setState(() {
+            _loading = false;
+            _missingSurveys = true;
+          });
+        }
+        return;
       }
 
       final l = AppLocalizations.of(context);
@@ -197,7 +252,10 @@ class _PredictionScreenState extends State<PredictionScreen> {
         result: _result!, 
         recommendation: _recommendation,
         weeklySurvey: _weeklySurvey,
-        onRetry: () => setState(() { _result = null; _recommendation = null; _weeklySurvey = null; })
+        onRetry: () {
+          setState(() { _result = null; _recommendation = null; _weeklySurvey = null; });
+          _predict();
+        }
       );
     }
 
@@ -246,26 +304,65 @@ class _PredictionScreenState extends State<PredictionScreen> {
           Center(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const _ScanIcon(),
-                  const SizedBox(height: 32),
-                  Text(l.translate('predictive_analysis'), style: Theme.of(context).textTheme.displayMedium),
-                  const SizedBox(height: 12),
-                  Text(
-                    l.translate('predictive_desc'),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
+              child: _missingSurveys 
+                ? _buildMissingSurveysUI(l)
+                : Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const _ScanIcon(),
+                      const SizedBox(height: 32),
+                      Text(l.translate('predictive_analysis'), style: Theme.of(context).textTheme.displayMedium),
+                      const SizedBox(height: 12),
+                      Text(
+                        l.translate('predictive_desc'),
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
+                      ),
+                      const SizedBox(height: 48),
+                    ],
                   ),
-                  const SizedBox(height: 48),
-                  // Button removed as analysis is automatic
-                ],
-              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMissingSurveysUI(AppLocalizations l) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.error.withAlpha(25),
+            shape: BoxShape.circle,
+          ),
+          child: const Icon(Iconsax.document_text_1, size: 64, color: AppColors.error),
+        ),
+        const SizedBox(height: 32),
+        Text(
+          "Questionnaires Incomplets",
+          style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 22),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 16),
+        const Text(
+          "Pour une analyse précise, notre IA a besoin de connaître vos habitudes récentes. Veuillez remplir vos questionnaires.",
+          textAlign: TextAlign.center,
+          style: TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
+        ),
+        const SizedBox(height: 40),
+        PrimaryButton(
+          label: "Bilan Quotidien",
+          onTap: () => context.push('/daily-survey'),
+        ),
+        const SizedBox(height: 16),
+        PrimaryButton(
+          label: "Bilan Hebdomadaire",
+          onTap: () => context.push('/weekly-survey'),
+        ),
+      ],
     );
   }
 }

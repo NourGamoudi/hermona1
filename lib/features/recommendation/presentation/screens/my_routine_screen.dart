@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/features/recommendation/domain/entities/recommendation_result.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:acneia/core/localization/app_localizations.dart';
 
 class MyRoutineScreen extends StatefulWidget {
@@ -89,11 +90,8 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
 
       if (docs.isEmpty) {
         if (mounted) {
-          final l = AppLocalizations.of(context);
-          setState(() {
-            _error = l.translate('no_routine_available');
-            _loading = false;
-          });
+          // Remove the error state and button, directly redirect to prediction to generate/show the routine
+          context.go('/prediction');
         }
         return;
       }
@@ -544,7 +542,7 @@ class _RoutineTab extends StatelessWidget {
 
 class _RoutineStepCard extends StatelessWidget {
   final RoutineStep step;
-  final int index; // Added index
+  final int index;
 
   const _RoutineStepCard({required this.step, required this.index});
 
@@ -577,34 +575,36 @@ class _RoutineStepCard extends StatelessWidget {
       }
     }
 
-    return GlassCard(
-      padding: const EdgeInsets.all(16),
-      borderRadius: 24,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [AppColors.primary, AppColors.secondary],
+    return GestureDetector(
+      onTap: () => _showProductDetails(context, step, l, rationale, index),
+      child: GlassCard(
+        padding: const EdgeInsets.all(16),
+        borderRadius: 24,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppColors.primary, AppColors.secondary],
+                    ),
+                    shape: BoxShape.circle,
                   ),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    '${index + 1}', // Use index for sequential numbering
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      fontSize: 16,
+                  child: Center(
+                    child: Text(
+                      '${index + 1}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                      ),
                     ),
                   ),
                 ),
-              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -645,6 +645,7 @@ class _RoutineStepCard extends StatelessWidget {
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: step.productExamples.take(2).map((e) => Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
@@ -663,55 +664,229 @@ class _RoutineStepCard extends StatelessWidget {
               )).toList(),
             ),
           ],
+        ],
+      ),
+    ),
+  );
+}
 
-          // Rationale section
-          if (rationale != null) ...[
-            const SizedBox(height: 16),
+  void _showProductDetails(BuildContext context, RoutineStep step, AppLocalizations l, String? rationale, int index) {
+    final imageUrl = _getProductImageUrl(step.product, step.productExamples);
+    final allEx = step.productExamples.join(' ').toLowerCase();
+    
+    String? brandLogoUrl;
+    if (allEx.contains('avene') || allEx.contains('avène')) {
+      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=eau-thermale-avene.fr&sz=128';
+    } else if (allEx.contains('la roche-posay') || allEx.contains('effaclar')) {
+      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=laroche-posay.fr&sz=128';
+    } else if (allEx.contains('cerave')) {
+      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=cerave.com&sz=128';
+    } else if (allEx.contains('bioderma') || allEx.contains('sensibio')) {
+      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=bioderma.fr&sz=128';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.75,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          children: [
+            // Handle bar
             Container(
-              padding: const EdgeInsets.all(12),
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                color: AppColors.secondary.withAlpha(15),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.secondary.withAlpha(20)),
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(24),
                 children: [
-                  const Icon(Icons.lightbulb_outline, size: 16, color: AppColors.secondary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l.translate('why_this_choice'),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w900,
-                            color: AppColors.secondary,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          rationale,
-                          style: TextStyle(
-                            fontSize: 11,
-                            height: 1.4,
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+                  // Product Image
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: CachedNetworkImage(
+                      imageUrl: imageUrl,
+                      height: 200,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Container(
+                        color: Colors.grey[100],
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
                     ),
                   ),
+                  const SizedBox(height: 24),
+                  if (brandLogoUrl != null) 
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: CachedNetworkImage(
+                        imageUrl: brandLogoUrl,
+                        height: 30,
+                        fit: BoxFit.contain,
+                        alignment: Alignment.centerLeft,
+                      ),
+                    ),
+                  // Title and Step
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              l.translate(step.product).toUpperCase(),
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            Text(
+                              '${l.translate('step_label')} ${index + 1}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textMutedPink,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  // Instruction
+                  _sectionTitle(l.translate('how_to_use') ?? 'UTILISATION'),
+                  Text(
+                    l.translate(step.instruction),
+                    style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 24),
+                  // Examples
+                  if (step.productExamples.isNotEmpty) ...[
+                    _sectionTitle(l.translate('recommended_products') ?? 'EXEMPLES DE PRODUITS'),
+                    const SizedBox(height: 8),
+                    ...step.productExamples.map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, color: AppColors.success, size: 18),
+                          const SizedBox(width: 12),
+                          Text(e, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    )),
+                  ],
+                  const SizedBox(height: 24),
+                  // Why this choice
+                  if (rationale != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withAlpha(10),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: AppColors.primary.withAlpha(30)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.psychology, color: AppColors.primary, size: 24),
+                              const SizedBox(width: 12),
+                              Text(
+                                l.translate('why_this_choice').toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.primary,
+                                  letterSpacing: 1,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            rationale,
+                            style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 40),
                 ],
               ),
             ),
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          color: Colors.grey,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  String _getProductImageUrl(String product, List<String> examples) {
+    final p = product.toLowerCase();
+    final e = examples.isNotEmpty ? examples.first.toLowerCase() : '';
+    debugPrint('DEBUG IMAGE: product=$p, first_example=$e');
+
+    // Specific Brand Logic
+    if (e.contains('la roche-posay') || e.contains('effaclar')) {
+      if (p.contains('nettoyant') || p.contains('gel')) return 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=600'; // Existing blueish
+      if (p.contains('hydratant') || p.contains('mat')) return 'https://images.unsplash.com/photo-1629732047847-50bad7558259?auto=format&fit=crop&q=80&w=600'; // Specific tube style
+      return 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=600';
+    }
+    
+    if (e.contains('cerave')) {
+      return 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&q=80&w=600'; // White/Green pump style
+    }
+
+    if (e.contains('bioderma') || e.contains('sebium')) {
+      return 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=600'; // Generic beauty
+    }
+
+    // Generic Category Logic
+    if (p.contains('nettoyant') || p.contains('gel')) {
+      return 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?auto=format&fit=crop&q=80&w=600';
+    }
+    if (p.contains('hydratant') || p.contains('crème')) {
+      return 'https://images.unsplash.com/photo-1612817288484-6f916006741a?auto=format&fit=crop&q=80&w=600';
+    }
+    if (p.contains('spf') || p.contains('solaire')) {
+      return 'https://images.unsplash.com/photo-1598440947619-2c35fc9aa908?auto=format&fit=crop&q=80&w=600';
+    }
+    if (p.contains('sérum')) {
+      return 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?auto=format&fit=crop&q=80&w=600';
+    }
+    if (p.contains('baume') || p.contains('démaquillant')) {
+      return 'https://images.unsplash.com/photo-1631730450584-1f973ff3c393?auto=format&fit=crop&q=80&w=600';
+    }
+    return 'https://images.unsplash.com/photo-1556229167-da3ed2105a4d?auto=format&fit=crop&q=80&w=600';
   }
 }
 

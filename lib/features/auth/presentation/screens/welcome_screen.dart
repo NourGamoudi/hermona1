@@ -6,12 +6,14 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:acneia/core/services/language_service.dart';
 import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/main.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final authed = FirebaseAuth.instance.currentUser != null;
     final l = AppLocalizations.of(context);
     final isFr = l.locale.languageCode == 'fr';
     final size = MediaQuery.of(context).size;
@@ -115,19 +117,27 @@ class WelcomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Column(
                     children: [
-                      _OutlinedPillButton(
-                        label: l.translate('login_button'),
-                        brandColor: brandPink,
-                        onTap: () => context.push('/login'),
-                      ).animate().fadeIn(delay: 600.ms),
+                      if (authed)
+                        _OutlinedPillButton(
+                          label: isFr ? "Continuer vers l'application" : "Continue to app",
+                          brandColor: brandPink,
+                          onTap: () => context.go('/home'),
+                        ).animate().fadeIn(delay: 600.ms)
+                      else ...[
+                        _OutlinedPillButton(
+                          label: l.translate('login_button'),
+                          brandColor: brandPink,
+                          onTap: () => context.push('/login'),
+                        ).animate().fadeIn(delay: 600.ms),
 
-                      const SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
-                      _OutlinedPillButton(
-                        label: l.translate('create_account_button'),
-                        brandColor: brandPink,
-                        onTap: () => context.push('/register'),
-                      ).animate().fadeIn(delay: 750.ms),
+                        _OutlinedPillButton(
+                          label: l.translate('create_account_button'),
+                          brandColor: brandPink,
+                          onTap: () => context.push('/register'),
+                        ).animate().fadeIn(delay: 750.ms),
+                      ]
                     ],
                   ),
                 ),

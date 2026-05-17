@@ -110,6 +110,9 @@ class AuthService {
   // â”€â”€ Connexion Google â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   Future<UserEntity> signInWithGoogle() async {
     try {
+      // Forcer la déconnexion Google pour afficher systématiquement le sélecteur de compte
+      await _google.signOut();
+      
       final gUser = await _google.signIn();
       if (gUser == null) {
         throw const AuthException('Connexion Google annulée');

@@ -247,9 +247,6 @@ class _EvolutionBody extends StatelessWidget {
     final latest = points.last;
     final targetDate = latest.date.subtract(const Duration(days: 7));
     
-    _SeverityPoint? bestMatch;
-    Duration minDiff = const Duration(days: 365);
-    
     // Priority: find the point that is at least 6-8 days before latest
     for (int i = points.length - 2; i >= 0; i--) {
       final daysDiff = latest.date.difference(points[i].date).inDays;
@@ -398,34 +395,6 @@ class _EvolutionBody extends StatelessWidget {
     );
   }
 
-  Widget _buildUniversalImage(String url, {double? height, BoxFit fit = BoxFit.cover}) {
-    if (url.startsWith('data:image')) {
-      try {
-        final base64String = url.split(',').last;
-        final bytes = base64Decode(base64String);
-        return Image.memory(bytes, height: height, width: double.infinity, fit: fit);
-      } catch (e) {
-        return const Icon(Icons.broken_image);
-      }
-    }
-    return Image.network(
-      url, 
-      height: height, 
-      width: double.infinity, 
-      fit: fit, 
-      errorBuilder: (_, __, ___) => const Icon(Icons.broken_image)
-    );
-  }
-
-  Color _getSeverityColor(String? level) {
-    switch (level?.toLowerCase()) {
-      case 'normal': return AppColors.success;
-      case 'moderate': return AppColors.warning;
-      case 'severe': return AppColors.error;
-      case 'verysevere': return Colors.purple;
-      default: return AppColors.primary;
-    }
-  }
 
   String? _extractUrlFromData(Map<String, dynamic>? data) {
     if (data == null) return null;
@@ -488,36 +457,6 @@ class _EvolutionBody extends StatelessWidget {
     return null;
   }
 
-  void _showFullScreenImage(BuildContext context, String url) {
-    showGeneralDialog(
-      context: context,
-      barrierColor: Colors.black,
-      barrierDismissible: true,
-      barrierLabel: 'Close',
-      pageBuilder: (ctx, _, __) => Scaffold(
-        backgroundColor: Colors.black,
-        body: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                child: url.startsWith('data:image')
-                    ? Image.memory(base64Decode(url.split(',').last), fit: BoxFit.contain)
-                    : Image.network(url, fit: BoxFit.contain),
-              ),
-            ),
-            Positioned(
-              top: 50, right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 32),
-                onPressed: () => Navigator.of(ctx).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   void _showRiskDetail(BuildContext context, _RiskPoint point) {
     final color = point.score > 0.61 ? AppColors.error : (point.score > 0.48 ? AppColors.warning : AppColors.success);
     showDialog(
@@ -558,7 +497,6 @@ class _IndividualChart extends StatelessWidget {
     
     final minX = spots.first.x;
     final maxX = spots.last.x;
-    final horizontalInterval = (maxX - minX) == 0 ? 1.0 : (maxX - minX);
 
     return LineChart(
       LineChartData(
