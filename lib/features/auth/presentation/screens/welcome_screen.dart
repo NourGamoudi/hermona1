@@ -13,7 +13,6 @@ class WelcomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authed = FirebaseAuth.instance.currentUser != null;
     final l = AppLocalizations.of(context);
     final isFr = l.locale.languageCode == 'fr';
     final size = MediaQuery.of(context).size;
@@ -85,7 +84,7 @@ class WelcomeScreen extends StatelessWidget {
                     style: GoogleFonts.playfairDisplay(
                       fontSize: 48,
                       fontWeight: FontWeight.w900,
-                      color: const Color(0xFFf5f3f5ff), // Ton code précis #f5f3f5ff
+                      color: const Color(0xFFF5F3F5), // Ton code précis #F5F3F5
                       height: 1.0,
                       letterSpacing: -1.5,
                     ),
@@ -100,9 +99,9 @@ class WelcomeScreen extends StatelessWidget {
                   child: Text(
                     l.translate('welcome_subtitle'),
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 22, // Encore plus grand pour le style
-                      color: const Color(0XFF48cae4), // Ton code précis #f51f98dd
+                      color: Color(0XFF48cae4), // Ton code précis #f51f98dd
                       height: 1.3,
                       fontWeight: FontWeight.w400,
                       letterSpacing: 0.1,
@@ -117,27 +116,19 @@ class WelcomeScreen extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 40),
                   child: Column(
                     children: [
-                      if (authed)
-                        _OutlinedPillButton(
-                          label: isFr ? "Continuer vers l'application" : "Continue to app",
-                          brandColor: brandPink,
-                          onTap: () => context.go('/home'),
-                        ).animate().fadeIn(delay: 600.ms)
-                      else ...[
-                        _OutlinedPillButton(
-                          label: l.translate('login_button'),
-                          brandColor: brandPink,
-                          onTap: () => context.push('/login'),
-                        ).animate().fadeIn(delay: 600.ms),
+                      _OutlinedPillButton(
+                        label: l.translate('login_button'),
+                        brandColor: brandPink,
+                        onTap: () => context.push('/login'),
+                      ).animate().fadeIn(delay: 600.ms),
 
-                        const SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
-                        _OutlinedPillButton(
-                          label: l.translate('create_account_button'),
-                          brandColor: brandPink,
-                          onTap: () => context.push('/register'),
-                        ).animate().fadeIn(delay: 750.ms),
-                      ]
+                      _OutlinedPillButton(
+                        label: l.translate('create_account_button'),
+                        brandColor: brandPink,
+                        onTap: () => context.push('/register'),
+                      ).animate().fadeIn(delay: 750.ms),
                     ],
                   ),
                 ),

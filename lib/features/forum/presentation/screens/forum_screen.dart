@@ -111,7 +111,7 @@ class _ForumScreenState extends State<ForumScreen> {
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
-                          contentPadding: EdgeInsets.symmetric(vertical: 15),
+                          contentPadding: const EdgeInsets.symmetric(vertical: 15),
                         ),
                       ),
                     ),

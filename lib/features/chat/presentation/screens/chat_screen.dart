@@ -508,7 +508,7 @@ class _ChatBubble extends StatelessWidget {
                     Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+                      gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(22),
                         topRight: Radius.circular(22),
@@ -547,7 +547,7 @@ class _ChatBubble extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary),
+                                const Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary),
                                 const SizedBox(width: 8),
                                 Text(AppLocalizations.of(context).translate('listen'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 1)),
                               ],

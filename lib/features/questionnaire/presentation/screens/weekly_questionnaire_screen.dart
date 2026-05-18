@@ -294,7 +294,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
         Text(label.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark, letterSpacing: 1)),
         const SizedBox(height: 8),
         DropdownButtonFormField<String>(
-          value: value.isEmpty ? null : value,
+          initialValue: value.isEmpty ? null : value,
           dropdownColor: Theme.of(context).brightness == Brightness.dark ? AppColors.surfaceDark : Colors.white,
           decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.zero),
           style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black, fontSize: 13, fontWeight: FontWeight.w600),

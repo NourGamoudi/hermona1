@@ -16,7 +16,6 @@ import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/features/recommendation/domain/entities/recommendation_result.dart';
 import 'package:acneia/features/recommendation/data/services/recommendation_api_service.dart';
 import 'package:acneia/features/detection/domain/entities/detection_result.dart';
-import 'package:acneia/features/detection/data/services/detection_api_service.dart';
 import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart';
 import 'package:acneia/core/services/smart_notification_manager.dart';
 import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
@@ -38,7 +37,6 @@ class _PredictionScreenState extends State<PredictionScreen> {
   
   final _predictSvc = PredictionApiService();
   final _recommendSvc = RecommendationApiService();
-  final _detectionSvc = DetectionApiService();
 
   @override
   void initState() {
@@ -96,8 +94,8 @@ class _PredictionScreenState extends State<PredictionScreen> {
         // Fetch Real-time Cycle Phase instead of using stale daily survey data
         final cycleSvc = CycleApiService();
         final cycleStatus = await cycleSvc.getCycleStatus();
-        final realPhase = cycleStatus?.phase ?? '';
-        final realDay = cycleStatus?.day ?? 0;
+        final realPhase = cycleStatus.phase;
+        final realDay = cycleStatus.day;
 
         if (dailySnap.docs.isNotEmpty) {
           final d = dailySnap.docs.first.data();
@@ -185,6 +183,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         return;
       }
 
+      if (!mounted) return;
       final l = AppLocalizations.of(context);
       debugPrint('DEBUG: Final payload to API: $answers');
 
@@ -212,11 +211,11 @@ class _PredictionScreenState extends State<PredictionScreen> {
           id: 'fallback',
           severityScore: 0.5,
           severityLevel: SeverityLevel.moderate,
-          classifications: [],
+          classifications: const [],
           analyzedAt: DateTime.now(),
-          imageUrls: [],
-          zoneCounts: {},
-          zoneRisks: {},
+          imageUrls: const [],
+          zoneCounts: const {},
+          zoneRisks: const {},
         );
       }
 
@@ -228,11 +227,13 @@ class _PredictionScreenState extends State<PredictionScreen> {
       );
       await _recommendSvc.saveResult(rec, uid);
 
-      if (mounted) setState(() { 
-        _result = res; 
-        _recommendation = rec;
-        _loading = false; 
-      });
+      if (mounted) {
+        setState(() { 
+          _result = res; 
+          _recommendation = rec;
+          _loading = false; 
+        });
+      }
     } catch (e) {
       if (mounted) {
         setState(() => _loading = false);
@@ -348,7 +349,7 @@ class _PredictionScreenState extends State<PredictionScreen> {
         ),
         const SizedBox(height: 16),
         const Text(
-          "Pour une analyse précise, notre IA a besoin de connaître vos habitudes récentes. Veuillez remplir vos questionnaires.",
+          "Veuillez remplir vos questionnaires pour faire un nouveau scan.",
           textAlign: TextAlign.center,
           style: TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
         ),

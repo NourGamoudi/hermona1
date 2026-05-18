@@ -341,12 +341,12 @@ class _RecommendationScreenState extends State<RecommendationScreen>
                   ),
                   Text('${l.translate('step_label')} ${index + 1}', style: const TextStyle(color: Colors.grey)),
                   const SizedBox(height: 24),
-                  Text(l.translate('how_to_use')?.toUpperCase() ?? 'UTILISATION', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  Text(l.translate('how_to_use').toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                   const SizedBox(height: 8),
                   Text(l.translate(step.instruction), style: const TextStyle(fontSize: 16)),
                   const SizedBox(height: 24),
                   if (step.productExamples.isNotEmpty) ...[
-                    Text(l.translate('recommended_products')?.toUpperCase() ?? 'PRODUITS', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
+                    Text(l.translate('recommended_products').toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
                     const SizedBox(height: 8),
                     ...step.productExamples.map((e) => Padding(
                       padding: const EdgeInsets.only(bottom: 4),
@@ -361,7 +361,7 @@ class _RecommendationScreenState extends State<RecommendationScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(l.translate('why_this_choice')?.toUpperCase() ?? 'POURQUOI ?', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                          Text(l.translate('why_this_choice').toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
                           const SizedBox(height: 8),
                           Text(rationale, style: const TextStyle(fontSize: 14)),
                         ],

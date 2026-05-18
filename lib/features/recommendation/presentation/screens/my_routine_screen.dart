@@ -339,9 +339,13 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
     final s = backendStrategy.toUpperCase();
     if (s.contains('PROTECTION') || s.contains('REPAIR'))      return l.translate('strategy_protection');
     if (s.contains('EQUILIBRE')  || s.contains('BALANCE') ||
-        s.contains('ÉQUILIBRE'))                                return l.translate('strategy_equilibrium');
+        s.contains('ÉQUILIBRE')) {
+      return l.translate('strategy_equilibrium');
+    }
     if (s.contains('PREVENTION') || s.contains('PRÉVENTION') ||
-        s.contains('PREVENT'))                                  return l.translate('strategy_prevention');
+        s.contains('PREVENT')) {
+      return l.translate('strategy_prevention');
+    }
     return backendStrategy; // forward raw string for unknown strategies
   }
 
@@ -350,9 +354,6 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
     final l = AppLocalizations.of(context);
 
     final strategy = _computeStrategy(l);
-    final altStrategy = _result!.alternativeStrategy.isNotEmpty
-        ? _result!.alternativeStrategy
-        : null;
     final variation = _result!.variationIndex;
 
     final Color stratColor = strategy == l.translate('strategy_protection')
@@ -767,7 +768,7 @@ class _RoutineStepCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   // Instruction
-                  _sectionTitle(l.translate('how_to_use') ?? 'UTILISATION'),
+                  _sectionTitle(l.translate('how_to_use')),
                   Text(
                     l.translate(step.instruction),
                     style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.black87),
@@ -775,7 +776,7 @@ class _RoutineStepCard extends StatelessWidget {
                   const SizedBox(height: 24),
                   // Examples
                   if (step.productExamples.isNotEmpty) ...[
-                    _sectionTitle(l.translate('recommended_products') ?? 'EXEMPLES DE PRODUITS'),
+                    _sectionTitle(l.translate('recommended_products')),
                     const SizedBox(height: 8),
                     ...step.productExamples.map((e) => Padding(
                       padding: const EdgeInsets.only(bottom: 8),

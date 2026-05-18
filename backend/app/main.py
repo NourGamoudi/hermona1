@@ -64,11 +64,11 @@ initialize_firebase()
 
 db = firestore.client()
 
-from .ml_pipeline.builder import MLFeatureBuilder
-from .ml_pipeline.defaults import RISK_THRESHOLDS
-from .ml_pipeline.features import FEATURE_NAMES
-from .services.recommendation_engine import RecommendationEngine
-from .services.hygiene_score_service import HygieneScoreService
+from app.ml_pipeline.builder import MLFeatureBuilder
+from app.ml_pipeline.defaults import RISK_THRESHOLDS
+from app.ml_pipeline.features import FEATURE_NAMES
+from app.services.recommendation_engine import RecommendationEngine
+from app.services.hygiene_score_service import HygieneScoreService
 
 # Initialize SHAP Explainer (Global to avoid re-creation overhead)
 # This uses the TreeExplainer optimized for LightGBM

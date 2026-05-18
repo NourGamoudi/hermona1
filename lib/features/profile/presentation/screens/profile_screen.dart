@@ -108,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       context.push('/onboarding', extra: p);
                     }
                   }),
-                  _ProfileItem(Iconsax.magic_star, l.translate('skin_type'), '${l.translate(_user?['skinType']?.toString().toLowerCase() ?? 'unknown')}', null),
+                  _ProfileItem(Iconsax.magic_star, l.translate('skin_type'), l.translate(_user?['skinType']?.toString().toLowerCase() ?? 'unknown'), null),
                 ]),
 
                 const SizedBox(height: 24),
@@ -276,8 +276,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.translate('stay'))),
           PrimaryButton(label: l.translate('leave'), width: 100, color: AppColors.error, onTap: () async {
             await FirebaseAuth.instance.signOut();
-            if (mounted) {
-              context.go('/login');
+            if (context.mounted) {
+              context.go('/welcome');
             }
           }),
         ],

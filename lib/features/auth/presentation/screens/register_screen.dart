@@ -109,7 +109,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Back Button
-                  _BackButton(onTap: () => context.go('/login')),
+                  _BackButton(onTap: () => context.go('/welcome')),
 
                   SizedBox(height: size.height * 0.03),
 

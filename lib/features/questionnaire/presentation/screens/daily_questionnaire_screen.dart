@@ -7,7 +7,6 @@ import 'package:iconsax/iconsax.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
-import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
 import 'package:acneia/features/questionnaire/domain/entities/daily_survey.dart';
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
@@ -76,7 +75,6 @@ class _DailyQuestionnaireScreenState extends State<DailyQuestionnaireScreen> {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) throw Exception(l.translate('user_not_connected'));
 
-      final profile = await _service.fetchUserProfile(user.uid);
       // 1. Call AI Prediction first (Backend calculates cycle status during this call)
       PredictionResult? prediction;
       try {

@@ -8,9 +8,7 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:acneia/core/localization/app_localizations.dart';
 
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:acneia/features/profile/presentation/cubit/trends_cubit.dart';
+
 import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
@@ -538,67 +536,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _MiniChart extends StatelessWidget {
-  final String title;
-  final Color color;
-  final List<FlSpot> spots;
 
-  const _MiniChart({required this.title, required this.color, required this.spots});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Colors.grey)),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 80,
-          child: spots.isEmpty 
-            ? const Center(child: Text('--', style: TextStyle(color: Colors.grey)))
-            : LineChart(
-                LineChartData(
-                  minY: 0, maxY: 100,
-                  gridData: const FlGridData(show: false),
-                  borderData: FlBorderData(show: false),
-                  titlesData: const FlTitlesData(show: false),
-                  lineBarsData: [
-                    LineChartBarData(
-                      spots: spots,
-                      isCurved: true,
-                      color: color,
-                      barWidth: 2,
-                      dotData: const FlDotData(show: false),
-                      belowBarData: BarAreaData(
-                        show: true,
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0)],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SeverityPoint {
-  final DateTime date;
-  final double score;
-  final String docId;
-  _SeverityPoint({required this.date, required this.score, required this.docId});
-}
-
-class _RiskPoint {
-  final DateTime date;
-  final double score;
-  _RiskPoint({required this.date, required this.score});
-}
 
 class _SquareScoreCard extends StatelessWidget {
   final String title, value, subtitle; final IconData icon; final Color color; final VoidCallback onTap;

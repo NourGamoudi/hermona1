@@ -142,7 +142,6 @@ class SmartNotificationManager {
     required String body,
     required String type,
     String? predictionId,
-    bool bypassAntiSpam = false,
   }) async {
     // Delegate to NotificationService for Idempotent Logic + Dispatch
     await _service.sendNotification(

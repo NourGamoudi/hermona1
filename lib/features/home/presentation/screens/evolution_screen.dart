@@ -1,17 +1,13 @@
-import 'dart:convert';
 import 'dart:ui';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/features/profile/presentation/cubit/trends_cubit.dart';
@@ -245,8 +241,6 @@ class _EvolutionBody extends StatelessWidget {
     if (points.length < 2) return points;
     
     final latest = points.last;
-    final targetDate = latest.date.subtract(const Duration(days: 7));
-    
     // Priority: find the point that is at least 6-8 days before latest
     for (int i = points.length - 2; i >= 0; i--) {
       final daysDiff = latest.date.difference(points[i].date).inDays;

@@ -58,10 +58,6 @@ final appRouter = GoRouter(
 
     if (!authed && !(isAuthForm || isWelcome)) return '/welcome';
     
-    // Si déjà connecté et sur une page de formulaire (login/register), on laisse passer vers home 
-    // SAUF si on est sur la page de garde (welcome) qu'on veut toujours afficher
-    if (authed && isAuthForm) return '/home';
-    
     return null;
   },
 

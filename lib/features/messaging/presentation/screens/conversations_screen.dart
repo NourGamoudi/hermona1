@@ -51,13 +51,13 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
               
               // Safety Warning
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
                 child: GlassCard(
-                  padding: EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(16),
                   child: Row(
                     children: [
-                      Icon(Iconsax.shield_tick, color: AppColors.warning, size: 20),
-                      SizedBox(width: 16),
+                      const Icon(Iconsax.shield_tick, color: AppColors.warning, size: 20),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Text(
                           l.translate('anon_warning'),

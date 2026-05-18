@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -27,6 +26,8 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
   int _currentStep = 0;
   bool loading = false;
+  bool isEditing = true;
+  bool isNewProfile = true;
 
   // Data (Storing technical KEYS)
   final TextEditingController _firstNameCtrl = TextEditingController();
@@ -61,6 +62,8 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
     super.initState();
     if (widget.initialProfile != null) {
       _populate(widget.initialProfile!);
+      isEditing = false;
+      isNewProfile = false;
     } else {
       _fetchExistingData();
     }
@@ -69,6 +72,16 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   Future<void> _fetchExistingData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+    
+    final profile = await _service.fetchUserProfile(user.uid);
+    if (profile != null && mounted) {
+      _populate(profile);
+      setState(() {
+        isEditing = false;
+        isNewProfile = false;
+      });
+      return;
+    }
     
     final snap = await FirebaseFirestore.instance.collection('public_profiles').doc(user.uid).get();
     if (snap.exists && mounted) {
@@ -179,7 +192,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
       await _service.saveUserProfile(profile);
       if (mounted) {
-        if (widget.initialProfile != null) {
+        if (!isNewProfile) {
           context.pop();
         } else {
           context.go('/daily-survey?onboarding=true');
@@ -211,8 +224,14 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
           },
         ),
         actions: [
+          if (!isEditing)
+            TextButton.icon(
+              icon: const Icon(Iconsax.edit, size: 16, color: AppColors.primary),
+              label: Text(l.translate('edit').toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+              onPressed: () => setState(() => isEditing = true),
+            ),
           Center(child: Padding(
-            padding: const EdgeInsets.only(right: 20),
+            padding: const EdgeInsets.only(right: 20, left: 10),
             child: Text('${_currentStep + 1}/5', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.primary)),
           )),
         ],
@@ -235,7 +254,8 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
               Expanded(
                 child: PageView(
                   controller: _pageController,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: isEditing ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+                  onPageChanged: (idx) => setState(() => _currentStep = idx),
                   children: [
                     _buildStep(child: _step1(l), title: l.translate('personal_profile'), sub: l.translate('onboarding_desc')),
                     _buildStep(child: _step2(l), title: l.translate('skin_type_label'), sub: l.translate('skin_type_question')),
@@ -247,11 +267,15 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 0, 24, 32),
-                child: PrimaryButton(
-                  label: _currentStep == 4 ? l.translate('finish') : l.translate('continue'),
-                  isLoading: loading,
-                  onTap: _next,
-                ),
+                child: !isEditing
+                  ? (_currentStep == 4 
+                      ? PrimaryButton(label: l.translate('close'), onTap: () => context.pop())
+                      : PrimaryButton(label: l.translate('continue'), onTap: () => _pageController.nextPage(duration: 500.ms, curve: Curves.easeOutQuart)))
+                  : PrimaryButton(
+                      label: _currentStep == 4 ? (!isNewProfile ? l.translate('save') : l.translate('finish')) : l.translate('continue'),
+                      isLoading: loading,
+                      onTap: _next,
+                    ),
               ),
             ],
           ),
@@ -271,7 +295,10 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
           const SizedBox(height: 8),
           Text(sub, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 14)).animate().fadeIn(delay: 100.ms),
           const SizedBox(height: 32),
-          child,
+          AbsorbPointer(
+            absorbing: !isEditing,
+            child: child,
+          ),
         ],
       ),
     );
@@ -284,10 +311,10 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              TextField(controller: _firstNameCtrl, decoration: InputDecoration(labelText: l.translate('first_name'), prefixIcon: const Icon(Iconsax.user, size: 20))),
+              TextField(controller: _firstNameCtrl, readOnly: !isEditing, decoration: InputDecoration(labelText: l.translate('first_name'), prefixIcon: const Icon(Iconsax.user, size: 20))),
               const SizedBox(height: 20),
               if (_pseudoCtrl.text.isEmpty)
-                TextField(controller: _pseudoCtrl, decoration: InputDecoration(labelText: l.translate('pseudonym_forum'), prefixIcon: const Icon(Iconsax.mask, size: 20)))
+                TextField(controller: _pseudoCtrl, readOnly: !isEditing, decoration: InputDecoration(labelText: l.translate('pseudonym_forum'), prefixIcon: const Icon(Iconsax.mask, size: 20)))
               else
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -307,9 +334,9 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Expanded(child: TextField(controller: _ageCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: l.translate('age_label')))),
+                  Expanded(child: TextField(controller: _ageCtrl, readOnly: !isEditing, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: l.translate('age_label')))),
                   const SizedBox(width: 20),
-                  Expanded(child: TextField(controller: _imcCtrl, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: l.translate('imc_label')))),
+                  Expanded(child: TextField(controller: _imcCtrl, readOnly: !isEditing, keyboardType: TextInputType.number, decoration: InputDecoration(labelText: l.translate('imc_label')))),
                 ],
               ),
             ],
@@ -445,6 +472,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
               padding: EdgeInsets.zero,
               child: TextField(
                 textAlign: TextAlign.center,
+                readOnly: !isEditing,
                 keyboardType: TextInputType.number,
                 decoration: InputDecoration(hintText: 'C${i+1}', border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(vertical: 12)),
                 onChanged: (v) => lastCycles[i] = int.tryParse(v) ?? 28,
@@ -572,15 +600,18 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 1.5, color: AppColors.textSecondaryDark)),
-        const SizedBox(height: 12),
-        ...optionKeys.map((key) => RadioListTile<String>(
-          title: Text(l.translate(key)),
-          value: key,
+        RadioGroup<String>(
           groupValue: current,
-          onChanged: (v) => onSel(v!),
-          activeColor: AppColors.primary,
-          contentPadding: EdgeInsets.zero,
-        )),
+          onChanged: (v) { if (v != null) onSel(v); },
+          child: Column(
+            children: optionKeys.map((key) => RadioListTile<String>(
+              title: Text(l.translate(key)),
+              value: key,
+              activeColor: AppColors.primary,
+              contentPadding: EdgeInsets.zero,
+            )).toList(),
+          ),
+        ),
       ],
     );
   }
