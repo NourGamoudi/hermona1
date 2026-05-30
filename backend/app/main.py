@@ -11,7 +11,7 @@ HERMONA HYBRID CLINICAL-ML DECISION SYSTEM:
 - API Layer: Orchestration of the clinical-to-ML pipeline.
 - Frontend Layer: Presentation and data collection.
 """
-from fastapi import FastAPI, UploadFile, File, HTTPException, Request, Depends
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import joblib
@@ -155,6 +155,7 @@ class ChatPayload(BaseModel):
     daily: Optional[Dict[str, Any]] = None
     hormonal: Optional[Dict[str, Any]] = None
     history: List[Dict[str, str]] = []
+    lang: str = "fr"
 
 @app.post("/chat")
 async def chat(body: ChatPayload, _ = Depends(verify_api_key)):
@@ -181,6 +182,7 @@ CONSIGNES :
 2. Basse TES RÉPONSES sur ces données spécifiques. Ne donne pas de conseils génériques si les données permettent de personnaliser.
 3. Si l'utilisatrice est en phase lutéale, mentionne l'impact de la progestérone sur le sébum.
 4. CLAUSE DE NON-RESPONSABILITÉ : Rappelle occasionnellement que tu es une IA et non un dermatologue.
+5. IMPORTANT : Tu dois répondre dans la langue suivante : {'Anglais' if body.lang == 'en' else 'Français'}.
 """
         
         messages = [{"role": "system", "content": system_prompt}]
@@ -208,7 +210,7 @@ CONSIGNES :
 import tempfile
 
 @app.post("/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), _ = Depends(verify_api_key)):
+async def transcribe_audio(file: UploadFile = File(...), lang: str = Form("fr"), _ = Depends(verify_api_key)):
     """
     Transcrit un fichier audio (m4a, mp3, wav, webm, ogg, mp4) en texte
     en utilisant le modèle Whisper de Groq.
@@ -235,7 +237,7 @@ async def transcribe_audio(file: UploadFile = File(...), _ = Depends(verify_api_
                 transcription = groq_client.audio.transcriptions.create(
                     model="whisper-large-v3-turbo",
                     file=(os.path.basename(tmp_path), audio_file, "audio/m4a"),
-                    language="fr",
+                    language=lang[:2],
                     response_format="text"
                 )
             text = transcription if isinstance(transcription, str) else getattr(transcription, "text", "")

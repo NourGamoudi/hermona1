@@ -80,7 +80,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final size = MediaQuery.of(context).size;
     final l = AppLocalizations.of(context);
 
-    return Scaffold(
+    return Theme(
+      data: AppTheme.light(),
+      child: Scaffold(
       body: Stack(
         children: [
           // Background Blobs
@@ -252,7 +254,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                       TextSpan(text: l.translate('i_accept')),
                                       TextSpan(
                                         text: l.translate('terms'),
-                                        style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900),
+                                        style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900),
                                         recognizer: TapGestureRecognizer()..onTap = () => context.push('/terms'),
                                       ),
                                     ],
@@ -288,7 +290,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         onTap: () => context.go('/login'),
                         child: Text(
                           l.translate('login'),
-                          style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 14),
+                          style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.w900, fontSize: 14),
                         ),
                       ),
                     ],
@@ -301,7 +303,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }
 

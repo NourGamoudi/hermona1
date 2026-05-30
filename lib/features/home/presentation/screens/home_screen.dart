@@ -38,14 +38,27 @@ class _HomeScreenState extends State<HomeScreen> {
     final uid = FirebaseAuth.instance.currentUser?.uid;
     if (uid == null) return;
     
-    // 1. Load basic user info
+    // 1. Load basic user info and local cycle status immediately
     final d = await FirebaseFirestore.instance.collection(AppConstants.colUsers).doc(uid).get();
     if (d.exists && mounted) {
-      setState(() => _firstName = d.data()?['firstName'] as String?);
+      CycleStatus? localCycle;
+      try {
+        localCycle = _cycleStatusFromProfile(d.data() ?? {});
+      } catch (e) {
+        debugPrint('Error parsing local cycle: $e');
+      }
+      
+      setState(() {
+        _firstName = d.data()?['firstName'] as String?;
+        _cycleStatus = localCycle;
+      });
     }
 
-    // 2. Load cycle status from API (Source of Truth)
-    setState(() => _loadingCycle = true);
+    // 2. Load cycle status from API (Source of Truth) in background
+    if (_cycleStatus == null) {
+      setState(() => _loadingCycle = true);
+    }
+    
     try {
       final cycleSvc = CycleApiService();
       final status = await cycleSvc.getCycleStatus();
@@ -58,21 +71,118 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     } catch (e) {
       debugPrint('Error loading cycle status: $e');
-      if (mounted) setState(() => _loadingCycle = false);
+      if (mounted) {
+        setState(() {
+          _loadingCycle = false;
+        });
+        _checkPhaseAlert();
+      }
     }
+  }
+
+  CycleStatus? _cycleStatusFromProfile(Map<String, dynamic> profile) {
+    final lastPeriodValue = profile['lastPeriodsDate'] ??
+        profile['lastPeriodDate'] ??
+        profile['last_period_date'];
+    if (lastPeriodValue == null) return null;
+
+    final lastPeriod = _parseProfileDate(lastPeriodValue);
+    if (lastPeriod == null) return null;
+
+    final durationsRaw = profile['lastCyclesDuration'] ??
+        profile['cycleDuration'] ??
+        profile['cycleLength'];
+    final durations = durationsRaw is List
+        ? durationsRaw.map((v) => _parseInt(v, 28).clamp(15, 120).toInt()).toList()
+        : <int>[_parseInt(durationsRaw, 28).clamp(15, 120).toInt()];
+    final cycleLength = durations.isEmpty
+        ? 28
+        : (durations.reduce((a, b) => a + b) / durations.length)
+            .round()
+            .clamp(15, 120)
+            .toInt();
+    final menstruationDuration =
+        _parseInt(profile['menstruationDuration'] ?? profile['periodDuration'], 5)
+            .clamp(1, 10)
+            .toInt();
+
+    final today = DateTime.now();
+    final start = DateTime(lastPeriod.year, lastPeriod.month, lastPeriod.day);
+    final current = DateTime(today.year, today.month, today.day);
+    final day = (current.difference(start).inDays % cycleLength) + 1;
+    final ovulationDay = (cycleLength - 14)
+        .clamp(menstruationDuration + 1, cycleLength)
+        .toInt();
+
+    String phase;
+    if (day <= menstruationDuration) {
+      phase = 'menstrual';
+    } else if (day < ovulationDay) {
+      phase = 'follicular';
+    } else if (day <= ovulationDay + 1) {
+      phase = 'ovulatory';
+    } else {
+      phase = 'luteal';
+    }
+
+    return CycleStatus(
+      day: day,
+      phase: phase,
+      ovulationDay: ovulationDay,
+      cycleLength: cycleLength,
+      menstruationDuration: menstruationDuration,
+    );
+  }
+
+  DateTime? _parseProfileDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value);
+    try {
+      return (value as dynamic).toDate();
+    } catch (_) {
+      return null;
+    }
+  }
+
+  int _parseInt(dynamic value, int fallback) {
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? fallback;
+    return fallback;
   }
 
   void _checkPhaseAlert() {
     if (_cycleStatus == null) return;
     
-    if (_cycleStatus!.phase == 'luteal') {
-      debugPrint('🔔 Phase Lutéale détectée !');
-      final l = AppLocalizations.of(context);
-      NotificationService().sendNotification(
-        title: l.translate('phase_luteal'),
-        body: l.translate('luteal_notif_body'),
-        type: 'CYCLE',
-      );
+    final l = AppLocalizations.of(context);
+    final phase = _cycleStatus!.phase;
+    
+    String title = '';
+    String body = '';
+
+    if (phase == 'menstrual') {
+      title = l.translate('phase_menstrual');
+      body = l.translate('menstrual_notif_body');
+    } else if (phase == 'follicular') {
+      title = l.translate('phase_follicular');
+      body = l.translate('follicular_notif_body');
+    } else if (phase == 'ovulatory') {
+      title = l.translate('phase_ovulatory');
+      body = l.translate('ovulatory_notif_body');
+    } else if (phase == 'luteal') {
+      title = l.translate('phase_luteal');
+      body = l.translate('luteal_notif_body');
+    }
+
+    if (title.isNotEmpty && title != 'phase_unknown') {
+      Future.delayed(const Duration(seconds: 15), () {
+        debugPrint('🔔 Phase $phase détectée (après 15 sec) !');
+        NotificationService().sendNotification(
+          title: title,
+          body: body,
+          type: 'CYCLE_ALERT_TEST',
+        );
+      });
     }
   }
 
@@ -164,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 2),
               Text(
                 '${_firstName ?? l.translate('unknown')} ✨',
-                style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900, color: const Color(0xFF2D2D2D)),
+                style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900),
               ),
             ],
           ),
@@ -321,20 +431,20 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFFE5E7EB), // Gris plus foncé / Slate grey
-          borderRadius: BorderRadius.vertical(top: Radius.circular(40)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(40)),
         ),
         padding: const EdgeInsets.fromLTRB(32, 16, 32, 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: Container(width: 45, height: 5, decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))),
+            Center(child: Container(width: 45, height: 5, decoration: BoxDecoration(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)))),
             const SizedBox(height: 24),
-            Text(l.translate('cycle_details'), style: Theme.of(context).textTheme.displaySmall?.copyWith(color: Colors.black, fontWeight: FontWeight.w900)),
+            Text(l.translate('cycle_details'), style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w900)),
             const SizedBox(height: 12),
-            Text('${l.translate('day_in_cycle')} $day • ${l.translate('average_cycle')}: $avgCycle ${l.translate('days')}', style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w900, fontSize: 15)),
+            Text('${l.translate('day_in_cycle')} $day • ${l.translate('average_cycle')}: $avgCycle ${l.translate('days')}', style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8), fontWeight: FontWeight.w900, fontSize: 15)),
             const SizedBox(height: 24),
             if (currentPhase == l.translate('phase_menstrual'))
               _buildPhaseInfo(context, l.translate('phase_menstrual'), l.translate('phase_menstrual_range'), l.translate('phase_menstrual_desc'), true, [const Color(0xFFFF2D55), const Color(0xFFFF5E3A)]),
@@ -353,6 +463,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPhaseInfo(BuildContext context, String title, String days, String desc, bool isCur, List<Color> colors) {
     final l = AppLocalizations.of(context);
     final accentColor = colors.first;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -367,8 +478,8 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: isCur ? LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight) : null,
-            color: isCur ? null : Colors.white.withValues(alpha: 0.6),
-            border: Border.all(color: isCur ? Colors.white.withValues(alpha: 0.2) : Colors.black.withValues(alpha: 0.05)),
+            color: isCur ? null : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.white.withValues(alpha: 0.6)),
+            border: Border.all(color: isCur ? Colors.white.withValues(alpha: 0.2) : (isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.05))),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     fontWeight: FontWeight.w900, 
                     fontSize: 13, 
                     letterSpacing: 0.5,
-                    color: isCur ? Colors.white : Colors.grey.shade800
+                    color: isCur ? Colors.white : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8)
                   )
                 ),
                 const SizedBox(height: 8),
@@ -398,7 +509,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(
                     fontSize: 12, 
                     height: 1.6, 
-                    color: isCur ? Colors.white.withValues(alpha: 0.9) : Colors.grey.shade600,
+                    color: isCur ? Colors.white.withValues(alpha: 0.9) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
                     fontWeight: isCur ? FontWeight.w500 : FontWeight.normal,
                   )
                 ),
@@ -600,7 +711,7 @@ class _HeaderAction extends StatelessWidget {
   const _HeaderAction({required this.icon, required this.onTap});
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withValues(alpha: 0.1))), child: Icon(icon, size: 20, color: Colors.grey.shade700)));
+    return GestureDetector(onTap: onTap, child: Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), shape: BoxShape.circle, border: Border.all(color: Colors.grey.withValues(alpha: 0.1))), child: Icon(icon, size: 20, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7))));
   }
 }
 

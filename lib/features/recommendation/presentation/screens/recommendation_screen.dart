@@ -98,12 +98,13 @@ class _RecommendationScreenState extends State<RecommendationScreen>
   @override
   Widget build(BuildContext context) {
     final l = AppLocalizations.of(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
         title: Text(l.translate('recommendations_title')),
         centerTitle: true,
-        backgroundColor: Colors.white.withAlpha(180),
+        backgroundColor: isDark ? AppColors.bgDark.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.7),
         surfaceTintColor: Colors.transparent,
         flexibleSpace: ClipRRect(
           child: BackdropFilter(
@@ -121,11 +122,17 @@ class _RecommendationScreenState extends State<RecommendationScreen>
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
-              AppColors.bgLight,
-              AppColors.bgLight.withAlpha(204),
-              AppColors.surfaceLight,
-            ],
+            colors: isDark
+                ? [
+                    AppColors.bgDark,
+                    AppColors.bgDark.withValues(alpha: 0.8),
+                    AppColors.surfaceDark,
+                  ]
+                : [
+                    AppColors.bgLight,
+                    AppColors.bgLight.withValues(alpha: 0.8),
+                    AppColors.surfaceLight,
+                  ],
           ),
         ),
         child: _loading
@@ -214,7 +221,28 @@ class _RecommendationScreenState extends State<RecommendationScreen>
                   padding: const EdgeInsets.only(top: 4),
                   child: Text(
                     s.productExamples.join(', '),
-                    style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              if (s.reason.isNotEmpty && s.reason != '...')
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.psychology_alt, size: 14, color: AppColors.primary),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          l.translate(s.reason),
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
             ],
@@ -298,9 +326,9 @@ class _RecommendationScreenState extends State<RecommendationScreen>
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: Column(
           children: [
@@ -337,7 +365,7 @@ class _RecommendationScreenState extends State<RecommendationScreen>
                     ),
                   Text(
                     l.translate(step.product).toUpperCase(),
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.primary),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppColors.primary),
                   ),
                   Text('${l.translate('step_label')} ${index + 1}', style: const TextStyle(color: Colors.grey)),
                   const SizedBox(height: 24),
@@ -361,7 +389,7 @@ class _RecommendationScreenState extends State<RecommendationScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(l.translate('why_this_choice').toUpperCase(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                          Text(l.translate('why_this_choice').toUpperCase(), style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
                           const SizedBox(height: 8),
                           Text(rationale, style: const TextStyle(fontSize: 14)),
                         ],

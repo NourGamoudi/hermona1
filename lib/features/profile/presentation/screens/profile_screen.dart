@@ -215,11 +215,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l.translate('cancel'))),
           PrimaryButton(label: l.translate('apply'), width: 120, onTap: () async {
             final navigator = Navigator.of(ctx);
-            AppTheme.setPrimary(current);
+            final appState = HermonaApp.of(context);
+            appState?.setPrimaryColor(current);
             final p = await SharedPreferences.getInstance();
             await p.setInt(AppConstants.keyPrimaryColor, current.toARGB32());
             if (mounted) {
-              setState(() {});
               navigator.pop();
             }
           }),
@@ -251,7 +251,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _langTile(BuildContext context, String label, String code, bool active) {
     return ListTile(
       title: Text(label, style: TextStyle(fontWeight: active ? FontWeight.w900 : FontWeight.normal, color: active ? AppColors.primary : null)),
-      trailing: active ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+      trailing: active ? Icon(Icons.check_circle, color: AppColors.primary) : null,
       onTap: () async {
         final navigator = Navigator.of(context);
         debugPrint("DEBUG AUDIT: Switching language to $code");

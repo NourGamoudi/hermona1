@@ -388,7 +388,7 @@ class _ResultView extends StatelessWidget {
         extendBodyBehindAppBar: true,
         appBar: AppBar(
           title: Text(l.translate('hermona_report')),
-          backgroundColor: Colors.white.withAlpha(180),
+          backgroundColor: Theme.of(context).brightness == Brightness.dark ? AppColors.bgDark.withValues(alpha: 0.7) : Colors.white.withValues(alpha: 0.7),
           surfaceTintColor: Colors.transparent,
           flexibleSpace: ClipRRect(
             child: BackdropFilter(
@@ -427,11 +427,25 @@ class _ResultView extends StatelessWidget {
             ),
           ),
         ),
-        body: TabBarView(
+        body: Column(
           children: [
-            _AnalysisTab(result: result, color: color, weeklySurvey: weeklySurvey),
-            _RoutineTab(recommendation: recommendation),
-            _LifestyleTab(recommendation: recommendation),
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _AnalysisTab(result: result, color: color, weeklySurvey: weeklySurvey),
+                  _RoutineTab(recommendation: recommendation),
+                  _LifestyleTab(recommendation: recommendation),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 80.0, left: 16, right: 16, top: 8),
+              child: Text(
+                AppLocalizations.of(context).translate('medical_disclaimer'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 10, color: AppColors.textMutedPink, fontStyle: FontStyle.italic),
+              ),
+            ),
           ],
         ),
         floatingActionButton: FloatingActionButton.extended(
@@ -683,7 +697,7 @@ class _ScanIcon extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          const Icon(Iconsax.magic_star, size: 80, color: AppColors.primary),
+          Icon(Iconsax.magic_star, size: 80, color: AppColors.primary),
           Container(
             width: 120,
             height: 120,

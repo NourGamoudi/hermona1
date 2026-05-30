@@ -139,6 +139,7 @@ class NotificationService {
 
   Future<void> scheduleDailyReminder() async {
     try {
+      // Rappel du soir (20:00)
       await _plugin.zonedSchedule(
         100,
         'Bilan Quotidien',
@@ -151,6 +152,23 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexact,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'SURVEY_DAILY',
+      );
+
+      // Rappel du matin (10:00)
+      await _plugin.zonedSchedule(
+        101,
+        'Bilan Quotidien',
+        'C\'est l\'heure de votre suivi quotidien pour une belle peau !',
+        _nextInstanceOfTime(10, 0),
+        const NotificationDetails(
+          android: AndroidNotificationDetails('daily_reminder', 'Daily Reminders'),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.inexact,
+        uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.time,
+        payload: 'SURVEY_DAILY',
       );
     } catch (e) { debugPrint('Error scheduling daily reminder: $e'); }
   }
@@ -169,6 +187,7 @@ class NotificationService {
         androidScheduleMode: AndroidScheduleMode.inexact,
         uiLocalNotificationDateInterpretation: UILocalNotificationDateInterpretation.absoluteTime,
         matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+        payload: 'SURVEY_WEEKLY',
       );
     } catch (e) { debugPrint('Error scheduling weekly reminder: $e'); }
   }

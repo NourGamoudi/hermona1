@@ -8,6 +8,9 @@ import 'package:acneia/features/questionnaire/domain/entities/weekly_survey.dart
 
 import 'package:intl/intl.dart';
 
+import 'package:acneia/core/constants/app_constants.dart';
+import 'package:acneia/features/forum/data/services/forum_service.dart';
+
 class QuestionnaireService {
 
   final _db = FirebaseFirestore.instance;
@@ -30,7 +33,15 @@ class QuestionnaireService {
 
   Future<void> saveUserProfile(UserProfile profile) async {
 
-    await _db.collection('users').doc(profile.id).set(profile.toJson());
+    await _db.collection(AppConstants.colUsers).doc(profile.id).set(profile.toJson());
+    if (profile.pseudonym != null && profile.pseudonym!.isNotEmpty) {
+      await _db.collection(AppConstants.colPublicProfiles).doc(profile.id).set({
+        'uid': profile.id,
+        'pseudonym': profile.pseudonym,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      ForumService.invalidateProfile(profile.id);
+    }
 
   }
 

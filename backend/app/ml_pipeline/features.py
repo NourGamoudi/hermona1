@@ -8,10 +8,10 @@ FEATURE_NAMES = [
     'maquillage', 'hydratation_verres', 'fumeur', 'cigarettes', 'imc',
     
     # Alcool (One-Hot)
-    'alcool_jamais', 'alcool_occasionnel', 'alcool_régulier',
+    'alcool_jamais', 'alcool_occasionnel', 'alcool_rÚgulier',
     
     # Type de Peau (One-Hot)
-    'type_peau_acnéique', 'type_peau_déshydratée', 'type_peau_grasse', 'type_peau_mixte',
+    'type_peau_acnÚique', 'type_peau_dÚshydratÚe', 'type_peau_grasse', 'type_peau_mixte',
     'type_peau_normale', 'type_peau_seche', 'type_peau_sensible',
     
     # Sport (One-Hot)

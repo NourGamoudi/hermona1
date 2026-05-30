@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:ui';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:uuid/uuid.dart';
@@ -19,6 +20,7 @@ import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart'
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 import 'package:acneia/features/prediction/data/services/prediction_api_service.dart';
 import 'package:acneia/features/questionnaire/data/services/questionnaire_service.dart';
+import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -54,6 +56,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   UserProfile? _profile;
   PredictionResult? _prediction;
+  CycleStatus? _cycleStatus;
 
   List<String> get _suggestions {
     final l = AppLocalizations.of(context);
@@ -91,8 +94,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   Future<void> _initTts() async {
     try {
-      final l = AppLocalizations.of(context);
-      await _tts.setLanguage(l.locale.languageCode == 'fr' ? "fr-FR" : "en-US");
       await _tts.setSpeechRate(0.5);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
@@ -102,7 +103,9 @@ class _ChatScreenState extends State<ChatScreen> {
       _tts.setPauseHandler(() => setState(() => _isSpeaking = false));
       _tts.setErrorHandler((_) => setState(() => _isSpeaking = false));
       if (mounted) setState(() => _ttsReady = true);
-    } catch (_) {}
+    } catch (e) {
+      debugPrint("TTS Init Error: $e");
+    }
   }
 
   Future<void> _stopSpeaking() async {
@@ -117,6 +120,12 @@ class _ChatScreenState extends State<ChatScreen> {
       await _stopSpeaking();
       return;
     }
+    try {
+      final l = AppLocalizations.of(context);
+      await _tts.setLanguage(l.locale.languageCode == 'fr' ? "fr-FR" : "en-US");
+    } catch (e) {
+      debugPrint("TTS Lang Error: $e");
+    }
     await _tts.speak(text);
   }
 
@@ -129,18 +138,32 @@ class _ChatScreenState extends State<ChatScreen> {
 
     // 🔥 REAL-TIME STREAM (Stable Sync)
     _msgSub = _chatSvc.getMessagesStream(uid).listen((hist) {
-      if (mounted && hist.isNotEmpty) {
+      if (mounted) {
         setState(() {
-          if (hist.length != _msgs.where((m) => m.role != 'system').length) {
+          final localRealCount = _msgs.where((m) => m.role != 'system' && m.id != 'welcome_msg').length;
+          if (hist.length != localRealCount) {
+            final existingWelcome = _msgs.where((m) => m.id == 'welcome_msg').toList();
+            
             _msgs.clear();
             _msgs.addAll(hist);
+            
+            if (localRealCount == 0 && existingWelcome.isEmpty) {
+              _addWelcome();
+            } else if (existingWelcome.isNotEmpty) {
+              _msgs.addAll(existingWelcome);
+              _msgs.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+            }
+          } else if (hist.isEmpty && _msgs.isEmpty) {
+            _addWelcome();
           }
         });
 
-        if (widget.targetMessageId != null && !_scrolledToTarget) {
-          _scrollToTarget();
-        } else {
-          _scrollBottom();
+        if (hist.isNotEmpty || _msgs.isNotEmpty) {
+          if (widget.targetMessageId != null && !_scrolledToTarget) {
+            _scrollToTarget();
+          } else {
+            _scrollBottom();
+          }
         }
       }
     });
@@ -151,12 +174,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _predictionSvc.getHistory(uid).then((preds) {
       if (mounted && preds.isNotEmpty) setState(() => _prediction = preds.first);
     });
+    final cycleSvc = CycleApiService();
+    cycleSvc.getCycleStatus().then((status) {
+      if (mounted) setState(() => _cycleStatus = status);
+    }).catchError((e) {
+      debugPrint("Error fetching cycle status: $e");
+    });
   }
 
   void _addWelcome() {
     final l = AppLocalizations.of(context);
     setState(() => _msgs.add(ChatMessage(
-          id: _uuid.v4(),
+          id: 'welcome_msg',
           role: 'assistant',
           timestamp: DateTime.now(),
           content: l.translate('chat_welcome'),
@@ -173,12 +202,13 @@ class _ChatScreenState extends State<ChatScreen> {
   }
 
   Future<void> _stopRecording() async {
+    final l = AppLocalizations.of(context);
     final path = await _audioRecorder.stop();
     setState(() => _isRecording = false);
     if (path != null) {
       setState(() => _isTranscribing = true);
       try {
-        final text = await _chatSvc.transcribeAudio(path);
+        final text = await _chatSvc.transcribeAudio(path, lang: l.locale.languageCode);
         if (!mounted) {
           return;
         }
@@ -226,6 +256,8 @@ class _ChatScreenState extends State<ChatScreen> {
         prediction: _prediction,
         cancelToken: _cancelToken,
         history: historyToSend,
+        lang: AppLocalizations.of(context).locale.languageCode,
+        cycleStatus: _cycleStatus,
       );
 
       if (!mounted) return;
@@ -236,6 +268,7 @@ class _ChatScreenState extends State<ChatScreen> {
       _chatSvc.saveMessage(botMsg, uid);
 
       setState(() {
+        _msgs.add(botMsg);
         _loading = false;
         _typing = false;
       });
@@ -283,6 +316,14 @@ class _ChatScreenState extends State<ChatScreen> {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor.withValues(alpha: 0.85),
+        elevation: 0,
+        flexibleSpace: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
         title: FittedBox(fit: BoxFit.scaleDown, child: Text(l.translate('assistant_hermona'))),
         leadingWidth: 52,
         leading: Padding(
@@ -304,7 +345,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   width: 1,
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.arrow_back_ios_new_rounded,
                 color: AppColors.primary,
                 size: 16,
@@ -315,7 +356,7 @@ class _ChatScreenState extends State<ChatScreen> {
         actions: [
           if (_isSpeaking)
             IconButton(
-              icon: const Icon(Icons.stop_circle, color: AppColors.primary),
+              icon: Icon(Icons.stop_circle, color: AppColors.primary),
               onPressed: _stopSpeaking,
             ),
           const SizedBox(width: 8),
@@ -363,6 +404,14 @@ class _ChatScreenState extends State<ChatScreen> {
                 _buildSuggestions(),
 
               _buildInput(size),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8.0, left: 16, right: 16),
+                child: Text(
+                  l.translate('medical_disclaimer'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 10, color: AppColors.textMutedPink, fontStyle: FontStyle.italic),
+                ),
+              ),
             ],
           ),
         ],
@@ -385,7 +434,7 @@ class _ChatScreenState extends State<ChatScreen> {
           borderRadius: 50,
           child: Text(
             _suggestions[i],
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
           ),
         ),
       ),
@@ -508,7 +557,7 @@ class _ChatBubble extends StatelessWidget {
                     Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
+                      gradient: LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]),
                       borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(22),
                         topRight: Radius.circular(22),
@@ -529,10 +578,10 @@ class _ChatBubble extends StatelessWidget {
                       children: [
                         Text(
                           msg.content, 
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15, 
                             height: 1.6, 
-                            color: Colors.black87, // Force dark color for visibility on light bubble
+                            color: Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87,
                           )
                         ),
                         const SizedBox(height: 14),
@@ -547,9 +596,9 @@ class _ChatBubble extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary),
+                                Icon(Icons.volume_up_rounded, size: 14, color: AppColors.primary),
                                 const SizedBox(width: 8),
-                                Text(AppLocalizations.of(context).translate('listen'), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 1)),
+                                Text(AppLocalizations.of(context).translate('listen'), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary, letterSpacing: 1)),
                               ],
                             ),
                           ),
@@ -591,7 +640,7 @@ class _TypingIndicator extends StatelessWidget {
                 width: 6,
                 height: 6,
                 margin: const EdgeInsets.symmetric(horizontal: 2),
-                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
               ).animate(onPlay: (c) => c.repeat(reverse: true)).moveY(begin: 0, end: -5, duration: 400.ms, delay: (i * 150).ms)),
             ),
           ),

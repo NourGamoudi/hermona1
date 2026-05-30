@@ -9,10 +9,7 @@ import 'package:acneia/core/constants/app_constants.dart';
 import 'package:acneia/features/questionnaire/domain/entities/user_profile.dart';
 import 'package:acneia/features/prediction/domain/entities/prediction_result.dart';
 import 'package:acneia/features/chat/domain/repositories/chat_repository.dart';
-
-// import removed
-
-
+import 'package:acneia/features/questionnaire/data/services/cycle_api_service.dart';
 
 class ChatApiService implements ChatRepository {
 
@@ -38,6 +35,8 @@ class ChatApiService implements ChatRepository {
     UserProfile? profile,
     PredictionResult? prediction,
     CancelToken? cancelToken,
+    String? lang,
+    CycleStatus? cycleStatus,
   }) async {
 
     try {
@@ -45,6 +44,7 @@ class ChatApiService implements ChatRepository {
       // Préparer le payload attendu par le backend FastAPI
 
       final payload = {
+        "lang": lang ?? "fr",
         "message": userMessage,
         "profile": {
           "age": profile?.age ?? 25,
@@ -58,8 +58,8 @@ class ChatApiService implements ChatRepository {
           "hydratation_verres": 6, 
         },
         "hormonal": {
-          "jour_cycle": prediction?.cycleDay ?? 14,
-          "phase": prediction?.cyclePhase ?? "folliculaire",
+          "jour_cycle": cycleStatus?.day ?? prediction?.cycleDay ?? 14,
+          "phase": cycleStatus?.phase ?? prediction?.cyclePhase ?? "folliculaire",
         },
         "history": history
             .takeLast(6)
@@ -193,25 +193,15 @@ class ChatApiService implements ChatRepository {
 
 
   @override
-
-  Future<String> transcribeAudio(String path) async {
-
+  Future<String> transcribeAudio(String path, {String? lang}) async {
     try {
-
       final formData = FormData.fromMap({
-
         'file': await MultipartFile.fromFile(path, filename: 'audio.m4a'),
-
+        'lang': lang ?? 'fr',
       });
 
-      
-
-      
-
       final response = await _dio.post('/transcribe', data: formData);
-
       return response.data['text'] ?? '';
-
     } catch (e) {
 
       throw Exception('Erreur de transcription : $e');

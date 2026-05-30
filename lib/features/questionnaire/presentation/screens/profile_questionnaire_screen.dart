@@ -35,7 +35,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   final TextEditingController _imcCtrl = TextEditingController(text: '22.0');
   final TextEditingController _pseudoCtrl = TextEditingController();
   
-  String sopk = 'option_unknown'; // Keys: 'option_yes', 'option_no', 'option_unknown'
+  String sopk = 'option_no'; // Keys: 'option_yes', 'option_no'
   bool acneFamilyHistory = false;
   bool smoker = false;
   String alcohol = 'freq_never'; // Keys: 'freq_never', 'freq_occasionally', 'freq_daily'
@@ -77,8 +77,8 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
     if (profile != null && mounted) {
       _populate(profile);
       setState(() {
-        isEditing = false;
-        isNewProfile = false;
+        isNewProfile = profile.skinType.isEmpty;
+        isEditing = isNewProfile;
       });
       return;
     }
@@ -192,7 +192,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
 
       await _service.saveUserProfile(profile);
       if (mounted) {
-        if (!isNewProfile) {
+        if (context.canPop()) {
           context.pop();
         } else {
           context.go('/daily-survey?onboarding=true');
@@ -226,13 +226,13 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
         actions: [
           if (!isEditing)
             TextButton.icon(
-              icon: const Icon(Iconsax.edit, size: 16, color: AppColors.primary),
-              label: Text(l.translate('edit').toUpperCase(), style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
+              icon: Icon(Iconsax.edit, size: 16, color: AppColors.primary),
+              label: Text(l.translate('edit').toUpperCase(), style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12)),
               onPressed: () => setState(() => isEditing = true),
             ),
           Center(child: Padding(
             padding: const EdgeInsets.only(right: 20, left: 10),
-            child: Text('${_currentStep + 1}/5', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.primary)),
+            child: Text('${_currentStep + 1}/5', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.primary)),
           )),
         ],
       ),
@@ -313,24 +313,14 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
             children: [
               TextField(controller: _firstNameCtrl, readOnly: !isEditing, decoration: InputDecoration(labelText: l.translate('first_name'), prefixIcon: const Icon(Iconsax.user, size: 20))),
               const SizedBox(height: 20),
-              if (_pseudoCtrl.text.isEmpty)
-                TextField(controller: _pseudoCtrl, readOnly: !isEditing, decoration: InputDecoration(labelText: l.translate('pseudonym_forum'), prefixIcon: const Icon(Iconsax.mask, size: 20)))
-              else
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Iconsax.mask, size: 20, color: AppColors.primary),
-                      const SizedBox(width: 12),
-                      Text('${l.translate('pseudonym_forum')} : ${_pseudoCtrl.text}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                    ],
-                  ),
+              TextField(
+                controller: _pseudoCtrl,
+                readOnly: !isEditing,
+                decoration: InputDecoration(
+                  labelText: l.translate('pseudonym_forum'),
+                  prefixIcon: const Icon(Iconsax.mask, size: 20),
                 ),
+              ),
               const SizedBox(height: 20),
               Row(
                 children: [
@@ -343,7 +333,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
           ),
         ).animate().fadeIn(delay: 200.ms),
         const SizedBox(height: 32),
-        _buildChoiceSection(l.translate('pcos_question'), ['option_yes', 'option_no', 'option_unknown'], sopk, (v) => setState(() => sopk = v)),
+        _buildChoiceSection(l.translate('pcos_question'), ['option_yes', 'option_no'], sopk, (v) => setState(() => sopk = v)),
         const SizedBox(height: 20),
         _buildSwitch(l.translate('acne_family'), acneFamilyHistory, (v) => setState(() => acneFamilyHistory = v)),
         _buildSwitch(l.translate('smoker_label'), smoker, (v) => setState(() => smoker = v)),
@@ -429,7 +419,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                   decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
                   child: Row(
                     children: [
-                      const Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
+                      Icon(Iconsax.calendar, color: AppColors.primary, size: 20),
                       const SizedBox(width: 16),
                       Text(DateFormat('dd MMMM yyyy').format(lastPeriodsDate), style: const TextStyle(fontWeight: FontWeight.w700)),
                       const Spacer(),
@@ -456,7 +446,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
                 onChanged: (v) => setState(() => menstruationDuration = v.toInt()),
               ),
             ),
-            Text('$menstruationDuration', style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary)),
+            Text('$menstruationDuration', style: TextStyle(fontWeight: FontWeight.w900, color: AppColors.primary)),
             const SizedBox(width: 8),
             Text(l.translate('days_label').toLowerCase(), style: const TextStyle(fontSize: 10, color: AppColors.textSecondaryDark)),
           ],

@@ -20,11 +20,32 @@ class CycleStatus {
   factory CycleStatus.fromJson(Map<String, dynamic> json) {
     return CycleStatus(
       day: json['cycleDay'] ?? 1,
-      phase: json['cyclePhase'] ?? 'unknown',
+      phase: _normalizePhase(json['cyclePhase']),
       ovulationDay: json['ovulationDay'] ?? 14,
       cycleLength: json['cycleLength'] ?? 28,
       menstruationDuration: json['menstruationDuration'] ?? 5,
     );
+  }
+
+  static String _normalizePhase(dynamic value) {
+    final phase = (value ?? '').toString().trim().toLowerCase();
+    if (phase.contains('menstrual') || phase.contains('menstruelle')) {
+      return 'menstrual';
+    }
+    if (phase.contains('follicular') || phase.contains('folliculaire')) {
+      return 'follicular';
+    }
+    if (phase.contains('ovulatory') ||
+        phase.contains('ovulation') ||
+        phase.contains('ovulatoire')) {
+      return 'ovulatory';
+    }
+    if (phase.contains('luteal') ||
+        phase.contains('luteale') ||
+        phase.contains('lut')) {
+      return 'luteal';
+    }
+    return 'menstrual';
   }
 }
 

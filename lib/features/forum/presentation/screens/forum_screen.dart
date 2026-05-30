@@ -67,7 +67,7 @@ class _ForumScreenState extends State<ForumScreen> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Iconsax.info_circle, color: AppColors.primary), 
+            icon: Icon(Iconsax.info_circle, color: AppColors.primary), 
             onPressed: _safetyNotice
           ),
           const SizedBox(width: 8),
@@ -338,9 +338,9 @@ class _ForumCardState extends State<_ForumCard> {
                     },
                     child: Row(
                       children: [
-                        const Icon(Iconsax.send_1, size: 16, color: AppColors.primary),
+                        Icon(Iconsax.send_1, size: 16, color: AppColors.primary),
                         const SizedBox(width: 6),
-                        Text(AppLocalizations.of(context).translate('direct_label').toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                        Text(AppLocalizations.of(context).translate('direct_label').toUpperCase(), style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppColors.primary)),
                       ],
                     ),
                   ),
@@ -441,7 +441,8 @@ class _AuthorBadgeState extends State<_AuthorBadge> {
       future: _profileFuture,
       builder: (ctx, snap) {
         final data = snap.data?.data() as Map<String, dynamic>?;
-        final pseudo = data?['pseudonym'] ?? AppLocalizations.of(context).translate('anonymous');
+        final rawPseudo = data?['pseudonym'] as String?;
+        final pseudo = (rawPseudo != null && rawPseudo.trim().isNotEmpty) ? rawPseudo : AppLocalizations.of(context).translate('anonymous');
         final aIdx = data?['avatarIndex'] ?? 0;
         final avatars = ['🦋', '✨', '🌸', '💖', '🌙', '🌈'];
         final avatar = (aIdx >= 0 && aIdx < avatars.length) ? avatars[aIdx] : '🌸';

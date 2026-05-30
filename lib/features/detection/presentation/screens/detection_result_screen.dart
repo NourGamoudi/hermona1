@@ -47,7 +47,7 @@ class DetectionResultScreen extends StatelessWidget {
               const SizedBox(height: 32),
               Text(l.translate('lesion_details'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              ...result.classifications.map((c) => _buildClassificationCard(c)),
+              ...result.classifications.map((c) => _buildClassificationCard(context, c)),
               const SizedBox(height: 32),
               Text(l.translate('zone_analysis'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
@@ -130,7 +130,7 @@ class DetectionResultScreen extends StatelessWidget {
             child: Text(
               _getSeverityDescription(context, result.severityLevel),
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 13, color: Colors.black54, height: 1.4),
+              style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6), height: 1.4),
             ),
           ),
         ],
@@ -193,14 +193,16 @@ class DetectionResultScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildClassificationCard(AcneClassification c) {
+  Widget _buildClassificationCard(BuildContext context, AcneClassification c) {
     final color = _getTypeColor(c.type);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(24),
+        border: isDark ? Border.all(color: color.withValues(alpha: 0.1)) : null,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -210,26 +212,27 @@ class DetectionResultScreen extends StatelessWidget {
             children: [
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
-                child: Text(c.type, style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 12)),
+                decoration: BoxDecoration(color: isDark ? color.withValues(alpha: 0.15) : Colors.white, borderRadius: BorderRadius.circular(12)),
+                child: Text(c.type, style: TextStyle(color: isDark ? color.withValues(alpha: 0.9) : color, fontWeight: FontWeight.bold, fontSize: 12)),
               ),
               Text('${(c.percentage * 100).toInt()}%', style: TextStyle(color: color.withValues(alpha: 0.5), fontWeight: FontWeight.w900, fontSize: 18)),
             ],
           ),
           const SizedBox(height: 16),
-          Text(c.description, style: const TextStyle(fontSize: 14, color: Colors.black87, fontWeight: FontWeight.w500)),
+          Text(c.description, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFF7F2),
+              color: isDark ? Colors.white.withValues(alpha: 0.03) : const Color(0xFFFFF7F2),
               borderRadius: BorderRadius.circular(16),
+              border: isDark ? Border.all(color: Colors.white.withValues(alpha: 0.05)) : null,
             ),
             child: Row(
               children: [
                 const Icon(Icons.lightbulb_outline, color: Color(0xFFFFD700), size: 20),
                 const SizedBox(width: 12),
-                Expanded(child: Text(c.cause, style: const TextStyle(fontSize: 12, color: Color(0xFF8E6A74), height: 1.4))),
+                Expanded(child: Text(c.cause, style: TextStyle(fontSize: 12, color: isDark ? AppColors.textSecondaryDark : const Color(0xFF8E6A74), height: 1.4))),
               ],
             ),
           ),

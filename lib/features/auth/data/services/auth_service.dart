@@ -107,7 +107,7 @@ class AuthService {
     }
   }
 
-  // â”€â”€ Connexion Google â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  //  Connexion google
   Future<UserEntity> signInWithGoogle() async {
     try {
       // Forcer la déconnexion Google pour afficher systématiquement le sélecteur de compte

@@ -1,10 +1,19 @@
-import 'package:flutter/foundation.dart' show kReleaseMode;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kReleaseMode;
 
 class AppConstants {
   // ——————————————————————————————————————————————————————————————————————————————————————
-  static const String apiBaseUrl = kReleaseMode 
-      ? 'https://hermona-api.onrender.com' // PROD
-      : 'http://10.174.12.131:8000'; // DEV (Wi-Fi Machine IP)
+  static String get apiBaseUrl {
+    const overrideUrl = String.fromEnvironment('HERMONA_API_BASE_URL');
+    if (overrideUrl.isNotEmpty) return overrideUrl;
+    if (kReleaseMode) return 'https://hermona-api.onrender.com';
+
+    if (defaultTargetPlatform == TargetPlatform.android) {
+      return 'http://192.168.100.64:8000'; // DEV physical Android on same Wi-Fi
+    }
+
+    return 'http://127.0.0.1:8000'; // DEV desktop/iOS simulator
+  }
   static const String apiKey     = 'hermona_secret_2026';
 
 

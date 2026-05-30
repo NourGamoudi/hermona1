@@ -72,15 +72,15 @@ class DailySurvey {
           ? DateTime.parse(json['date']) 
           : (json['date'] as dynamic).toDate(),
 
-      stress: json['stress'] ?? 0,
+      stress: json['stress'] ?? json['stress_level'] ?? 0,
 
-      sleepDuration: (json['sleepDuration'] ?? 0).toDouble(),
+      sleepDuration: (json['sleepDuration'] ?? json['sleep_hours'] ?? 0).toDouble(),
 
-      sleepQuality: json['sleepQuality'] ?? 0,
+      sleepQuality: json['sleepQuality'] ?? json['sleep_quality'] ?? 0,
 
-      hydration: json['hydration'] ?? 0,
+      hydration: json['hydration'] ?? json['water_glasses'] ?? 0,
 
-      food: List<String>.from(json['food'] ?? []),
+      food: List<String>.from(json['food'] ?? json['diet_tags'] ?? []),
 
       symptoms: List<String>.from(json['symptoms'] ?? []),
 
@@ -105,14 +105,19 @@ class DailySurvey {
       'date': Timestamp.fromDate(date),
 
       'stress': stress,
+      'stress_level': stress,
 
       'sleepDuration': sleepDuration,
+      'sleep_hours': sleepDuration,
 
       'sleepQuality': sleepQuality,
+      'sleep_quality': sleepQuality,
 
       'hydration': hydration,
+      'water_glasses': hydration,
 
       'food': food,
+      'diet_tags': food,
 
       'symptoms': symptoms,
 

@@ -63,7 +63,9 @@ class _LoginScreenState extends State<LoginScreen> {
         child: BlocBuilder<AuthCubit, AuthState>(
           builder: (context, state) {
             final isLoading = state is AuthLoading;
-            return Scaffold(
+            return Theme(
+              data: AppTheme.light(),
+              child: Scaffold(
               body: Stack(
                 children: [
                   // ───────────────────────────────────────────────────────────
@@ -188,7 +190,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       onPressed: () => _showForgotPassword(context),
                                       child: Text(
                                         l.translate('forgot_password'),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           color: AppColors.primary,
                                           fontSize: 13,
                                           fontWeight: FontWeight.w700,
@@ -259,7 +261,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                 onTap: () => context.go('/register'),
                                 child: Text(
                                   l.translate('register'),
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w900,
                                     fontSize: 14,
@@ -274,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ],
               ),
-            );
+            ));
           },
         ),
       ),

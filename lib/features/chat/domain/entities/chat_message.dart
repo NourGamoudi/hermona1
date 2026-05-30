@@ -44,21 +44,28 @@ class ChatMessage extends Equatable {
 
 
 
-  factory ChatMessage.fromJson(Map<String, dynamic> j) => ChatMessage(
-
-    id       : j['id']        as String,
-
-    role     : j['role']      as String,
-
-    content  : j['content']   as String,
-
-    timestamp: DateTime.parse(j['timestamp'] as String),
-
-    isVoice  : j['isVoice']   as bool? ?? false,
-
-    audioUrl : j['audioUrl']  as String?,
-
-  );
+  factory ChatMessage.fromJson(Map<String, dynamic> j) {
+    DateTime ts;
+    final rawTs = j['timestamp'];
+    if (rawTs is String) {
+      ts = DateTime.tryParse(rawTs) ?? DateTime.now();
+    } else {
+      try {
+        ts = (rawTs as dynamic).toDate();
+      } catch (_) {
+        ts = DateTime.now();
+      }
+    }
+    
+    return ChatMessage(
+      id       : j['id']        as String? ?? '',
+      role     : j['role']      as String? ?? 'user',
+      content  : j['content']   as String? ?? '',
+      timestamp: ts,
+      isVoice  : j['isVoice']   as bool? ?? false,
+      audioUrl : j['audioUrl']  as String?,
+    );
+  }
 
 
 

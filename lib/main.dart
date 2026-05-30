@@ -73,6 +73,9 @@ class HermonaAppState extends State<HermonaApp> {
   }
 
   void setThemeMode(ThemeMode m) => setState(() => _mode = m);
+  void setPrimaryColor(Color c) => setState(() {
+    AppTheme.setPrimary(c);
+  });
   void setLocale(Locale l) {
     debugPrint("DEBUG AUDIT: HermonaAppState.setLocale called with ${l.languageCode}");
     setState(() => _locale = l);

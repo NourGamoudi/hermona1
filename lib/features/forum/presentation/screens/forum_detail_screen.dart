@@ -103,7 +103,8 @@ class _ForumDetailScreenState extends State<ForumDetailScreen> {
                       future: _svc.getAuthorProfile(post['authorId']),
                       builder: (ctx, uSnap) {
                         final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                        final pseudo = uData?['pseudonym'] ?? l.translate('anonymous');
+                        final rawPseudo = uData?['pseudonym'] as String?;
+                        final pseudo = (rawPseudo != null && rawPseudo.trim().isNotEmpty) ? rawPseudo : l.translate('anonymous');
                         return Text('${l.translate('by_author_label')} $pseudo', style: Theme.of(ctx).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic), overflow: TextOverflow.ellipsis);
                       },
                     ),
@@ -358,7 +359,8 @@ class _ReplyCardState extends State<_ReplyCard> {
                 future: widget.svc.getAuthorProfile(d['authorId']),
                 builder: (ctx, uSnap) {
                   final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                  final pseudo = uData?['pseudonym'] ?? AppLocalizations.of(context).translate('anonymous');
+                  final rawPseudo = uData?['pseudonym'] as String?;
+                  final pseudo = (rawPseudo != null && rawPseudo.trim().isNotEmpty) ? rawPseudo : AppLocalizations.of(context).translate('anonymous');
                   return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis);
                 },
               ),
@@ -448,7 +450,8 @@ class _ReplyCardState extends State<_ReplyCard> {
                   future: widget.svc.getAuthorProfile(nd['authorId']),
                     builder: (ctx, uSnap) {
                       final uData = uSnap.data?.data() as Map<String, dynamic>?;
-                      final pseudo = uData?['pseudonym'] ?? AppLocalizations.of(context).translate('anonymous');
+                      final rawPseudo = uData?['pseudonym'] as String?;
+                      final pseudo = (rawPseudo != null && rawPseudo.trim().isNotEmpty) ? rawPseudo : AppLocalizations.of(context).translate('anonymous');
                       return Text(pseudo, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, fontSize: 11));
                     },
                 ),

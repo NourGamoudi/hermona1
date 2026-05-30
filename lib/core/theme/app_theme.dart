@@ -11,7 +11,7 @@ import 'package:google_fonts/google_fonts.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppColors {
-  static const Color primary      = Color(0xFFFF69B4); // Hot Pink
+  static Color get primary      => AppTheme.primary;
   static const Color primaryDark  = Color(0xFFE05297);
   static const Color primaryLight = Color(0xFFFFB6C1); // Light Pink
   static const Color secondary    = Color(0xFF9B59B6); // Amethyst
@@ -53,7 +53,7 @@ class AppColors {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AppTheme {
-  static Color _primary = AppColors.primary;
+  static Color _primary = const Color(0xFFFF69B4);
 
   static void setPrimary(Color c) => _primary = c;
   static Color get primary => _primary;

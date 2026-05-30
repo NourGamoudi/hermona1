@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -156,15 +157,21 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
       
       // 1. Detection (IA Photo)
       final detectionService = DetectionApiService();
-      final detectionResult = await detectionService.analyzeImages([File(photos['face']!)]);
+      final facePhoto = File(photos['face']!);
+      if (!await facePhoto.exists()) {
+        throw Exception(l.translate('photo_required'));
+      }
+
+      final detectionResult = await detectionService.analyzeImages([facePhoto]).catchError((e) {
+        throw Exception('Analyse photo indisponible: $e');
+      });
       await detectionService.saveResult(detectionResult, user.uid);
 
       // 2. Prediction (Risque & Hygiène)
-      final predictService = PredictionApiService();
       Map<String, dynamic> answers = {
-        'spf_used': spfThisWeek != 'spf_never',
-        'cleansing': cleansingFrequency,
-        'makeup': makeupFrequency,
+        'spf': spfThisWeek != 'spf_never', // Backend expects 'spf' for protection_solaire
+        'cleansing_frequency': cleansingFrequency, // Backend expects 'cleansing_frequency'
+        'makeup': makeupFrequency != 'freq_never', // Backend expects boolean for 'makeup'
         'routine_followed': routineFollowed,
       };
 
@@ -176,28 +183,23 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
 
         if (dailySnap.docs.isNotEmpty) {
           final docs = dailySnap.docs.toList();
-          docs.sort((a, b) => (b.data()['date'] as Timestamp).compareTo(a.data()['date'] as Timestamp));
+          docs.sort((a, b) => _readDate(b.data()['date']).compareTo(_readDate(a.data()['date'])));
           final d = docs.first.data();
           answers.addAll({
-            'stress': d['stress'],
-            'sleep': d['sleepDuration'],
-            'sleep_quality': d['sleepQuality'],
-            'hydration': d['hydration'],
-            'diet': d['food'],
+            'stress': d['stress'] ?? d['stress_level'],
+            'sleep': d['sleepDuration'] ?? d['sleep_hours'],
+            'sleep_quality': d['sleepQuality'] ?? d['sleep_quality'],
+            'hydration': d['hydration'] ?? d['water_glasses'],
+            'diet': d['food'] ?? d['diet_tags'],
           });
         }
 
-        final predictionResult = await predictService.predict(answers, lang: l.locale.languageCode);
-        await predictService.saveResult(predictionResult, user.uid);
-
-        // 3. Recommendation (Routine)
-        final recommendService = RecommendationApiService();
-        final recommendation = await recommendService.getRecommendations(
-          detection: detectionResult,
+        unawaited(_refreshPredictionAndRecommendation(
+          answers: answers,
+          detectionResult: detectionResult,
           userId: user.uid,
           lang: l.locale.languageCode,
-        );
-        await recommendService.saveResult(recommendation, user.uid);
+        ));
       } catch (e) {
         debugPrint('Erreur lors de la prédiction/recommandation: $e');
       }
@@ -207,9 +209,48 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
       }
     } catch (e) {
       setState(() => error = e.toString());
-      _showError('Erreur lors de l\'analyse : $e');
+      if (e.toString().contains('Analyse photo indisponible')) {
+        _showError('Bilan hebdomadaire enregistré. Analyse photo indisponible pour le moment.');
+        if (mounted) context.go('/home');
+        return;
+      }
+      _showError('${l.translate('error_saving')} : $e');
     } finally {
       if (mounted) setState(() => loading = false);
+    }
+  }
+
+  DateTime _readDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is DateTime) return value;
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    try {
+      return (value as dynamic).toDate();
+    } catch (_) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+  }
+
+  Future<void> _refreshPredictionAndRecommendation({
+    required Map<String, dynamic> answers,
+    required dynamic detectionResult,
+    required String userId,
+    required String lang,
+  }) async {
+    try {
+      final predictService = PredictionApiService();
+      final predictionResult = await predictService.predict(answers, lang: lang);
+      await predictService.saveResult(predictionResult, userId);
+
+      final recommendService = RecommendationApiService();
+      final recommendation = await recommendService.getRecommendations(
+        detection: detectionResult,
+        userId: userId,
+        lang: lang,
+      );
+      await recommendService.saveResult(recommendation, userId);
+    } catch (e) {
+      debugPrint('Background prediction/recommendation failed: $e');
     }
   }
 

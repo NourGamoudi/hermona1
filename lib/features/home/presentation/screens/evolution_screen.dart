@@ -67,7 +67,7 @@ class EvolutionScreen extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.primary.withValues(alpha: 0.25), width: 1),
                 ),
-                child: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary, size: 18),
+                child: Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.primary, size: 18),
               ),
             ),
           ),
@@ -75,7 +75,7 @@ class EvolutionScreen extends StatelessWidget {
         body: BlocBuilder<TrendsCubit, TrendsState>(
           builder: (context, state) {
             if (state is TrendsLoading) {
-              return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+              return Center(child: CircularProgressIndicator(color: AppColors.primary));
             }
             if (state is TrendsError) {
               return Center(child: Text(state.message));
@@ -350,7 +350,7 @@ class _EvolutionBody extends StatelessWidget {
                       // GIANT SCORE
                       Text(
                         '${point.score.toStringAsFixed(1)}%',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 64,
                           fontWeight: FontWeight.w900,
                           color: AppColors.primary,

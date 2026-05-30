@@ -103,7 +103,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Iconsax.message_text, size: 48, color: AppColors.primary),
+                            Icon(Iconsax.message_text, size: 48, color: AppColors.primary),
                             const SizedBox(height: 16),
                             Text(l.translate('say_hello'), style: const TextStyle(fontWeight: FontWeight.w900, color: AppColors.textSecondaryDark)),
                           ],
@@ -157,7 +157,7 @@ class _ChatPrivateScreenState extends State<ChatPrivateScreen> {
                           width: 44,
                           height: 44,
                           margin: const EdgeInsets.only(bottom: 2),
-                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
                           child: _sending 
                               ? const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
                               : const Icon(Iconsax.send_1, color: Colors.white, size: 18),
@@ -196,7 +196,7 @@ class _MessageBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
               decoration: BoxDecoration(
-                gradient: isMe ? const LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]) : null,
+                gradient: isMe ? LinearGradient(colors: [AppColors.primary, AppColors.primaryDark]) : null,
                 color: isMe ? null : Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(20),
@@ -209,7 +209,7 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
-                  Text(content, style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 14, height: 1.4)),
+                  Text(content, style: TextStyle(color: isMe ? Colors.white : (Theme.of(context).brightness == Brightness.dark ? Colors.white : Colors.black87), fontSize: 14, height: 1.4)),
                   const SizedBox(height: 6),
                   Text(date, style: TextStyle(color: (isMe ? Colors.white : AppColors.textSecondaryDark).withValues(alpha: 0.5), fontSize: 10, fontWeight: FontWeight.bold)),
                 ],

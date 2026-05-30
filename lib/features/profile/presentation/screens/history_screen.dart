@@ -135,7 +135,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(16)),
-                        child: const Icon(Iconsax.magic_star, color: AppColors.primary, size: 24),
+                        child: Icon(Iconsax.magic_star, color: AppColors.primary, size: 24),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
@@ -202,7 +202,7 @@ class _HistoryScreenState extends State<HistoryScreen> with SingleTickerProvider
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(12)),
-                        child: const Icon(Iconsax.message_text, color: AppColors.primary, size: 20),
+                        child: Icon(Iconsax.message_text, color: AppColors.primary, size: 20),
                       ),
                       const SizedBox(width: 16),
                       Expanded(

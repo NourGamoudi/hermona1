@@ -8,7 +8,6 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/features/recommendation/domain/entities/recommendation_result.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:acneia/core/localization/app_localizations.dart';
 
 class MyRoutineScreen extends StatefulWidget {
@@ -213,20 +212,34 @@ class _MyRoutineScreenState extends State<MyRoutineScreen>
                         ),
                       ];
                     },
-                    body: TabBarView(
-                      controller: _tab,
+                    body: Column(
                       children: [
-                        _RoutineTab(
-                          steps: _result!.morningRoutine,
-                          isMorning: true,
-                          result: _result!,
+                        Expanded(
+                          child: TabBarView(
+                            controller: _tab,
+                            children: [
+                              _RoutineTab(
+                                steps: _result!.morningRoutine,
+                                isMorning: true,
+                                result: _result!,
+                              ),
+                              _RoutineTab(
+                                steps: _result!.eveningRoutine,
+                                isMorning: false,
+                                result: _result!,
+                              ),
+                              _LifestyleTab(result: _result!),
+                            ],
+                          ),
                         ),
-                        _RoutineTab(
-                          steps: _result!.eveningRoutine,
-                          isMorning: false,
-                          result: _result!,
+                        Padding(
+                          padding: const EdgeInsets.all(12.0),
+                          child: Text(
+                            AppLocalizations.of(context).translate('medical_disclaimer'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(fontSize: 10, color: AppColors.textMutedPink, fontStyle: FontStyle.italic),
+                          ),
                         ),
-                        _LifestyleTab(result: _result!),
                       ],
                     ),
                   ),
@@ -589,7 +602,7 @@ class _RoutineStepCard extends StatelessWidget {
                 Container(
                   width: 40,
                   height: 40,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [AppColors.primary, AppColors.secondary],
                     ),
@@ -647,22 +660,54 @@ class _RoutineStepCard extends StatelessWidget {
             Wrap(
               spacing: 8,
               runSpacing: 8,
-              children: step.productExamples.take(2).map((e) => Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withAlpha(12),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.primary.withAlpha(25)),
-                ),
-                child: Text(
-                  e,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
+              children: step.productExamples.take(2).map((e) => GestureDetector(
+                onTap: () => _showSpecificProductDetails(context, e, _getProductImageUrl(step.product, [e])),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withAlpha(12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.primary.withAlpha(25)),
+                  ),
+                  child: Text(
+                    e,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               )).toList(),
+            ),
+          ],
+          if (rationale != null && rationale.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withAlpha(15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withAlpha(30)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.psychology_alt, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      rationale,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.primary,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -672,120 +717,73 @@ class _RoutineStepCard extends StatelessWidget {
 }
 
   void _showProductDetails(BuildContext context, RoutineStep step, AppLocalizations l, String? rationale, int index) {
-    final imageUrl = _getProductImageUrl(step.product, step.productExamples);
-    final allEx = step.productExamples.join(' ').toLowerCase();
-    
-    String? brandLogoUrl;
-    if (allEx.contains('avene') || allEx.contains('avène')) {
-      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=eau-thermale-avene.fr&sz=128';
-    } else if (allEx.contains('la roche-posay') || allEx.contains('effaclar')) {
-      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=laroche-posay.fr&sz=128';
-    } else if (allEx.contains('cerave')) {
-      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=cerave.com&sz=128';
-    } else if (allEx.contains('bioderma') || allEx.contains('sensibio')) {
-      brandLogoUrl = 'https://www.google.com/s2/favicons?domain=bioderma.fr&sz=128';
-    }
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            // Handle bar
             Container(
               margin: const EdgeInsets.only(top: 12),
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Colors.grey[350],
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
-            Expanded(
-              child: ListView(
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.all(24),
-                children: [
-                  // Product Image
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: CachedNetworkImage(
-                      imageUrl: imageUrl,
-                      height: 200,
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Container(
-                        color: Colors.grey[100],
-                        child: const Center(child: CircularProgressIndicator()),
-                      ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                  Text(
+                    l.translate(step.product).toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primary,
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  if (brandLogoUrl != null) 
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: CachedNetworkImage(
-                        imageUrl: brandLogoUrl,
-                        height: 30,
-                        fit: BoxFit.contain,
-                        alignment: Alignment.centerLeft,
-                      ),
-                    ),
-                  // Title and Step
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              l.translate(step.product).toUpperCase(),
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.w900,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            Text(
-                              '${l.translate('step_label')} ${index + 1}',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textMutedPink,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                  Text(
+                    '${l.translate('step_label')} ${index + 1}',
+                    style: const TextStyle(color: Colors.grey),
                   ),
                   const SizedBox(height: 24),
                   // Instruction
                   _sectionTitle(l.translate('how_to_use')),
                   Text(
                     l.translate(step.instruction),
-                    style: const TextStyle(fontSize: 16, height: 1.5, color: Colors.black87),
+                    style: const TextStyle(fontSize: 16, height: 1.5),
                   ),
                   const SizedBox(height: 24),
                   // Examples
                   if (step.productExamples.isNotEmpty) ...[
                     _sectionTitle(l.translate('recommended_products')),
                     const SizedBox(height: 8),
-                    ...step.productExamples.map((e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.check_circle_outline, color: AppColors.success, size: 18),
-                          const SizedBox(width: 12),
-                          Text(e, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-                        ],
+                    ...step.productExamples.map((e) => InkWell(
+                      onTap: () => _showSpecificProductDetails(context, e, _getProductImageUrl(step.product, [e])),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.check_circle_outline, color: AppColors.success, size: 18),
+                            const SizedBox(width: 12),
+                            Expanded(child: Text(e, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
+                            const Icon(Icons.chevron_right, size: 16, color: Colors.grey),
+                          ],
+                        ),
                       ),
                     )),
                   ],
@@ -804,11 +802,11 @@ class _RoutineStepCard extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.psychology, color: AppColors.primary, size: 24),
+                              Icon(Icons.psychology, color: AppColors.primary, size: 24),
                               const SizedBox(width: 12),
                               Text(
                                 l.translate('why_this_choice').toUpperCase(),
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w900,
                                   color: AppColors.primary,
@@ -820,14 +818,15 @@ class _RoutineStepCard extends StatelessWidget {
                           const SizedBox(height: 12),
                           Text(
                             rationale,
-                            style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.black87),
+                            style: const TextStyle(fontSize: 14, height: 1.5),
                           ),
                         ],
                       ),
                     ),
                   ],
                   const SizedBox(height: 40),
-                ],
+                  ],
+                ),
               ),
             ),
           ],
@@ -888,6 +887,231 @@ class _RoutineStepCard extends StatelessWidget {
       return 'https://images.unsplash.com/photo-1631730450584-1f973ff3c393?auto=format&fit=crop&q=80&w=600';
     }
     return 'https://images.unsplash.com/photo-1556229167-da3ed2105a4d?auto=format&fit=crop&q=80&w=600';
+  }
+
+  Map<String, dynamic> _getProductMetadata(String name) {
+    final lName = name.toLowerCase();
+    
+    String type = 'Soin cible';
+    String role = 'Traitement';
+    String skinType = 'Tous types de peau';
+    String tips = 'Appliquer une noisette sur le visage';
+    String priority = 'Recommandé ⭐⭐';
+    String price = 'Budget moyen';
+
+    if (lName.contains('gel moussant') || lName.contains('effaclar') || lName.contains('cleanance')) {
+      type = 'Nettoyant Purifiant (Cleanser)';
+      role = 'Contrôle du sébum et nettoyage en profondeur';
+      skinType = 'Peau grasse, mixte, acnéique';
+      tips = 'Faire mousser sur visage humide, masser 60s, puis rincer.';
+      priority = 'Essentiel ⭐⭐⭐';
+      price = 'Budget moyen';
+    } else if (lName.contains('hydratant') || lName.contains('toleriane') || lName.contains('tolérance')) {
+      type = 'Nettoyant Doux (Cleanser)';
+      role = 'Nettoyage respectueux de la barrière cutanée';
+      skinType = 'Peau sensible, sèche, fragilisée';
+      tips = 'Masser doucement sur visage humide, rincer à l\'eau tiède.';
+      priority = 'Essentiel ⭐⭐⭐';
+      price = 'Budget moyen';
+    } else if (lName.contains('vit c') || lName.contains('ampoule [c]')) {
+      type = 'Sérum (Antioxydant)';
+      role = 'Éclat du teint et protection contre les radicaux libres';
+      skinType = 'Tous types de peau (sauf très sensible)';
+      tips = 'Appliquer le matin avant la crème hydratante et le SPF.';
+      priority = 'Optionnel ⭐';
+      price = 'Budget élevé';
+    } else if (lName.contains('niacinamide')) {
+      type = 'Sérum (Régulateur)';
+      role = 'Réduction des pores, contrôle du sébum et anti-rougeurs';
+      skinType = 'Peau mixte, grasse, à imperfections';
+      tips = 'Appliquer matin et/ou soir avant la crème hydratante.';
+      priority = 'Recommandé ⭐⭐';
+      price = (lName.contains('ordinary') || lName.contains('inkey')) ? 'Budget faible' : 'Budget moyen';
+    } else if (lName.contains('rétinol') || lName.contains('retinol')) {
+      type = 'Sérum (Renouvellement)';
+      role = 'Anti-âge, anti-marques, accélération du renouvellement cellulaire';
+      skinType = 'Peau mature, peau à marques résiduelles';
+      tips = 'Appliquer uniquement le soir. Commencer 2x/semaine. SPF obligatoire le lendemain.';
+      priority = 'Recommandé ⭐⭐';
+      price = lName.contains('ordinary') ? 'Budget faible' : 'Budget moyen';
+    } else if (lName.contains('bha') || lName.contains('salicylic')) {
+      type = 'Exfoliant Chimique (Sérum/Lotion)';
+      role = 'Désobstruction des pores, anti-points noirs, anti-inflammatoire';
+      skinType = 'Peau grasse, sujette aux points noirs';
+      tips = 'Appliquer 2 à 3 fois par semaine le soir. Ne pas mélanger avec le rétinol.';
+      priority = 'Recommandé ⭐⭐';
+      price = (lName.contains('ordinary') || lName.contains('inkey')) ? 'Budget faible' : 'Budget moyen';
+    } else if (lName.contains('mat') || lName.contains('phytosolution') || lName.contains('sebiaclear')) {
+      type = 'Crème de jour (Moisturizer)';
+      role = 'Hydratation légère et contrôle de la brillance';
+      skinType = 'Peau grasse, peau mixte';
+      tips = 'Appliquer matin et soir sur le visage propre.';
+      priority = 'Essentiel ⭐⭐⭐';
+      price = 'Budget moyen';
+    } else if (lName.contains('crème hydratante') || lName.contains('lipikar') || lName.contains('xeracalm')) {
+      type = 'Crème riche (Moisturizer)';
+      role = 'Hydratation intense et réparation barrière cutanée';
+      skinType = 'Peau sèche, très sèche, sous traitement asséchant';
+      tips = 'Appliquer généreusement matin et soir.';
+      priority = 'Essentiel ⭐⭐⭐';
+      price = 'Budget moyen';
+    } else if (lName.contains('uvmune') || lName.contains('sun oil control') || lName.contains('uv-clear') || lName.contains('anthelios')) {
+      type = 'Protection Solaire (Sunscreen)';
+      role = 'Protection UV, prévention des marques hyperpigmentées';
+      skinType = 'Tous types de peau';
+      tips = 'Appliquer 2 doigts de produit le matin en fin de routine. Renouveler en cas d\'exposition directe.';
+      priority = 'Essentiel ⭐⭐⭐';
+      price = 'Budget moyen';
+    } else if (lName.contains('take the day off') || lName.contains('squalane cleanser') || lName.contains('cleansing balm')) {
+      type = 'Baume Démaquillant (Cleanser)';
+      role = 'Démaquillage efficace, élimination du sébum et du SPF';
+      skinType = 'Tous types de peau (Double nettoyage)';
+      tips = 'Masser sur peau sèche pour dissoudre le maquillage, émulsionner à l\'eau puis rincer.';
+      priority = 'Recommandé ⭐⭐';
+      price = lName.contains('ordinary') ? 'Budget faible' : 'Budget moyen';
+    } else if (lName.contains('baume b5') || lName.contains('cicalfate') || lName.contains('bariéderm')) {
+      type = 'Baume Réparateur (Moisturizer)';
+      role = 'Cicatrisation, apaisement intense, réparation barrière cutanée';
+      skinType = 'Peau irritée, peau fragilisée (Post-traitement)';
+      tips = 'Appliquer en couche épaisse sur les zones irritées le soir.';
+      priority = 'Recommandé ⭐⭐';
+      price = 'Budget moyen';
+    }
+
+    return {
+      'name': name,
+      'type': type,
+      'role': role,
+      'skinType': skinType,
+      'tips': tips,
+      'priority': priority,
+      'price': price,
+    };
+  }
+
+  void _showSpecificProductDetails(BuildContext context, String productName, String imageUrl) {
+    final meta = _getProductMetadata(productName);
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.85,
+        ),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color ?? Theme.of(context).colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[350],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                  Text(
+                    productName,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary.withAlpha(20),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        meta['type'] as String,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.secondary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  
+                  _infoRow(Icons.api_rounded, 'Rôle du produit', meta['role'] as String),
+                  _infoRow(Icons.face_retouching_natural, 'Type de peau', meta['skinType'] as String),
+                  _infoRow(Icons.lightbulb_outline, 'Conseils d\'utilisation', meta['tips'] as String),
+                  _infoRow(Icons.star_border, 'Niveau de priorité', meta['priority'] as String),
+                  _infoRow(Icons.sell_outlined, 'Estimation de prix', meta['price'] as String),
+                  
+                  const SizedBox(height: 40),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String title, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 24),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withAlpha(15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: AppColors.primary, size: 22),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.grey,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w500,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

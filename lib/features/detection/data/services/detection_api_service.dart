@@ -153,7 +153,7 @@ class DetectionApiService implements DetectionRepository {
       'severityLevel': result.severityLevel.name,
       'classifications': result.classifications.map((c) => c.toJson()).toList(),
       'analyzedAt': result.analyzedAt.toIso8601String(),
-      'imageUrls': result.imageUrls,
+      'imageUrls': [], // DO NOT save base64 images to Firestore (causes invalid argument error > 1MB)
       'hasImages': result.imageUrls.isNotEmpty,
       'zoneCounts': result.zoneCounts,
       'zoneRisks': result.zoneRisks,

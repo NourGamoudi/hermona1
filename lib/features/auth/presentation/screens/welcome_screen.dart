@@ -6,7 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:acneia/core/services/language_service.dart';
 import 'package:acneia/core/localization/app_localizations.dart';
 import 'package:acneia/main.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:acneia/core/theme/app_theme.dart';
+
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -20,7 +21,9 @@ class WelcomeScreen extends StatelessWidget {
     // The exact vibrant pink from the screenshot
     const brandPink = Color(0xFFFFC0CB);
 
-    return Scaffold(
+    return Theme(
+      data: AppTheme.light(),
+      child: Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
@@ -159,7 +162,7 @@ class WelcomeScreen extends StatelessWidget {
           ),
         ],
       ),
-    );
+    ));
   }
 
   void _updateLang(BuildContext context, String code) async {

@@ -30,7 +30,7 @@ class NotificationScreen extends StatelessWidget {
             ],
             indicatorColor: const Color(0xFFF9A8D4), // AppTheme.primary equivalent if not using it directly
             labelColor: const Color(0xFFF9A8D4),
-            unselectedLabelColor: Colors.black,
+            unselectedLabelColor: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : Colors.black87,
           ),
         ),
         body: uid == null 
@@ -94,9 +94,9 @@ class NotificationScreen extends StatelessWidget {
           children: [
             Icon(Iconsax.notification_status, size: 80, color: AppTheme.primary.withValues(alpha: 0.5)),
             const SizedBox(height: 16),
-            Text(emptyTitle, style: const TextStyle(color: Color(0xFF4F4F4F), fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(emptyTitle, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark : const Color(0xFF4F4F4F), fontSize: 16, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(emptySub, style: const TextStyle(color: Colors.black, fontSize: 12), textAlign: TextAlign.center),
+            Text(emptySub, style: TextStyle(color: Theme.of(context).brightness == Brightness.dark ? AppColors.textSecondaryDark.withValues(alpha: 0.7) : Colors.black54, fontSize: 12), textAlign: TextAlign.center),
           ],
         ),
       );
@@ -195,19 +195,19 @@ class _NotificationCard extends StatelessWidget {
                     ),
                     Text(
                       DateFormat('HH:mm').format(timestamp),
-                      style: const TextStyle(color: Colors.black, fontSize: 10),
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5), fontSize: 10),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   data['body'] ?? '',
-                  style: const TextStyle(color: Colors.black, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8), fontSize: 12),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   DateFormat('d MMMM yyyy', AppLocalizations.of(context).locale.languageCode).format(timestamp),
-                  style: const TextStyle(color: Colors.black, fontSize: 10),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.4), fontSize: 10),
                 ),
               ],
             ),

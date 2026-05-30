@@ -1,16 +1,16 @@
 def encode_alcohol(alc_str: str) -> dict:
     alc = str(alc_str or "").lower()
-    mapping = {'alcool_jamais': 0, 'alcool_occasionnel': 0, 'alcool_régulier': 0}
+    mapping = {'alcool_jamais': 0, 'alcool_occasionnel': 0, 'alcool_rÚgulier': 0}
     if 'jamais' in alc: mapping['alcool_jamais'] = 1
     elif 'occasionnel' in alc: mapping['alcool_occasionnel'] = 1
-    elif 'régulier' in alc or 'regulier' in alc: mapping['alcool_régulier'] = 1
+    elif 'régulier' in alc or 'regulier' in alc: mapping['alcool_rÚgulier'] = 1
     else: mapping['alcool_jamais'] = 1
     return mapping
 
 def encode_skin_type(skin_str: str) -> dict:
     st = str(skin_str or "").lower()
     mapping = {
-        'type_peau_acnéique': 0, 'type_peau_déshydratée': 0, 'type_peau_grasse': 0,
+        'type_peau_acnÚique': 0, 'type_peau_dÚshydratÚe': 0, 'type_peau_grasse': 0,
         'type_peau_mixte': 0, 'type_peau_normale': 0, 'type_peau_seche': 0, 'type_peau_sensible': 0
     }
     if 'grasse' in st: mapping['type_peau_grasse'] = 1
@@ -18,8 +18,8 @@ def encode_skin_type(skin_str: str) -> dict:
     elif 'sèche' in st or 'seche' in st: mapping['type_peau_seche'] = 1
     elif 'sensible' in st: mapping['type_peau_sensible'] = 1
     elif 'normale' in st: mapping['type_peau_normale'] = 1
-    elif 'acnéique' in st or 'acneique' in st: mapping['type_peau_acnéique'] = 1
-    elif 'déshydratée' in st or 'deshydratee' in st: mapping['type_peau_déshydratée'] = 1
+    elif 'acnéique' in st or 'acneique' in st: mapping['type_peau_acnÚique'] = 1
+    elif 'déshydratée' in st or 'deshydratee' in st: mapping['type_peau_dÚshydratÚe'] = 1
     else: mapping['type_peau_mixte'] = 1
     return mapping
 
