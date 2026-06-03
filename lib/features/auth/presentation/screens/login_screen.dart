@@ -5,6 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:acneia/core/theme/app_theme.dart';
 import 'package:acneia/core/widgets/common_widgets.dart';
@@ -447,7 +448,11 @@ class _SocialButton extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.login, size: 22, color: Colors.white),
+            SvgPicture.asset(
+              'assets/images/google_logo.svg',
+              height: 24,
+              width: 24,
+            ),
             const SizedBox(width: 14),
             Text(
               label,

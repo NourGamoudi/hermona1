@@ -452,23 +452,76 @@ class _EvolutionBody extends StatelessWidget {
   }
 
   void _showRiskDetail(BuildContext context, _RiskPoint point) {
+    final l = AppLocalizations.of(context);
     final color = point.score > 0.61 ? AppColors.error : (point.score > 0.48 ? AppColors.warning : AppColors.success);
+    
     showDialog(
       context: context,
+      barrierColor: Colors.black87,
       builder: (dialogCtx) => Dialog(
         backgroundColor: Colors.transparent,
-        child: GlassCard(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text('${(point.score * 100).toInt()}%', style: TextStyle(fontSize: 56, fontWeight: FontWeight.bold, color: color)),
-              Text(AppLocalizations.of(context).translate('flare_risk'), style: const TextStyle(fontSize: 12, letterSpacing: 1.5)),
-              const SizedBox(height: 12),
-              Text(DateFormat('EEEE d MMMM yyyy', AppLocalizations.of(context).locale.languageCode).format(point.date), style: const TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
-              const SizedBox(height: 24),
-              PrimaryButton(label: AppLocalizations.of(context).translate('close'), onTap: () => Navigator.of(dialogCtx).pop()),
-            ],
+        insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Theme.of(context).brightness == Brightness.dark 
+                    ? Colors.black.withValues(alpha: 0.8) 
+                    : Colors.white.withValues(alpha: 0.9),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+              ),
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: -10,
+                    right: -10,
+                    child: IconButton(
+                      icon: const Icon(Icons.close_rounded, color: Colors.grey, size: 28),
+                      onPressed: () => Navigator.of(dialogCtx).pop(),
+                    ),
+                  ),
+
+                  Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const SizedBox(height: 20),
+                      Text(l.translate('flare_risk').toUpperCase(), 
+                          style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 2, color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      
+                      // GIANT SCORE
+                      Text(
+                        '${(point.score * 100).toInt()}%',
+                        style: TextStyle(
+                          fontSize: 64,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.primary,
+                          letterSpacing: -2,
+                        ),
+                      ),
+                      
+                      const SizedBox(height: 8),
+                      Text(
+                        DateFormat('EEEE d MMMM yyyy', l.locale.languageCode).format(point.date),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey),
+                      ),
+                      
+                      const SizedBox(height: 48),
+
+                      // CLOSE BUTTON
+                      PrimaryButton(
+                        label: l.translate('close').toUpperCase(),
+                        onTap: () => Navigator.of(dialogCtx).pop(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -479,11 +532,12 @@ class _EvolutionBody extends StatelessWidget {
 
 class _IndividualChart extends StatelessWidget {
   final List<FlSpot> spots;
-  final Color color;
+  final Color? color;
+  final List<Color>? gradientColors;
   final Map<double, String> labels;
   final Function(int) onTap;
 
-  const _IndividualChart({required this.spots, required this.color, required this.labels, required this.onTap});
+  const _IndividualChart({required this.spots, this.color, this.gradientColors, required this.labels, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -537,8 +591,29 @@ class _IndividualChart extends StatelessWidget {
         }),
         lineBarsData: [
           LineChartBarData(
-            spots: spots, isCurved: true, color: color, barWidth: 4, dotData: const FlDotData(show: true),
-            belowBarData: BarAreaData(show: true, gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [color.withValues(alpha: 0.2), color.withValues(alpha: 0)])),
+            spots: spots,
+            isCurved: true,
+            color: gradientColors != null ? null : color,
+            gradient: gradientColors != null
+                ? LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: gradientColors!,
+                    stops: const [0.2, 0.4, 0.7, 0.9],
+                  )
+                : null,
+            barWidth: 4,
+            dotData: const FlDotData(show: true),
+            belowBarData: BarAreaData(
+              show: true,
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: gradientColors != null
+                    ? gradientColors!.reversed.map((c) => c.withValues(alpha: 0.2)).toList()
+                    : [color!.withValues(alpha: 0.2), color!.withValues(alpha: 0)],
+              ),
+            ),
           ),
         ],
       ),
