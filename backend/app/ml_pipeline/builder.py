@@ -157,7 +157,7 @@ class MLFeatureBuilder:
         # 4. Categorical Encodings
         data.update(encode_alcohol(profile.get('alcohol')))
         data.update(encode_skin_type(profile.get('skinType')))
-        data.update(encode_sport(answers.get('sport', profile.get('sport'))))
+        data.update(encode_sport(answers.get('sport', profile.get('sportFreq', profile.get('sport')))))
         data.update(encode_cleansing(cleansing_freq))
         data.update(encode_hormonal_phase(cycle_phase))
         

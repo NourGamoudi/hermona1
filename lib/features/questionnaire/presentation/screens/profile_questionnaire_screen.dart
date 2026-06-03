@@ -34,11 +34,18 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   final TextEditingController _ageCtrl = TextEditingController(text: '25');
   final TextEditingController _imcCtrl = TextEditingController(text: '22.0');
   final TextEditingController _pseudoCtrl = TextEditingController();
+  final TextEditingController _cigarettesCtrl = TextEditingController(text: '0');
+  final List<TextEditingController> _cycleCtrls = [
+    TextEditingController(text: '28'),
+    TextEditingController(text: '28'),
+    TextEditingController(text: '28'),
+  ];
   
   String sopk = 'option_no'; // Keys: 'option_yes', 'option_no'
   bool acneFamilyHistory = false;
-  bool smoker = false;
+  String smokingHabit = 'freq_never';
   String alcohol = 'freq_never'; // Keys: 'freq_never', 'freq_occasionally', 'freq_daily'
+  String sportFreq = 'sport_jamais'; // Keys: 'sport_jamais', 'sport_1-2x/semaine', 'sport_3-4x/semaine'
   String skinType = 'skin_mixte'; // Keys: 'skin_grasse', 'skin_mixte', etc.
   List<String> cosmeticAllergies = []; // Keys: 'allergy_none', 'allergy_perfume', etc.
   String hormonalTreatment = 'hormonal_none'; // Keys: 'hormonal_pill', etc.
@@ -50,6 +57,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
   int menstruationDuration = 5;
 
   final List<String> alcoholOptionKeys = ['freq_never', 'freq_occasionally', 'freq_daily'];
+  final List<String> sportFreqOptionKeys = ['sport_jamais', 'sport_1-2x/semaine', 'sport_3-4x/semaine'];
   final List<String> skinTypeOptionKeys = ['skin_grasse', 'skin_mixte', 'skin_seche', 'skin_sensible', 'skin_normale', 'skin_acneique'];
   final List<String> allergiesOptionKeys = ['allergy_none', 'allergy_perfume', 'allergy_preservatives', 'allergy_alcohol', 'allergy_nickel', 'allergy_sunscreen', 'allergy_retinol', 'allergy_aha_bha'];
   final List<String> hormonalOptionKeys = ['hormonal_pill', 'hormonal_implant', 'hormonal_iud', 'hormonal_none'];
@@ -98,8 +106,10 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
     _imcCtrl.text = p.imc.toString();
     sopk = p.sopk ? 'option_yes' : 'option_no';
     acneFamilyHistory = p.acneFamilyHistory;
-    smoker = p.smoker;
+    smokingHabit = p.smoker ? (p.cigarettesPerDay > 5 ? 'freq_daily' : 'freq_occasionally') : 'freq_never';
+    _cigarettesCtrl.text = p.cigarettesPerDay.toString();
     alcohol = p.alcohol;
+    sportFreq = p.sportFreq.isEmpty ? 'sport_jamais' : p.sportFreq;
     skinType = p.skinType;
     cosmeticAllergies = List.from(p.cosmeticAllergies);
     hormonalTreatment = p.hormonalTreatment;
@@ -108,6 +118,9 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
     routineSoir = List.from(p.routineSoir);
     lastPeriodsDate = p.lastPeriodsDate;
     lastCycles = List.from(p.lastCyclesDuration);
+    for (int i = 0; i < lastCycles.length && i < 3; i++) {
+      _cycleCtrls[i].text = lastCycles[i].toString();
+    }
     menstruationDuration = p.menstruationDuration;
   }
 
@@ -174,9 +187,10 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
         imc: double.tryParse(_imcCtrl.text) ?? 22.0,
         sopk: sopk == 'option_yes',
         acneFamilyHistory: acneFamilyHistory,
-        smoker: smoker,
-        cigarettesPerDay: 0,
+        smoker: smokingHabit != 'freq_never',
+        cigarettesPerDay: smokingHabit == 'freq_never' ? 0 : (int.tryParse(_cigarettesCtrl.text) ?? 0),
         alcohol: alcohol,
+        sportFreq: sportFreq,
         skinType: skinType,
         cosmeticAllergies: cosmeticAllergies,
         hormonalTreatment: hormonalTreatment,
@@ -336,7 +350,32 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
         _buildChoiceSection(l.translate('pcos_question'), ['option_yes', 'option_no'], sopk, (v) => setState(() => sopk = v)),
         const SizedBox(height: 20),
         _buildSwitch(l.translate('acne_family'), acneFamilyHistory, (v) => setState(() => acneFamilyHistory = v)),
-        _buildSwitch(l.translate('smoker_label'), smoker, (v) => setState(() => smoker = v)),
+        const SizedBox(height: 20),
+        _buildChoiceSection(l.translate('smoker_label'), alcoholOptionKeys, smokingHabit, (v) {
+          setState(() {
+            smokingHabit = v;
+            if (v == 'freq_never') _cigarettesCtrl.text = '0';
+            else if (v == 'freq_occasionally' && _cigarettesCtrl.text == '0') _cigarettesCtrl.text = '3';
+            else if (v == 'freq_daily' && _cigarettesCtrl.text == '0') _cigarettesCtrl.text = '10';
+          });
+        }),
+        if (smokingHabit != 'freq_never') ...[
+          const SizedBox(height: 12),
+          GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: TextField(
+              controller: _cigarettesCtrl,
+              readOnly: !isEditing,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: l.translate('cigarettes_per_day_label') ?? 'Cigarettes par jour',
+                border: InputBorder.none,
+              ),
+            ),
+          ).animate().fadeIn(),
+        ],
+        const SizedBox(height: 20),
+        _buildChoiceSection(l.translate('sport_freq_question'), sportFreqOptionKeys, sportFreq, (v) => setState(() => sportFreq = v)),
       ],
     );
   }
@@ -461,6 +500,7 @@ class _ProfileQuestionnaireScreenState extends State<ProfileQuestionnaireScreen>
             child: GlassCard(
               padding: EdgeInsets.zero,
               child: TextField(
+                controller: _cycleCtrls[i],
                 textAlign: TextAlign.center,
                 readOnly: !isEditing,
                 keyboardType: TextInputType.number,

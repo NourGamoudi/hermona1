@@ -21,6 +21,7 @@ class UserProfile {
   final int menstruationDuration;
   final Map<String, String> initialPhotos;
   final String? pseudonym;
+  final String sportFreq;
 
   UserProfile({
     required this.id,
@@ -43,6 +44,7 @@ class UserProfile {
     required this.menstruationDuration,
     required this.initialPhotos,
     this.pseudonym,
+    this.sportFreq = '',
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json, String id) {
@@ -73,6 +75,7 @@ class UserProfile {
           ? Map<String, String>.from(json['initialPhotos'])
           : <String, String>{},
       pseudonym: json['pseudonym'] as String?,
+      sportFreq: json['sportFreq'] ?? '',
     );
   }
 
@@ -97,6 +100,7 @@ class UserProfile {
       'menstruationDuration': menstruationDuration,
       'initialPhotos': initialPhotos,
       'pseudonym': pseudonym,
+      'sportFreq': sportFreq,
     };
   }
 }

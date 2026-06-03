@@ -14,6 +14,13 @@ class AppLocalizations {
 
   static const _localizedValues = {
     'fr': {
+      'cigarettes_per_day_label': 'Cigarettes par jour',
+
+      'sport_freq_question': 'Fréquence de sport par semaine',
+      'sport_jamais': 'Jamais',
+      'sport_1-2x/semaine': '1-2x/semaine',
+      'sport_3-4x/semaine': '3-4x/semaine',
+
       '🚨 Alerte Risque Élevé': '🚨 Alerte Risque Élevé',
       '🚨 High Risk Alert': '🚨 Alerte Risque Élevé',
       '🔮 Risque de Poussée': '🔮 Risque de Poussée',
@@ -1006,7 +1013,7 @@ class AppLocalizations {
       'pseudonym_forum': 'Pseudonyme (Forum)',
       'pcos_question': 'Avez-vous le SOPK ?',
       'acne_family': 'Antécédents familiaux d\'acné',
-      'smoker_label': 'Fumeuse',
+      'smoker_label': 'Tabagisme',
       'skin_type_question': 'Quel est ton type de peau ?',
       'cosmetic_allergies': 'Allergies cosmétiques connues',
       'acne_treatment_question': 'Traitement acné actuel',
@@ -1936,6 +1943,13 @@ class AppLocalizations {
           'Remarque : Hermona est un assistant IA et ne remplace pas un dermatologue.',
     },
     'en': {
+      'cigarettes_per_day_label': 'Cigarettes per day',
+
+      'sport_freq_question': 'Sports frequency per week',
+      'sport_jamais': 'Never',
+      'sport_1-2x/semaine': '1-2x/week',
+      'sport_3-4x/semaine': '3-4x/week',
+
       '🚨 Alerte Risque Élevé': '🚨 High Risk Alert',
       '🚨 High Risk Alert': '🚨 High Risk Alert',
       '🔮 Risque de Poussée': '🔮 Breakout Risk',
@@ -2916,7 +2930,7 @@ class AppLocalizations {
       'pseudonym_forum': 'Pseudonym (Forum)',
       'pcos_question': 'Do you have PCOS?',
       'acne_family': 'Family history of acne',
-      'smoker_label': 'Smoker',
+      'smoker_label': 'Smoking',
       'skin_type_question': 'What is your skin type?',
       'cosmetic_allergies': 'Known cosmetic allergies',
       'acne_treatment_question': 'Current acne treatment',
