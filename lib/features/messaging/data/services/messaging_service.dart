@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:acneia/core/constants/app_constants.dart';
 
 class MessagingService {
@@ -94,12 +95,23 @@ class MessagingService {
 
       if (recipientId.isNotEmpty) {
         debugPrint('🔔 Création notification pour: $recipientId');
+        
+        // Translation for the title
+        String title = 'Nouveau message';
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          final lang = prefs.getString('selected_language') ?? 'fr';
+          if (lang == 'en') {
+            title = 'New message';
+          }
+        } catch (_) {}
+
         final notifId = _uuid.v4();
         await _db.collection(AppConstants.colNotifications).doc(notifId).set({
           'id': notifId,
           'userId': recipientId,
           'type': 'MESSAGE',
-          'title': 'Nouveau message',
+          'title': title,
           'body': preview,
           'timestamp': FieldValue.serverTimestamp(),
           'read': false,

@@ -343,24 +343,24 @@ class _PredictionScreenState extends State<PredictionScreen> {
         ),
         const SizedBox(height: 32),
         Text(
-          "Questionnaires Incomplets",
+          l.translate('incomplete_surveys_title'),
           style: Theme.of(context).textTheme.displayMedium?.copyWith(fontSize: 22),
           textAlign: TextAlign.center,
         ),
         const SizedBox(height: 16),
-        const Text(
-          "Veuillez remplir vos questionnaires pour faire un nouveau scan.",
+        Text(
+          l.translate('incomplete_surveys_desc'),
           textAlign: TextAlign.center,
-          style: TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
+          style: const TextStyle(color: AppColors.textSecondaryDark, height: 1.5),
         ),
         const SizedBox(height: 40),
         PrimaryButton(
-          label: "Bilan Quotidien",
+          label: l.translate('daily_bilan_btn'),
           onTap: () => context.push('/daily-survey'),
         ),
         const SizedBox(height: 16),
         PrimaryButton(
-          label: "Bilan Hebdomadaire",
+          label: l.translate('weekly_bilan_btn'),
           onTap: () => context.push('/weekly-survey'),
         ),
       ],

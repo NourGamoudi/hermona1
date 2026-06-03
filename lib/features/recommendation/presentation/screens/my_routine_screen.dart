@@ -555,6 +555,24 @@ class _RoutineTab extends StatelessWidget {
 }
 
 class _RoutineStepCard extends StatelessWidget {
+  String _normalizeInstruction(String instruction) {
+    final i = instruction.toLowerCase().trim();
+    if (i.contains('faire mousser')) return 'lather_wet_face';
+    if (i.contains('respectueux')) return 'respectful_cleaning';
+    if (i.contains('masser doucement') || i.contains('tiède')) return 'massage_gently_wet_face';
+    if (i.contains('avant la crème') && i.contains('spf')) return 'apply_morning_before_moisturizer';
+    if (i.contains('matin et/ou soir avant la crème')) return 'apply_morning_evening_before_moisturizer';
+    if (i.contains('uniquement le soir') || i.contains('commencer 2x/semaine')) return 'apply_evening_only_retinol';
+    if (i.contains('2 à 3 fois par semaine le soir')) return 'apply_2_3_times_evening';
+    if (i.contains('matin et soir sur le visage propre')) return 'apply_morning_evening_clean_face';
+    if (i.contains('généreusement matin et soir')) return 'apply_generously_morning_evening';
+    if (i.contains('2 doigts') || i.contains('renouveler')) return 'apply_2_fingers_morning';
+    if (i.contains('sur peau sèche pour dissoudre') || i.contains('émulsionner')) return 'massage_dry_skin_emulsify';
+    if (i.contains('couche épaisse sur les zones irritées')) return 'apply_thick_layer_irritated_areas';
+    if (i.contains('noisette')) return 'apply_small_amount';
+    return instruction;
+  }
+
   final RoutineStep step;
   final int index;
 
@@ -625,7 +643,7 @@ class _RoutineStepCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      l.translate(step.product).toUpperCase(),
+                      l.translate(_normalizeProductKey(step.product)).toUpperCase(),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
@@ -648,7 +666,7 @@ class _RoutineStepCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            l.translate(step.instruction),
+            l.translate(_normalizeInstruction(step.instruction)),
             style: const TextStyle(
               fontSize: 14,
               height: 1.4,
@@ -749,7 +767,7 @@ class _RoutineStepCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                   Text(
-                    l.translate(step.product).toUpperCase(),
+                    l.translate(_normalizeProductKey(step.product)).toUpperCase(),
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
@@ -764,7 +782,7 @@ class _RoutineStepCard extends StatelessWidget {
                   // Instruction
                   _sectionTitle(l.translate('how_to_use')),
                   Text(
-                    l.translate(step.instruction),
+                    l.translate(_normalizeInstruction(step.instruction)),
                     style: const TextStyle(fontSize: 16, height: 1.5),
                   ),
                   const SizedBox(height: 24),
@@ -889,93 +907,94 @@ class _RoutineStepCard extends StatelessWidget {
     return 'https://images.unsplash.com/photo-1556229167-da3ed2105a4d?auto=format&fit=crop&q=80&w=600';
   }
 
-  Map<String, dynamic> _getProductMetadata(String name) {
+  Map<String, dynamic> _getProductMetadata(String name, BuildContext context) {
+    final l = AppLocalizations.of(context);
     final lName = name.toLowerCase();
     
-    String type = 'Soin cible';
-    String role = 'Traitement';
-    String skinType = 'Tous types de peau';
-    String tips = 'Appliquer une noisette sur le visage';
-    String priority = 'Recommandé ⭐⭐';
-    String price = 'Budget moyen';
+    String type = l.translate('soin_cible');
+    String role = l.translate('traitement');
+    String skinType = l.translate('all_skin_types');
+    String tips = l.translate('apply_small_amount');
+    String priority = l.translate('recommended_2_star');
+    String price = l.translate('medium_budget');
 
     if (lName.contains('gel moussant') || lName.contains('effaclar') || lName.contains('cleanance')) {
-      type = 'Nettoyant Purifiant (Cleanser)';
-      role = 'Contrôle du sébum et nettoyage en profondeur';
-      skinType = 'Peau grasse, mixte, acnéique';
-      tips = 'Faire mousser sur visage humide, masser 60s, puis rincer.';
-      priority = 'Essentiel ⭐⭐⭐';
-      price = 'Budget moyen';
+      type = l.translate('cleanser_purifying');
+      role = l.translate('sebum_control_cleaning');
+      skinType = l.translate('oily_mixed_acne');
+      tips = l.translate('lather_wet_face');
+      priority = l.translate('essential_3_star');
+      price = l.translate('medium_budget');
     } else if (lName.contains('hydratant') || lName.contains('toleriane') || lName.contains('tolérance')) {
-      type = 'Nettoyant Doux (Cleanser)';
-      role = 'Nettoyage respectueux de la barrière cutanée';
-      skinType = 'Peau sensible, sèche, fragilisée';
-      tips = 'Masser doucement sur visage humide, rincer à l\'eau tiède.';
-      priority = 'Essentiel ⭐⭐⭐';
-      price = 'Budget moyen';
+      type = l.translate('cleanser_gentle');
+      role = l.translate('respectful_cleaning');
+      skinType = l.translate('sensitive_dry_fragile');
+      tips = l.translate('massage_gently_wet_face');
+      priority = l.translate('essential_3_star');
+      price = l.translate('medium_budget');
     } else if (lName.contains('vit c') || lName.contains('ampoule [c]')) {
-      type = 'Sérum (Antioxydant)';
-      role = 'Éclat du teint et protection contre les radicaux libres';
-      skinType = 'Tous types de peau (sauf très sensible)';
-      tips = 'Appliquer le matin avant la crème hydratante et le SPF.';
-      priority = 'Optionnel ⭐';
-      price = 'Budget élevé';
+      type = l.translate('serum_antioxidant');
+      role = l.translate('radiance_protection');
+      skinType = l.translate('all_skin_types_except_sensitive');
+      tips = l.translate('apply_morning_before_moisturizer');
+      priority = l.translate('optional_1_star');
+      price = l.translate('high_budget');
     } else if (lName.contains('niacinamide')) {
-      type = 'Sérum (Régulateur)';
-      role = 'Réduction des pores, contrôle du sébum et anti-rougeurs';
-      skinType = 'Peau mixte, grasse, à imperfections';
-      tips = 'Appliquer matin et/ou soir avant la crème hydratante.';
-      priority = 'Recommandé ⭐⭐';
-      price = (lName.contains('ordinary') || lName.contains('inkey')) ? 'Budget faible' : 'Budget moyen';
+      type = l.translate('serum_regulator');
+      role = l.translate('pore_reduction_sebum_control');
+      skinType = l.translate('mixed_oily_blemish');
+      tips = l.translate('apply_morning_evening_before_moisturizer');
+      priority = l.translate('recommended_2_star');
+      price = (lName.contains('ordinary') || lName.contains('inkey')) ? l.translate('low_budget') : l.translate('medium_budget');
     } else if (lName.contains('rétinol') || lName.contains('retinol')) {
-      type = 'Sérum (Renouvellement)';
-      role = 'Anti-âge, anti-marques, accélération du renouvellement cellulaire';
-      skinType = 'Peau mature, peau à marques résiduelles';
-      tips = 'Appliquer uniquement le soir. Commencer 2x/semaine. SPF obligatoire le lendemain.';
-      priority = 'Recommandé ⭐⭐';
-      price = lName.contains('ordinary') ? 'Budget faible' : 'Budget moyen';
+      type = l.translate('serum_renewal');
+      role = l.translate('anti_aging_anti_marks');
+      skinType = l.translate('mature_residual_marks');
+      tips = l.translate('apply_evening_only_retinol');
+      priority = l.translate('recommended_2_star');
+      price = lName.contains('ordinary') ? l.translate('low_budget') : l.translate('medium_budget');
     } else if (lName.contains('bha') || lName.contains('salicylic')) {
-      type = 'Exfoliant Chimique (Sérum/Lotion)';
-      role = 'Désobstruction des pores, anti-points noirs, anti-inflammatoire';
-      skinType = 'Peau grasse, sujette aux points noirs';
-      tips = 'Appliquer 2 à 3 fois par semaine le soir. Ne pas mélanger avec le rétinol.';
-      priority = 'Recommandé ⭐⭐';
-      price = (lName.contains('ordinary') || lName.contains('inkey')) ? 'Budget faible' : 'Budget moyen';
+      type = l.translate('chemical_exfoliant');
+      role = l.translate('pore_unclogging_anti_blackheads');
+      skinType = l.translate('oily_blackheads');
+      tips = l.translate('apply_2_3_times_evening');
+      priority = l.translate('recommended_2_star');
+      price = (lName.contains('ordinary') || lName.contains('inkey')) ? l.translate('low_budget') : l.translate('medium_budget');
     } else if (lName.contains('mat') || lName.contains('phytosolution') || lName.contains('sebiaclear')) {
-      type = 'Crème de jour (Moisturizer)';
-      role = 'Hydratation légère et contrôle de la brillance';
-      skinType = 'Peau grasse, peau mixte';
-      tips = 'Appliquer matin et soir sur le visage propre.';
-      priority = 'Essentiel ⭐⭐⭐';
-      price = 'Budget moyen';
+      type = l.translate('day_cream');
+      role = l.translate('light_hydration_shine_control');
+      skinType = l.translate('oily_mixed');
+      tips = l.translate('apply_morning_evening_clean_face');
+      priority = l.translate('essential_3_star');
+      price = l.translate('medium_budget');
     } else if (lName.contains('crème hydratante') || lName.contains('lipikar') || lName.contains('xeracalm')) {
-      type = 'Crème riche (Moisturizer)';
-      role = 'Hydratation intense et réparation barrière cutanée';
-      skinType = 'Peau sèche, très sèche, sous traitement asséchant';
-      tips = 'Appliquer généreusement matin et soir.';
-      priority = 'Essentiel ⭐⭐⭐';
-      price = 'Budget moyen';
+      type = l.translate('rich_cream');
+      role = l.translate('intense_hydration_barrier_repair');
+      skinType = l.translate('dry_very_dry_drying_treatment');
+      tips = l.translate('apply_generously_morning_evening');
+      priority = l.translate('essential_3_star');
+      price = l.translate('medium_budget');
     } else if (lName.contains('uvmune') || lName.contains('sun oil control') || lName.contains('uv-clear') || lName.contains('anthelios')) {
-      type = 'Protection Solaire (Sunscreen)';
-      role = 'Protection UV, prévention des marques hyperpigmentées';
-      skinType = 'Tous types de peau';
-      tips = 'Appliquer 2 doigts de produit le matin en fin de routine. Renouveler en cas d\'exposition directe.';
-      priority = 'Essentiel ⭐⭐⭐';
-      price = 'Budget moyen';
+      type = l.translate('sunscreen');
+      role = l.translate('uv_protection_hyperpigmentation');
+      skinType = l.translate('all_skin_types');
+      tips = l.translate('apply_2_fingers_morning');
+      priority = l.translate('essential_3_star');
+      price = l.translate('medium_budget');
     } else if (lName.contains('take the day off') || lName.contains('squalane cleanser') || lName.contains('cleansing balm')) {
-      type = 'Baume Démaquillant (Cleanser)';
-      role = 'Démaquillage efficace, élimination du sébum et du SPF';
-      skinType = 'Tous types de peau (Double nettoyage)';
-      tips = 'Masser sur peau sèche pour dissoudre le maquillage, émulsionner à l\'eau puis rincer.';
-      priority = 'Recommandé ⭐⭐';
-      price = lName.contains('ordinary') ? 'Budget faible' : 'Budget moyen';
+      type = l.translate('cleansing_balm');
+      role = l.translate('effective_makeup_removal_sebum_spf');
+      skinType = l.translate('all_skin_types_double_cleansing');
+      tips = l.translate('massage_dry_skin_emulsify');
+      priority = l.translate('recommended_2_star');
+      price = lName.contains('ordinary') ? l.translate('low_budget') : l.translate('medium_budget');
     } else if (lName.contains('baume b5') || lName.contains('cicalfate') || lName.contains('bariéderm')) {
-      type = 'Baume Réparateur (Moisturizer)';
-      role = 'Cicatrisation, apaisement intense, réparation barrière cutanée';
-      skinType = 'Peau irritée, peau fragilisée (Post-traitement)';
-      tips = 'Appliquer en couche épaisse sur les zones irritées le soir.';
-      priority = 'Recommandé ⭐⭐';
-      price = 'Budget moyen';
+      type = l.translate('repairing_balm');
+      role = l.translate('healing_intense_soothing');
+      skinType = l.translate('irritated_fragile_post_treatment');
+      tips = l.translate('apply_thick_layer_irritated_areas');
+      priority = l.translate('recommended_2_star');
+      price = l.translate('medium_budget');
     }
 
     return {
@@ -990,7 +1009,7 @@ class _RoutineStepCard extends StatelessWidget {
   }
 
   void _showSpecificProductDetails(BuildContext context, String productName, String imageUrl) {
-    final meta = _getProductMetadata(productName);
+    final meta = _getProductMetadata(productName, context);
     
     showModalBottomSheet(
       context: context,
@@ -1116,6 +1135,18 @@ class _RoutineStepCard extends StatelessWidget {
 }
 
 class _LifestyleTab extends StatelessWidget {
+  String _normalizeLifestyle(String item) {
+    final i = item.toLowerCase();
+    if (i.contains('dormir 8h')) return 'sleep_8h';
+    if (i.contains('boire de l')) return 'drink_water';
+    if (i.contains('ne pas toucher')) return 'dont_touch_face';
+    if (i.contains('acide hyaluronique')) return 'hyaluronic_acid';
+    if (i.contains('acides forts')) return 'strong_acids';
+    if (i.contains('mode sécurité')) return 'security_mode';
+    if (i.contains('mode secours')) return 'fallback_disclaimer';
+    return item;
+  }
+
   final RecommendationResult result;
 
   const _LifestyleTab({required this.result});
@@ -1146,7 +1177,7 @@ class _LifestyleTab extends StatelessWidget {
                   const SizedBox(width: 16),
                   Expanded(
                     child: Text(
-                      AppLocalizations.of(context).translate(items[index]),
+                      AppLocalizations.of(context).translate(_normalizeLifestyle(items[index])),
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
                     ),
                   ),

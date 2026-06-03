@@ -210,7 +210,7 @@ class _WeeklyQuestionnaireScreenState extends State<WeeklyQuestionnaireScreen> {
     } catch (e) {
       setState(() => error = e.toString());
       if (e.toString().contains('Analyse photo indisponible')) {
-        _showError('Bilan hebdomadaire enregistré. Analyse photo indisponible pour le moment.');
+        _showError(l.translate('weekly_saved_no_photo'));
         if (mounted) context.go('/home');
         return;
       }

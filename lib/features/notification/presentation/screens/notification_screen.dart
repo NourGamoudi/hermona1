@@ -190,7 +190,7 @@ class _NotificationCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      data['title'] ?? 'Notification',
+                      AppLocalizations.of(context).translate(data['title'] ?? 'Notification'),
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                     ),
                     Text(
@@ -201,7 +201,7 @@ class _NotificationCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  data['body'] ?? '',
+                  AppLocalizations.of(context).translate(data['body'] ?? ''),
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.8), fontSize: 12),
                 ),
                 const SizedBox(height: 4),
